@@ -1,0 +1,215 @@
+/*
+ * styles/tokens.css — สี ฟอนต์ ขนาด (ที่เดียวที่กำหนดค่าสี)
+ * ไฟล์ CSS อื่นและ Module ใช้ var(--...) เท่านั้น ห้าม Hardcode สี
+ */
+:root {
+  /* พื้นหลังและตัวอักษร */
+  --c-bg: #f6f5f2;
+  --c-surface: #ffffff;
+  --c-surface-2: #f0eeea;
+  --c-text: #1f2328;
+  --c-text-muted: #5a6069;
+  --c-border: #dedad3;
+  --c-border-strong: #b3ada4;
+
+  /* สีหลักของเว็บ */
+  --c-primary: #8c2f5d;
+  --c-primary-strong: #6d2147;
+  --c-primary-soft: #f7e8ef;
+  --c-on-primary: #ffffff;
+  --c-focus: #8c2f5d;
+
+  /* Source ของช่อง SKU: ล็อก 0 = เทา, กรอกเอง = ฟ้า, ระบบเติม = เขียว, Clearance = ส้ม */
+  --c-src-locked-bg: #e8e9eb;
+  --c-src-locked-fg: #5f6670;
+  --c-src-locked-bd: #c4c8ce;
+  --c-src-manual-bg: #dcebff;
+  --c-src-manual-fg: #16468c;
+  --c-src-manual-bd: #5a93e3;
+  --c-src-system-bg: #def3e3;
+  --c-src-system-fg: #1c5c32;
+  --c-src-system-bd: #4fa96a;
+  --c-src-clearance-bg: #ffe7cf;
+  --c-src-clearance-fg: #873c05;
+  --c-src-clearance-bd: #e98a33;
+
+  /* สีทั่วไป: สำเร็จ = เขียว, คำเตือน = เหลือง, อันตราย/ข้อผิดพลาด = แดง (ไม่ใช่สถานะคงเหลือ — ใช้ --status-* แทน) */
+  --c-success-bg: #d9f1df;
+  --c-success-fg: #185a2d;
+  --c-success-bd: #37995a;
+  --c-warn-bg: #fff1bf;
+  --c-warn-fg: #664a00;
+  --c-warn-bd: #deb100;
+  --c-danger-bg: #fddedb;
+  --c-danger-fg: #8c1c16;
+  --c-danger-bd: #d8443a;
+
+  /* สถานะคงเหลือ (ทุกหน้า: ตาราง, Dropdown, กราฟ, รายงาน) — ขาดเป้ารุนแรงกว่าเกินเป้า
+   * จัดสรรครบ (±1 บาท) = เขียว / ขาด = แดง / เกิน = เหลือง / ยังไม่กำหนด (เป้าชั้นบนเป็น 0 หรือยังไม่มีรายการ) = เทาอ่อน */
+  --status-complete: var(--c-success-bd);
+  --status-complete-bg: var(--c-success-bg);
+  --status-complete-fg: var(--c-success-fg);
+  --status-short: var(--c-danger-bd);
+  --status-short-bg: var(--c-danger-bg);
+  --status-short-fg: var(--c-danger-fg);
+  --status-over: var(--c-warn-bd);
+  --status-over-bg: var(--c-warn-bg);
+  --status-over-fg: var(--c-warn-fg);
+  --status-empty: #c9c4bc;
+  --status-empty-bg: #f3f1ed;
+  --status-empty-fg: #6b717a;
+
+  /* Status ระดับ SKU */
+  --c-st-npd-bg: #ece3fb;
+  --c-st-npd-fg: #4a2a8c;
+  --c-st-existing-bg: #e4e9f0;
+  --c-st-existing-fg: #2e3c52;
+  --c-st-clearance-bg: var(--c-src-clearance-bg);
+  --c-st-clearance-fg: var(--c-src-clearance-fg);
+  --c-st-upcoming-bg: #ffffff;
+  --c-st-upcoming-fg: #6b717a;
+  --c-st-ended-bg: #d3d5d9;
+  --c-st-ended-fg: #3f454d;
+
+  /* ช่วงเวลา Forecast */
+  --c-win-past-bg: #d6d8dc;
+  --c-win-past-fg: #3d434c;
+  --c-win-current-bg: #3d434c;
+  --c-win-current-fg: #ffffff;
+  --c-win-locked-bg: #f7e8ef;
+  --c-win-locked-fg: #6d2147;
+  --c-win-locked-bd: #c98aa8;
+  --c-win-open-bg: #ffffff;
+  --c-win-open-fg: #1c5c32;
+  --c-win-open-bd: #4fa96a;
+
+  /* แผนราย SKU โหมดปรับแผน: Actual (ลายจาง) / ล็อก M+1–M+3 / จุด Override */
+  --c-actual-bg: #efede9;
+  --c-actual-stripe: #e0dcd5;
+  --c-actual-fg: #4a4f57;
+  --c-frozen-bg: #f7e8ef;
+  --c-frozen-fg: #6d2147;
+  --c-override: #8c2f5d;
+
+  /* Diagram หน้าแรก: Top-down / Bottom-up */
+  --c-td: #8c2f5d;
+  --c-td-soft: #f7e8ef;
+  --c-bu: #2c6e8a;
+  --c-bu-soft: #e2f0f5;
+
+  /* กราฟ */
+  --c-bar: #8c2f5d;
+  --c-bar-ghost: #cfc8bf;
+  --c-split-net: #8c2f5d;
+  --c-split-gp: #d9a7bf;
+  --c-split-vat: #cfc8bf;
+
+  /* Channel (Channel Master colorToken): --ch-1 ถึง --ch-8 Channel ใหม่ได้สีถัดไปตาม order */
+  --ch-1: #8c2f5d;
+  --ch-2: #2c6e8a;
+  --ch-3: #c2702a;
+  --ch-4: #4d7d3a;
+  --ch-5: #6a4fa0;
+  --ch-6: #b0435a;
+  --ch-7: #3f7f7a;
+  --ch-8: #8a6d1f;
+
+  /* ผู้รับผิดชอบ (แถบรายเดือน): สีอ่อนต่อคน ตามลำดับใน Sales Person Master / ว่าง = ลายเส้นทแยง */
+  --person-1: #dbe8f7;
+  --person-2: #f6e0c8;
+  --person-3: #dcefd8;
+  --person-4: #eadcf4;
+  --person-5: #f7dce4;
+  --person-6: #d6eeec;
+  --person-7: #f1ecc9;
+  --person-8: #f7e3b5;
+  --c-owner-fg: #2c3138;
+  --c-vacant-bg: #fbf3f2;
+  --c-vacant-stripe: #efc9c4;
+  --c-vacant-fg: #8c1c16;
+
+  /* สถานะ Workflow: ร่าง = เทา, รออนุมัติ = ฟ้า, อนุมัติแล้ว = เขียว, ส่งกลับแก้ = แดง, ต้องตรวจใหม่ = เหลือง */
+  --c-wf-draft-bg: #eceae6;
+  --c-wf-draft-fg: #4a4f57;
+  --c-wf-submitted-bg: #dcebff;
+  --c-wf-submitted-fg: #16468c;
+  --c-wf-approved-bg: #d9f1df;
+  --c-wf-approved-fg: #185a2d;
+  --c-wf-returned-bg: #fddedb;
+  --c-wf-returned-fg: #8c1c16;
+  --c-wf-review-bg: #fff1bf;
+  --c-wf-review-fg: #664a00;
+  --c-wf-locked-bg: #3d434c;
+  --c-wf-locked-fg: #ffffff;
+
+  /* โหมดแก้ไข: แถบด้านบน / ขอบช่องที่ยังไม่บันทึก */
+  --c-edit-bg: #fff6d6;
+  --c-edit-fg: #664a00;
+  --c-edit-bd: #deb100;
+  --c-dirty: #d98e00;
+
+  /* Tooltip รายช่อง / Popover */
+  --c-tip-bg: #1f2328;
+  --c-tip-fg: #ffffff;
+  --c-tip-muted: #b9c0c9;
+  --c-backdrop: rgba(31, 35, 40, 0.35);
+
+  /* Growth: บวก = เขียว / ลบ = แดง */
+  --c-growth-pos: var(--c-success-fg);
+  --c-growth-neg: var(--c-danger-fg);
+
+  /* Test */
+  --c-pass: var(--c-success-fg);
+  --c-pass-bg: var(--c-success-bg);
+  --c-fail: var(--c-danger-fg);
+  --c-fail-bg: var(--c-danger-bg);
+
+  --c-shadow: rgba(31, 35, 40, 0.08);
+
+  /* ตัวอักษร (ใหญ่พอสำหรับฉายบนจอประชุม) */
+  --font-sans: 'IBM Plex Sans Thai', 'Leelawadee UI', 'Tahoma', sans-serif;
+  --fs-xs: 13px;
+  --fs-sm: 15px;
+  --fs-base: 18px;
+  --fs-lg: 21px;
+  --fs-xl: 26px;
+  --fs-h1: 38px;
+  --fs-title: 26px;
+  --fs-table: 14px;
+  --fs-num: 30px;
+  --lh: 1.6;
+  --fw-medium: 500;
+  --fw-bold: 600;
+
+  /* ระยะห่างและขนาด */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --radius: 12px;
+  --radius-sm: 6px;
+  --container: 1280px;
+  --container-wide: 1760px;
+  --gutter: 24px;
+  --row-h: 36px;
+  --bar-height: 220px;
+  --header-h: 52px;
+  --side-w: 236px;
+  --side-w-collapsed: 56px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --fs-base: 16px;
+    --fs-lg: 18px;
+    --fs-xl: 21px;
+    --fs-h1: 28px;
+    --fs-title: 21px;
+    --fs-num: 24px;
+    --gutter: 16px;
+    --bar-height: 160px;
+  }
+}

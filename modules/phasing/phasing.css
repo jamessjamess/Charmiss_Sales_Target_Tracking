@@ -1,0 +1,103 @@
+/* modules/phasing/phasing.css — แถบบริบทแถวเดียว + กราฟ/ตาราง 12 เดือนที่คอลัมน์ตรงกัน
+ * ทดสอบที่ viewport 1920×937 และ 1366×625 เหมือนหน้า Top-down */
+
+/* คอลัมน์ร่วมของกราฟและตาราง: ป้ายแถว | 12 เดือน | รวม */
+.page-phasing {
+  --ph-cols: 176px repeat(12, minmax(0, 1fr)) 132px;
+  --bar-height: 160px;
+}
+@media (max-height: 760px) {
+  .page-phasing { --bar-height: 120px; }
+}
+@media (max-height: 700px) {
+  .page-phasing { --bar-height: 84px; --row-h: 30px; }
+  .page-phasing .page { padding-top: var(--sp-3); }
+  .page-phasing .page-intro { margin-bottom: var(--sp-2); }
+  .card.ph-card { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
+}
+
+.page-phasing .module-body > * + * { margin-top: var(--sp-3); }
+
+/* ---------- การ์ดกราฟ + ตาราง ---------- */
+.card.ph-card { padding: var(--sp-3) var(--sp-4); }
+.card.ph-card > * + * { margin-top: var(--sp-2); }
+.ph-chart-head { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); min-height: 26px; }
+.ph-chart-head .legend { font-size: var(--fs-xs); gap: var(--sp-3); }
+.ph-chart-head .swatch { width: 14px; height: 14px; }
+.ph-basis { background: var(--c-warn-bg); border-color: var(--c-warn-bd); color: var(--c-warn-fg); margin-right: auto; }
+
+.ph-grid { min-width: 1000px; }
+.ph-chart .bar-chart { grid-template-columns: var(--ph-cols); gap: 0; }
+.ph-chart .bar-col { padding: 0 var(--sp-1); }
+.ph-chart .bar-col:hover .bar { filter: brightness(1.15); }
+.ph-chart .bar { left: 22%; right: 22%; }
+.ph-chart .bar-ghost { left: 10%; right: 10%; }
+
+/* ตารางเรียงเป็นแถว: เดือน / ยอดขายปีก่อน / สัดส่วน / เป้าหมาย / การเติบโต / คงเหลือ */
+.ph-table {
+  display: grid;
+  grid-template-columns: var(--ph-cols);
+  grid-auto-rows: var(--row-h);
+  font-size: var(--fs-table);
+}
+.ph-cell {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-1);
+  border-bottom: 1px solid var(--c-border);
+  min-width: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ph-cell.num { justify-content: flex-end; }
+.ph-head { font-weight: var(--fw-bold); background: var(--c-surface-2); }
+.ph-label { font-weight: var(--fw-medium); color: var(--c-text-muted); white-space: normal; line-height: 1.15; flex-wrap: wrap; gap: 0 var(--sp-1); }
+.ph-label .history-tag { font-size: 10px; }
+.ph-prior { color: var(--c-text-muted); }
+.ph-total { font-weight: var(--fw-bold); background: var(--c-surface-2); border-left: 2px solid var(--c-border-strong); }
+
+/* จุดมุมช่อง = เดือนที่ต่างจากค่าตั้งต้น (Tooltip บอกค่าตั้งต้น) */
+.has-default-dot { position: relative; cursor: help; }
+.has-default-dot::after { content: ''; position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-override); }
+
+/* แถวคงเหลือ (components.remainingRow แบบ div ใน Grid) */
+.ph-table .remaining-row { display: contents; }
+.ph-table .remaining-row > * { display: flex; align-items: center; padding: 0 var(--sp-1); border-bottom: 1px solid var(--c-border); font-size: 12px; min-width: 0; }
+.ph-table .remaining-row > .rem-cell.num { justify-content: flex-end; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+.ph-table .remaining-row > .rem-label { white-space: nowrap; }
+.rem-line { display: block; }
+
+/* แถวผู้รับผิดชอบรายเดือน (คอลัมน์เดียวกับตาราง: ป้าย | 12 เดือน | รวม) — แสดงเฉพาะเมื่อมีหลายคนในปี */
+.ph-owner { display: grid; grid-template-columns: var(--ph-cols); align-items: stretch; min-height: 24px; margin-top: var(--sp-1); font-size: var(--fs-table); }
+.ph-owner .owner-seg { display: flex; align-items: center; margin: 2px 1px; }
+.ph-owner-label { border-bottom: 0; cursor: help; }
+
+/* โหมดดู: % และบาทเป็นข้อความ */
+.ph-value { font-weight: var(--fw-medium); }
+
+/* โหมดแก้ไข: ช่อง % และบาทของแต่ละเดือน (percentAmountInput.parts วางเป็นช่องของ Grid)
+ * ตัวอักษรในช่องกรอกเล็กกว่าตารางเล็กน้อย ให้ตัวเลข 7 หลักไม่ถูกตัด (ห้ามตัดตัวเลข) */
+.page-phasing { --ph-in-fs: var(--fs-table); --ph-in-pad: 2px 4px; }
+.ph-table .num-input.ph-cell { padding: 0 2px; }
+.ph-table input.num { width: 100%; min-width: 0; font-size: var(--ph-in-fs); padding: var(--ph-in-pad); height: calc(var(--row-h) - 8px); }
+.ph-table .num-suffix { display: none; }
+
+@media (min-width: 1800px) {
+  .page-phasing { --fs-table: 15px; --ph-cols: 196px repeat(12, minmax(0, 1fr)) 140px; }
+}
+/* จอไม่กว้าง (มี Side Menu): ตัวเลขเล็กลงเล็กน้อยให้ 12 เดือนพอดี */
+@media (max-width: 1799px) {
+  .page-phasing { --fs-table: 14px; --ph-cols: 160px repeat(12, minmax(0, 1fr)) 120px; --ph-in-fs: 13px; --ph-in-pad: 1px 3px; }
+}
+@media (max-width: 1599px) {
+  .page-phasing { --fs-table: 13px; --ph-cols: 150px repeat(12, minmax(0, 1fr)) 112px; --ph-in-fs: 12px; --ph-in-pad: 1px 1px; }
+  .ph-cell { padding: 0 3px; }
+}
+@media (max-width: 1439px) {
+  .page-phasing { --fs-table: 12px; --ph-cols: 132px repeat(12, minmax(0, 1fr)) 100px; --ph-in-fs: 11px; --ph-in-pad: 1px 2px; }
+  .ph-table .num-input.ph-cell { padding: 0 1px; }
+}
+/* จอแคบ: ตารางกับกราฟเลื่อนแนวนอนด้วยกันภายในการ์ด (หน้าไม่เลื่อนแนวนอน) */
+@media (max-width: 1023px) {
+  .ph-grid { min-width: 1240px; }
+}

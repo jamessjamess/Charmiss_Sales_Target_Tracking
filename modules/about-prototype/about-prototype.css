@@ -1,0 +1,27 @@
+/* modules/about-prototype/about-prototype.css — แท็บ + เนื้อหาเลื่อนภายในการ์ด (จอ ≥ 1024px หน้าสูงเท่าจอ) */
+
+.page-aboutPrototype .module-body > * + * { margin-top: var(--sp-3); }
+.card.ab-panel { padding: var(--sp-4) var(--sp-5); overflow-y: auto; }
+@media (min-width: 1024px) {
+  .page-aboutPrototype .module-body > .ab-panel { flex: 0 1 auto; min-height: 120px; }
+}
+.ab-panel h2 { font-size: var(--fs-lg); margin: 0 0 var(--sp-2); }
+.ab-list { margin: 0; padding-left: 1.4em; display: grid; gap: var(--sp-1); }
+.ab-scope { gap: var(--sp-6); }
+.ab-decisions td { vertical-align: top; padding: 5px var(--sp-2); }
+.ab-decisions td:first-child { width: 3em; }
+.ab-decisions td:nth-child(2) { width: 16em; }
+.ab-panel .callout-question { margin: 0; }
+.page-aboutPrototype .approve-box { margin-top: var(--sp-3); padding: var(--sp-3) var(--sp-5); }
+.page-aboutPrototype .approve-box h2 { font-size: var(--fs-base); margin: 0 0 var(--sp-1); }
+.page-aboutPrototype .approve-box ol { margin: 0; font-size: var(--fs-sm); }
+@media (max-height: 760px) {
+  .ab-panel { font-size: var(--fs-sm); }
+  .card.ab-panel { padding: var(--sp-3) var(--sp-4); }
+}
+
+@media print {
+  .ab-tab[hidden] { display: block !important; }
+  .ab-tab + .ab-tab { margin-top: 6mm; }
+  .card.ab-panel { overflow: visible; }
+}

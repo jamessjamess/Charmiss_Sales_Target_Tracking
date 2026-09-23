@@ -1,0 +1,204 @@
+/* modules/sku-planning/sku-planning.css — SKU Grid
+ * แถบเครื่องมือ 2 แถว (แถบบริบท + ตัวควบคุมตาราง) / 12 เดือน + รวม พอดีกว้าง (ไม่เลื่อนแนวนอน) / ห้ามตัดตัวเลขด้วย "…"
+ * หัวตาราง + แถวเป้าหมาย ติดบน / แถวรวมและแถวคงเหลือ ติดล่าง / คอลัมน์ SKU ติดซ้าย
+ * จอกว้างตั้งแต่ 1024px: หน้าไม่ยืด (body.fit-screen) กล่องตารางสูงเต็มพื้นที่ที่เหลือ ตารางเลื่อนภายในเมื่อ SKU มีมาก
+ * จอแคบกว่า 1920px Side Menu พับให้เอง (layout.js) */
+
+.page-skuPlanning {
+  --sp-owner-h: 0px;
+  --sp-head-h: 30px;
+  --sp-row-h: 32px;
+  --sp-foot-h: 30px;
+  --sp-col-sku: 250px;
+  --sp-col-sum: 112px;
+  --fs-cell: 13px;
+}
+@media (max-height: 700px) {
+  .page-skuPlanning { --sp-row-h: 28px; --sp-foot-h: 26px; --sp-head-h: 26px; }
+  .page-skuPlanning .page { padding-top: var(--sp-3); }
+  .page-skuPlanning .page-intro { margin-bottom: var(--sp-2); }
+}
+
+.page-skuPlanning .module-body > * + * { margin-top: var(--sp-2); }
+
+@media (min-width: 1024px) {
+  .page-skuPlanning .module-body > .sp-scroll { flex: 1 1 auto; min-height: 150px; }
+  .page-skuPlanning .sku-grid { height: 100%; }
+}
+
+/* ---------- แถวที่ 2: ตัวควบคุมตาราง ---------- */
+.sp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-4); }
+.sp-controls .select { font-size: var(--fs-sm); padding-top: 4px; padding-bottom: 4px; min-width: 9em; }
+.sp-controls .seg { padding: 4px var(--sp-3); }
+.sp-view { gap: var(--sp-1); }
+/* Legend ชิดขวา ถ้าที่ไม่พอขึ้นบรรทัดที่ 2 ภายในแถวเดียวกัน (ตัวอักษรเล็ก) */
+.sp-legend { flex: 1 1 0; min-width: 280px; justify-content: flex-end; font-size: var(--fs-xs); gap: 2px var(--sp-3); line-height: 1.25; }
+.sp-legend .swatch, .sp-legend-full .swatch { width: 14px; height: 14px; position: relative; }
+.sp-controls .help-btn { min-width: 24px; height: 24px; }
+.sku-grid thead .sp-sku-head { overflow: visible; }
+.sp-sku-head { display: table-cell; }
+.sp-sku-head > span { margin-right: var(--sp-2); }
+.sp-sku-head .ss-action-button, .sp-info-body .ss-action-button { padding: 1px var(--sp-2); font-size: 12px; }
+.sp-legend-full { font-size: var(--fs-xs); gap: var(--sp-1) var(--sp-3); }
+.sp-dirty-swatch { background: var(--c-surface); border: 2px solid var(--c-dirty); }
+.sp-override-swatch { background: var(--c-surface); border-color: var(--c-border-strong); }
+.sp-override-swatch .override-dot { top: 1px; right: 1px; }
+@media (max-width: 1599px) {
+  .sp-controls { gap: var(--sp-2) var(--sp-3); }
+  .sp-controls .seg { padding: 3px 10px; font-size: 13px; }
+  .sp-controls .field-label { font-size: 13px; }
+  .sp-legend { gap: 1px var(--sp-2); font-size: 11px; }
+}
+
+/* ---------- ตาราง ---------- */
+.sp-scroll { overflow: auto; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
+.sku-grid { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-cell); }
+.sku-grid.has-owner { --sp-owner-h: 24px; }
+.sku-grid col.col-sku { width: var(--sp-col-sku); }
+.sku-grid col.col-sum { width: var(--sp-col-sum); }
+.sku-grid th, .sku-grid td {
+  height: var(--sp-row-h);
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--c-border);
+  border-right: 1px solid var(--c-surface);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+}
+.sku-grid td { position: relative; }
+.sku-grid .num { text-align: right; }
+
+/* คอลัมน์ SKU ติดซ้าย */
+.sku-grid .row-head {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  white-space: normal;
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+}
+
+/* แถวผู้รับผิดชอบ (เฉพาะเมื่อมีหลายคนในปี) + หัวตาราง + แถวเป้าหมาย ติดบน */
+.sku-grid thead th, .sku-grid thead td { position: sticky; z-index: 3; }
+.sku-grid thead tr.sp-owner-row > * { top: 0; height: var(--sp-owner-h); padding: 1px 4px; font-size: 11px; background: var(--c-surface); border-bottom: 0; }
+.sku-grid thead tr.sp-owner-row > td.owner-seg { background: var(--seg, var(--c-surface-2)); box-shadow: inset 0 -2px 0 var(--c-surface), inset 2px 0 0 var(--c-surface); }
+.sku-grid thead tr.sp-owner-row > td.owner-seg.is-vacant, .sku-grid thead tr.sp-owner-row > td.owner-seg.is-resigned {
+  background: repeating-linear-gradient(135deg, var(--c-vacant-bg), var(--c-vacant-bg) 5px, var(--c-vacant-stripe) 5px, var(--c-vacant-stripe) 7px);
+}
+.sku-grid thead tr.sp-owner-row > .row-head { font-weight: var(--fw-medium); color: var(--c-text-muted); cursor: help; }
+.sku-grid thead tr.sp-head > * { top: var(--sp-owner-h); height: var(--sp-head-h); background: var(--c-surface-2); font-weight: var(--fw-bold); }
+.sku-grid thead tr.row-target > * { top: calc(var(--sp-owner-h) + var(--sp-head-h)); }
+.sku-grid thead .row-head { z-index: 4; left: 0; }
+
+.head-tag { display: block; font-size: 10px; font-weight: var(--fw-medium); color: var(--c-text-muted); line-height: 1; }
+.sku-grid thead th.head-actual { background: var(--c-actual-bg); }
+.sku-grid thead th.head-frozen { background: var(--c-frozen-bg); color: var(--c-frozen-fg); }
+
+.row-target th, .row-target td { background: var(--c-td-soft); color: var(--c-td); font-weight: var(--fw-bold); }
+.sku-grid .row-target .row-head { font-size: 12px; }
+
+/* ท้ายตาราง: ทุกแถวติดล่าง ตำแหน่งจาก --i (ลำดับนับจากล่าง) × ความสูงแถว */
+.sku-grid tfoot tr > * {
+  position: sticky;
+  bottom: calc(var(--i, 0) * var(--sp-foot-h));
+  z-index: 3;
+  height: var(--sp-foot-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.sku-grid tfoot .row-head { z-index: 4; left: 0; font-size: 12px; line-height: 1.1; }
+.sku-grid tfoot tr:first-child > * { box-shadow: inset 0 2px 0 var(--c-border-strong); }
+.row-baseline td, .row-baseline th { background: var(--c-surface-2); color: var(--c-text-muted); }
+.row-plan td, .row-plan th, .row-plan-money td, .row-plan-money th { background: var(--c-surface); font-weight: var(--fw-bold); }
+.row-plan-money td { color: var(--c-text-muted); }
+.row-series td, .row-series th { background: var(--c-st-npd-bg); color: var(--c-st-npd-fg); font-weight: var(--fw-bold); }
+.sku-grid .col-total { font-weight: var(--fw-bold); background: var(--c-surface-2); }
+
+/* แถวคงเหลือ (components.remainingRow): สีช่องตามสถานะของแต่ละเดือน ป้ายแถว = สถานะทั้งปี */
+.sku-grid .row-remaining > .rem-label { white-space: nowrap; cursor: help; text-align: left; }
+.sku-grid .row-remaining.rem-ok > .rem-label    { background: var(--status-complete-bg); }
+.sku-grid .row-remaining.rem-short > .rem-label { background: var(--status-short-bg); }
+.sku-grid .row-remaining.rem-over > .rem-label  { background: var(--status-over-bg); }
+.sku-grid .row-remaining.rem-empty > .rem-label { background: var(--status-empty-bg); }
+.sku-grid .row-remaining > td.m-ok    { background: var(--status-complete-bg); color: var(--status-complete-fg); }
+.sku-grid .row-remaining > td.m-short { background: var(--status-short-bg); color: var(--status-short-fg); }
+.sku-grid .row-remaining > td.m-over  { background: var(--status-over-bg); color: var(--status-over-fg); }
+.sku-grid .row-remaining > td.m-empty { background: var(--status-empty-bg); color: var(--status-empty-fg); }
+.sku-grid .row-remaining > td.col-total { box-shadow: inset 2px 0 0 var(--c-border-strong); }
+
+/* กลุ่ม SKU (พับได้) */
+.sku-grid .sp-group-cell { background: var(--c-surface-2); text-align: left; padding: 0; height: 26px; }
+.sp-group-toggle { position: sticky; left: 0; font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-bold); background: transparent; border: 0; padding: 2px var(--sp-3); cursor: pointer; color: var(--c-text); }
+
+/* แถวข้อความในตาราง (NPD ว่าง / SKU ของ Series ที่ยังไม่อยู่ในแผน) */
+/* ความสูงคงที่ ให้พื้นที่ส่วนเกินไปอยู่ที่แถวว่าง (sp-filler) เท่านั้น */
+.sku-grid .sp-info-cell { text-align: left; color: var(--c-text-muted); font-size: var(--fs-sm); height: var(--sp-row-h); padding: 2px var(--sp-3); }
+.sp-info-body { position: sticky; left: var(--sp-3); display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); white-space: normal; }
+.sp-info-body > span + span::before { content: '· '; }
+.sku-grid .sp-info-series .sp-info-cell { background: var(--c-st-npd-bg); color: var(--c-st-npd-fg); }
+
+/* แถวว่างรับพื้นที่ส่วนเกิน (ตารางสูงเต็มกล่อง) */
+.sku-grid tr.sp-filler > td { height: auto; padding: 0; border: 0; }
+
+/* หัวแถว SKU */
+.sku-line { display: flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; }
+.sku-name { font-weight: var(--fw-bold); }
+.sku-badges { display: inline-flex; flex-wrap: wrap; gap: 2px; }
+.sku-badges .badge { font-size: 11px; padding: 0 6px; line-height: 1.5; }
+.sp-actions { margin-left: auto; display: inline-flex; gap: 2px; }
+.sp-icon { width: 24px; height: 24px; padding: 0; line-height: 1; font-size: var(--fs-sm); }
+.sp-actions .trash-btn { min-width: 24px; height: 24px; }
+.sp-actions .trash-btn .icon { width: 14px; height: 14px; }
+.sp-start { display: flex; align-items: center; gap: var(--sp-1); font-size: 11px; font-weight: normal; color: var(--c-text-muted); margin-top: 2px; }
+.sp-start .select { font-size: 11px; padding: 0 var(--sp-4) 0 var(--sp-1); min-width: 0; }
+.row-stopped .row-head, .row-stopped td { opacity: 0.7; }
+.sp-empty { text-align: center !important; color: var(--c-text-muted); padding: var(--sp-4) !important; }
+.sku-grid td[data-cell] { cursor: default; }
+.sku-grid td[data-cell]:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+
+/* ช่องตัวเลข */
+.sku-grid input.num.cell {
+  width: 100%;
+  font-size: var(--fs-cell);
+  padding: 1px 4px;
+  height: 24px;
+  background: var(--c-surface);
+  border-color: var(--c-border-strong);
+  font-weight: var(--fw-bold);
+}
+.sku-grid td.has-promo input.num.cell { padding-left: 14px; }
+.sku-grid td.src-manual input.num.cell { border-color: var(--c-src-manual-bd); color: var(--c-src-manual-fg); }
+.sku-grid td.src-system input.num.cell { border-color: var(--c-src-system-bd); color: var(--c-src-system-fg); font-weight: var(--fw-medium); }
+.sku-grid td.src-clearance input.num.cell { border-color: var(--c-src-clearance-bd); color: var(--c-src-clearance-fg); font-weight: var(--fw-medium); }
+.sku-grid td.is-override input.num.cell { font-weight: var(--fw-bold); }
+
+.cell-actual { background: repeating-linear-gradient(135deg, var(--c-actual-bg), var(--c-actual-bg) 6px, var(--c-actual-stripe) 6px, var(--c-actual-stripe) 8px) !important; color: var(--c-actual-fg) !important; }
+.cell-frozen { background: var(--c-frozen-bg) !important; color: var(--c-frozen-fg) !important; }
+.cell-icon { font-size: 10px; margin-right: 2px; opacity: 0.8; }
+
+.override-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-override); }
+
+.promo-mark {
+  display: inline-block;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: 10px;
+  font-weight: var(--fw-bold);
+  line-height: 1.4;
+  cursor: help;
+}
+/* ป้าย P มุมบนซ้ายภายในช่องเสมอ (อยู่เหนือช่องกรอก) */
+.sku-grid td .promo-mark { position: absolute; left: 2px; top: 2px; z-index: 1; font-size: 9px; line-height: 1.3; padding: 0 2px; pointer-events: none; }
+
+@media (min-width: 1600px) {
+  .page-skuPlanning { --sp-col-sku: 270px; --fs-cell: 14px; }
+}
+@media (max-width: 1599px) {
+  .page-skuPlanning { --sp-col-sku: 230px; }
+  .sku-grid th, .sku-grid td { padding-left: 3px; padding-right: 3px; }
+}

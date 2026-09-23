@@ -1,0 +1,305 @@
+/*
+ * core/store.js — ส่งข้อมูลข้าม Module (ทางเดียวที่ Module ใช้เก็บค่า)
+ *
+ * Key ทั้งหมด (ชื่อเต็ม) — ข้อมูลแผนแยกตามปี:
+ *   app.planYear                      ปีแผนที่เลือกใน Header                         default: DEFAULT_PLAN_YEAR
+ *   plan.<ปี>.topDown                 { total, channels: [channelId], pct, units: { <channelId>: [unitId] } }
+ *                                     default: data/targets.js years.<ปี> / ไม่มี = 0 + defaultChannels/defaultUnits
+ *   plan.<ปี>.phasing.<unitId>        { monthPct: [12 สัดส่วน], edited: bool }       default: Seasonality ปีก่อนของหน่วย
+ *                                     → ไม่มี ใช้ของ Channel → ไม่มี เท่ากันทุกเดือน (calc.defaultPhasing)
+ *   plan.<ปี>.sku.<unitId>            { items: { <sku>: { startMonth, qty: [12], overrides: [12 bool], stopped } } }
+ *                                     แผนครั้งแรก (Baseline)  default: calc.defaultSkuPlan (SKU ที่ Listing และขายอยู่
+ *                                     + ค่าตั้งต้นรายช่องจาก data/plan-seeds.js)
+ *   plan.<ปี>.forecast.<unitId>       โครงเดียวกัน ใช้ในโหมดปรับแผน   default: สำเนาของ plan.<ปี>.sku.<unitId>
+ *                                     (โหมดปรับแผนเขียนที่นี่เท่านั้น ไม่เขียนทับ Baseline)
+ *   plan.<ปี>.workflow.<step>.<unitId|all>  { status, history: [{ action, by, at, note }], snapshot }
+ *                                     step = topDown (all) | phasing | sku | forecast | baseline (all)  default: ร่าง
+ *   master.products                   Product Master (ไม่แยกปี)   default: data/products.js
+ *   master.listings                   [{ sku, accountId (= unitId) }] (ไม่แยกปี)   default: data/listings.js
+ *   master.accounts / master.territories / master.salespeople / master.assignments
+ *                                     Account, เขตการขาย, Sales Person, ผู้รับผิดชอบตามช่วงเดือน (ไม่แยกปี)
+ *                                     default: data/accounts.js, territories.js, salespeople.js, assignments.js
+ *   ui.selection                      { channel, unit } ที่เลือกใน subChannelPicker (หน้า Phasing และวางแผน SKU ใช้ร่วมกัน)
+ *   ui.planMode                       'initial' สร้างแผนครั้งแรก | 'reforecast' ปรับแผน (ใช้ได้หลังล็อก Baseline)
+ *   ui.currentMonth                   เดือนปัจจุบันจำลองของปีแผน (0–11)   default: DEMO_FORECAST_MONTH
+ *   ui.productMaster.channel          Channel ที่เลือกในหน้า Product Master
+ *   ui.masterChannel                  Channel ที่เลือกในหน้า Account (หรือ 'all')
+ *   ui.role                           บทบาทจำลอง { type: 'management' | 'director' | 'sales', personId }  default: DEFAULT_ROLE
+ *   ui.sidebarCollapsed               Side Menu พับอยู่หรือไม่
+ *   ui.seriesFilter                   [Series ที่เลือก] (หน้าวางแผน SKU และ Product Master ใช้ร่วมกัน ว่าง = ทุก Series)
+ *
+ * API: get(key) / set(key, value) / remove(key) กลับไปใช้ค่าตั้งต้น / reset() ล้างทุก Key
+ *      isSet(key) / keys() / onChange(fn) / status { persistent, crossPage }
+ *      year() = ปีแผนที่เลือก / planKey('topDown') = 'plan.<ปีที่เลือก>.topDown'
+ *      master() = { products, listings, accounts, territories, salespeople, assignments } จาก master.*
+ *      data()   = SP.data ที่แทน accounts/territories/salespeople/assignments/products/listings ด้วยค่าใน master.*
+ *                 (ส่งให้ calc แทน SP.data เพื่อให้ค่าที่แก้ในหน้า Master มีผลทุกหน้า)
+ *      role() = บทบาทจำลอง / currentKey() = เดือนปัจจุบันจำลองแบบ 'YYYY-MM'
+ *      workflowStates() = { '<step>.<unitId|all>': state } ของปีที่เลือก / saveWorkflowStates(map)
+ * get() คืนสำเนาเสมอ แก้ค่าที่ได้โดยไม่ set() จะไม่มีผล
+ *
+ * เก็บค่าในหน่วยความจำ และบันทึกผ่าน adapter (ตอนนี้คือ sessionStorage)
+ * ถ้าจะเปลี่ยนไปใช้ Backend ให้เขียน adapter ใหม่ที่มี load/save/remove/clear เหมือนกัน
+ * โดยไม่ต้องแก้ Module
+ */
+(function (SP) {
+  'use strict';
+
+  var PREFIX = 'SP:';
+
+  function sessionAdapter() {
+    var ss;
+    try {
+      ss = window.sessionStorage;
+      ss.setItem(PREFIX + '__test', '1');
+      ss.removeItem(PREFIX + '__test');
+    } catch (e) {
+      return memoryAdapter();
+    }
+    function ownKeys() {
+      var out = [];
+      for (var i = 0; i < ss.length; i++) {
+        var k = ss.key(i);
+        if (k && k.indexOf(PREFIX) === 0) out.push(k);
+      }
+      return out;
+    }
+    return {
+      persistent: true,
+      load: function () {
+        var out = {};
+        ownKeys().forEach(function (k) {
+          try { out[k.slice(PREFIX.length)] = JSON.parse(ss.getItem(k)); } catch (e) { /* ข้ามค่าที่อ่านไม่ได้ */ }
+        });
+        return out;
+      },
+      save: function (key, value) { try { ss.setItem(PREFIX + key, JSON.stringify(value)); } catch (e) { /* เต็มหรือถูกปิด */ } },
+      remove: function (key) { try { ss.removeItem(PREFIX + key); } catch (e) { /* ignore */ } },
+      clear: function () { ownKeys().forEach(function (k) { try { ss.removeItem(k); } catch (e) { /* ignore */ } }); }
+    };
+  }
+
+  function memoryAdapter() {
+    return {
+      persistent: false,
+      load: function () { return {}; },
+      save: function () {},
+      remove: function () {},
+      clear: function () {}
+    };
+  }
+
+  function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+
+  var DEFAULTS = [
+    {
+      match: /^app\.planYear$/,
+      make: function () { return SP.data.settings.DEFAULT_PLAN_YEAR; }
+    },
+    {
+      match: /^plan\.(\d{4})\.topDown$/,
+      make: function (year) {
+        var d = SP.data.targets.years[year];
+        return d
+          ? { total: d.total, channels: clone(d.channels), pct: clone(d.pct), units: clone(d.units) }
+          : { total: 0, channels: clone(SP.data.targets.defaultChannels), pct: {}, units: clone(SP.data.targets.defaultUnits) };
+      }
+    },
+    {
+      match: /^plan\.(\d{4})\.phasing\.(.+)$/,
+      make: function (year, id) { return { monthPct: SP.core.calc.defaultPhasing(data(), Number(year), id), edited: false }; }
+    },
+    {
+      match: /^plan\.(\d{4})\.sku\.(.+)$/,
+      make: function (year, id) {
+        var withDefaults = !!SP.data.targets.years[year];
+        var seeds = withDefaults && SP.data.planSeeds && SP.data.planSeeds.years[year] ? SP.data.planSeeds.years[year][id] : null;
+        return SP.core.calc.defaultSkuPlan(master(), id, Number(year), withDefaults, seeds);
+      }
+    },
+    {
+      match: /^plan\.(\d{4})\.forecast\.(.+)$/,
+      make: function (year, id) { return get('plan.' + year + '.sku.' + id); }
+    },
+    {
+      match: /^plan\.(\d{4})\.workflow\.(.+)$/,
+      make: function () { return { status: 'draft', history: [] }; }
+    },
+    { match: /^master\.products$/, make: function () { return clone(SP.data.products); } },
+    { match: /^master\.listings$/, make: function () { return clone(SP.data.listings); } },
+    { match: /^master\.accounts$/, make: function () { return clone(SP.data.accounts); } },
+    { match: /^master\.territories$/, make: function () { return clone(SP.data.territories); } },
+    { match: /^master\.salespeople$/, make: function () { return clone(SP.data.salespeople); } },
+    { match: /^master\.assignments$/, make: function () { return clone(SP.data.assignments); } },
+    {
+      match: /^ui\.selection$/,
+      make: function () {
+        var id = SP.data.settings.DEFAULT_UNIT;
+        var info = SP.core.calc.unitInfo(SP.data, id);
+        return { channel: info ? info.channel.id : SP.data.channels[0].id, unit: id };
+      }
+    },
+    { match: /^ui\.planMode$/, make: function () { return 'initial'; } },
+    { match: /^ui\.currentMonth$/, make: function () { return SP.data.settings.DEMO_FORECAST_MONTH; } },
+    {
+      match: /^ui\.productMaster\.channel$/,
+      make: function () { var p = get(planKey('topDown')); return (p.channels && p.channels[0]) || SP.data.channels[0].id; }
+    },
+    { match: /^ui\.masterChannel$/, make: function () { return 'all'; } },
+    { match: /^ui\.role$/, make: function () { return { type: SP.data.settings.DEFAULT_ROLE, personId: null }; } },
+    { match: /^ui\.sidebarCollapsed$/, make: function () { return false; } },
+    { match: /^ui\.seriesFilter$/, make: function () { return []; } }
+  ];
+
+  function defaultFor(key) {
+    for (var i = 0; i < DEFAULTS.length; i++) {
+      var m = DEFAULTS[i].match.exec(key);
+      if (m) return DEFAULTS[i].make.apply(null, m.slice(1));
+    }
+    return undefined;
+  }
+
+  var adapter = sessionAdapter();
+  var values = adapter.load();
+  var listeners = [];
+
+  // ---------------------------------------------------------------------
+  // ค่าจากรุ่นก่อนที่ยังค้างใน sessionStorage (แปลงครั้งเดียวตอนโหลด แล้วบันทึกกลับ)
+  //   phasing เคยเก็บเป็น Array → { monthPct, edited } / ui.phasing.selection → ui.selection
+  //   ui.selection { account } → { unit } / topDown { accounts } → { units, channels }
+  //   master.products campaign → series
+  //   plan.<ปี>.salesPerson.<unitId> → master.assignments ทั้งปี แล้วลบ Key เดิม (เลิกใช้)
+  // ---------------------------------------------------------------------
+  function migrate() {
+    var changed = [];
+    function put(k, v) { values[k] = v; changed.push(k); }
+    Object.keys(values).forEach(function (k) {
+      if (/^plan\.\d{4}\.phasing\./.test(k) && Array.isArray(values[k])) put(k, { monthPct: values[k], edited: true });
+      if (/^plan\.\d{4}\.topDown$/.test(k) && values[k] && values[k].accounts && !values[k].units) {
+        var td = values[k];
+        td.units = td.accounts;
+        delete td.accounts;
+        if (!td.channels) td.channels = SP.data.channels.map(function (c) { return c.id; }).filter(function (id) { return td.units[id]; });
+        put(k, td);
+      }
+    });
+    if (values['ui.phasing.selection'] && !values['ui.selection']) put('ui.selection', values['ui.phasing.selection']);
+    var sel = values['ui.selection'];
+    if (sel && sel.account && !sel.unit) put('ui.selection', { channel: sel.channel, unit: sel.account });
+    if (Array.isArray(values['master.products']) && values['master.products'].some(function (p) { return 'campaign' in p; })) {
+      put('master.products', values['master.products'].map(function (p) {
+        if (!('campaign' in p)) return p;
+        if (p.series == null) p.series = p.campaign;
+        delete p.campaign;
+        return p;
+      }));
+    }
+    var old = Object.keys(values).filter(function (k) { return /^plan\.\d{4}\.salesPerson\./.test(k); });
+    if (old.length) {
+      var list = values['master.assignments'] ? values['master.assignments'] : clone(SP.data.assignments);
+      old.forEach(function (k) {
+        var m = /^plan\.(\d{4})\.salesPerson\.(.+)$/.exec(k);
+        var res = SP.core.calc.setOwner(list, m[2], values[k] || null, m[1] + '-01', m[1] + '-12', null);
+        if (res.ok) list = res.list;
+        delete values[k];
+        adapter.remove(k);
+      });
+      put('master.assignments', list);
+    }
+    changed.forEach(function (k) { adapter.save(k, values[k]); });
+  }
+  migrate();
+
+  // เปิดจากไฟล์ในเครื่อง: Chrome/Edge ให้ location.origin = 'file://' และแชร์ sessionStorage ข้ามหน้าได้
+  // Firefox ให้ 'null' เพราะมองแต่ละไฟล์เป็นคนละ Origin ค่าจึงไม่ส่งต่อข้ามหน้า
+  var opaqueFileOrigin = location.protocol === 'file:' &&
+    (String(location.origin) === 'null' || /firefox\//i.test(navigator.userAgent));
+
+  function emit(key) { listeners.forEach(function (fn) { fn(key); }); }
+
+  function get(key) { return clone(Object.prototype.hasOwnProperty.call(values, key) ? values[key] : defaultFor(key)); }
+
+  function set(key, value) {
+    values[key] = clone(value);
+    adapter.save(key, values[key]);
+    emit(key);
+  }
+
+  // ปีแผนที่เลือก (ถ้าค่าที่เก็บไว้ไม่อยู่ใน PLAN_YEARS ใช้ปีตั้งต้น)
+  function year() {
+    var y = Number(get('app.planYear'));
+    return SP.data.settings.PLAN_YEARS.indexOf(y) >= 0 ? y : SP.data.settings.DEFAULT_PLAN_YEAR;
+  }
+
+  function planKey(suffix) { return 'plan.' + year() + '.' + suffix; }
+
+  function master() {
+    return {
+      products: get('master.products'),
+      listings: get('master.listings'),
+      accounts: get('master.accounts'),
+      territories: get('master.territories'),
+      salespeople: get('master.salespeople'),
+      assignments: get('master.assignments')
+    };
+  }
+
+  function data() {
+    var d = {};
+    Object.keys(SP.data).forEach(function (k) { d[k] = SP.data[k]; });
+    var m = master();
+    Object.keys(m).forEach(function (k) { d[k] = m[k]; });
+    return d;
+  }
+
+  // บทบาทจำลอง: Sales Person ที่ไม่อยู่ใน Master แล้ว → กลับไปใช้บทบาทตั้งต้น
+  function role() {
+    var r = get('ui.role') || {};
+    if (r.type === 'sales' && !SP.core.calc.findById(get('master.salespeople'), r.personId)) return { type: SP.data.settings.DEFAULT_ROLE, personId: null };
+    return r;
+  }
+
+  function currentKey() { return SP.core.calc.monthKey(year(), Number(get('ui.currentMonth')) || 0); }
+
+  function workflowStates() {
+    var prefix = planKey('workflow.');
+    var out = {};
+    Object.keys(values).forEach(function (k) { if (k.indexOf(prefix) === 0) out[k.slice(prefix.length)] = clone(values[k]); });
+    return out;
+  }
+
+  function saveWorkflowStates(map) {
+    var before = workflowStates();
+    Object.keys(map).forEach(function (k) {
+      if (JSON.stringify(before[k]) !== JSON.stringify(map[k])) set(planKey('workflow.' + k), map[k]);
+    });
+  }
+
+  SP.core.store = {
+    get: get,
+    year: year,
+    master: master,
+    data: data,
+    role: role,
+    currentKey: currentKey,
+    workflowStates: workflowStates,
+    saveWorkflowStates: saveWorkflowStates,
+    planKey: planKey,
+    getDefault: function (key) { return clone(defaultFor(key)); },
+    set: set,
+    remove: function (key) {
+      delete values[key];
+      adapter.remove(key);
+      emit(key);
+    },
+    reset: function () {
+      values = {};
+      adapter.clear();
+      emit(null);
+    },
+    isSet: function (key) { return Object.prototype.hasOwnProperty.call(values, key); },
+    keys: function () { return Object.keys(values); },
+    onChange: function (fn) { listeners.push(fn); },
+    status: { persistent: adapter.persistent, crossPage: adapter.persistent && !opaqueFileOrigin }
+  };
+})(window.SP);

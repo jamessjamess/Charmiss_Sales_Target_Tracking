@@ -1,0 +1,138 @@
+/* modules/top-down/top-down.css — ตาราง (~75%) + Donut (~25%) ให้อยู่ในหน้าเดียว
+ * ทดสอบที่ viewport 1920×937 (จอ 1080 หักแถบ Chrome/Taskbar) และ 1366×625 ต้องไม่เลื่อน ไม่มี Scrollbar แนวนอน
+ * จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ (body.fit-screen) ตารางเลื่อนแนวตั้งภายในการ์ด / ห้ามตัดตัวเลขด้วย "…" */
+
+.page-topDown {
+  --td-row-h: 34px;
+  --td-col-prior: 160px;
+  --td-col-pct: 92px;
+  --td-col-amount: 130px;
+  --td-col-growth: 84px;
+  --td-col-compare: 150px;
+  --td-col-manage: 176px;
+  --donut-size: 180px;
+}
+@media (max-width: 1599px) {
+  .page-topDown {
+    --fs-table: 13px;
+    --td-col-prior: 142px;
+    --td-col-pct: 80px;
+    --td-col-amount: 112px;
+    --td-col-growth: 72px;
+    --td-col-compare: 104px;
+    --td-col-manage: 152px;
+    --donut-size: 150px;
+  }
+}
+@media (max-height: 700px) {
+  .page-topDown { --td-row-h: 30px; --donut-size: 128px; }
+}
+
+.page-topDown .module-body > * + * { margin-top: var(--sp-2); }
+
+/* ---------- แถบ Total บรรทัดเดียว ---------- */
+.td-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-5);
+  padding: var(--sp-2) var(--sp-4);
+  border-top: 4px solid var(--c-td);
+}
+.card.td-total > * + * { margin-top: 0; }
+.td-total-field { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.td-total-label { font-weight: var(--fw-bold); white-space: nowrap; }
+.td-total-value { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.td-total .num-input input { font-weight: var(--fw-bold); width: 8.2em; }
+.td-total-item { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1); white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .td-total-item { white-space: normal; } }
+
+/* ---------- ตาราง (ซ้าย) + Donut (ขวา) ---------- */
+.td-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); gap: var(--sp-3); align-items: stretch; }
+.card.td-tree, .card.td-charts { padding: 0; min-height: 0; overflow: hidden; }
+.card.td-tree > * + * { margin-top: 0; }
+.td-scroll { overflow-y: auto; overflow-x: hidden; max-height: 100%; }
+
+@media (min-width: 1024px) {
+  .page-topDown .module-body > .td-layout { flex: 1 1 auto; min-height: 0; }
+  .td-tree { display: flex; flex-direction: column; }
+  .td-tree .td-scroll { flex: 1 1 auto; min-height: 0; }
+}
+
+.td-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-table); }
+.td-table col.col-prior { width: var(--td-col-prior); }
+.td-table col.col-pct { width: var(--td-col-pct); }
+.td-table col.col-amount { width: var(--td-col-amount); }
+.td-table col.col-growth { width: var(--td-col-growth); }
+.td-table col.col-compare { width: var(--td-col-compare); }
+.td-table col.col-manage { width: var(--td-col-manage); }
+.td-table th, .td-table td {
+  height: var(--td-row-h);
+  padding: 0 var(--sp-2);
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* ชื่อยาวขึ้นบรรทัดใหม่ได้ ไม่ตัดด้วย "…" */
+.td-table .td-name { white-space: normal; line-height: 1.2; overflow-wrap: anywhere; }
+.td-table .num { text-align: right; }
+.td-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 32px;
+  background: var(--c-surface-2);
+  font-size: 12px;
+  font-weight: var(--fw-bold);
+  color: var(--c-text-muted);
+}
+@media (max-width: 1599px) { .td-table thead th { font-size: 11px; } }
+.has-tip { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
+.td-prior { color: var(--c-text-muted); }
+
+/* แถว Channel: แถบสีซ้ายตาม colorToken (--c) */
+.td-ch-row > * { background: var(--c-surface-2); font-weight: var(--fw-bold); }
+.td-ch-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: var(--sp-3); }
+.td-toggle { font: inherit; font-size: var(--fs-sm); width: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--c-text-muted); }
+.td-ch-name { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
+.td-unit-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-3) + 24px); font-weight: var(--fw-medium); cursor: help; }
+.td-unit-row .td-unit-name span { border-bottom: 1px dotted var(--c-border); }
+.td-table tr.is-hl > * { background: var(--c-primary-soft); }
+
+/* แถวคงเหลือ (components.remainingRow) */
+.td-table .remaining-row > * { height: 30px; font-size: 12px; }
+.td-table .remaining-row > .rem-label { box-shadow: inset 5px 0 0 var(--c, var(--c-border-strong)); padding-left: calc(var(--sp-3) + 24px); }
+.td-table .td-rem-total > * { border-top: 2px solid var(--c-border-strong); height: 34px; }
+.td-table .td-rem-total > .rem-label { padding-left: var(--sp-3); box-shadow: none; }
+
+/* แท่งเทียบปีก่อน */
+.td-compare { padding-right: var(--sp-3) !important; }
+
+/* โหมดแก้ไข: ช่อง % และบาท (percentAmountInput) + คอลัมน์จัดการ */
+.td-table .num-input { width: 100%; }
+.td-table input.num { width: 100%; font-size: var(--fs-table); padding: 1px 4px; height: calc(var(--td-row-h) - 8px); }
+.td-ch-row input.num { font-weight: var(--fw-bold); }
+.td-table .num-suffix { display: none; }
+.td-manage { font-weight: var(--fw-medium) !important; }
+.td-manage-group { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.td-manage .account-picker .btn { padding: 2px var(--sp-2); border: 1px solid var(--c-border-strong); background: var(--c-surface); }
+.td-manage .select-sm { min-width: 0; max-width: 150px; }
+.td-normalize { padding: 2px var(--sp-2); font-size: 12px; }
+.td-add-channel td { height: auto; padding: 4px var(--sp-3); background: var(--c-surface); }
+.td-add-channel .account-picker .btn { border: 1px solid var(--c-border-strong); background: var(--c-surface); }
+
+/* ---------- Donut ---------- */
+.card.td-charts { display: flex; flex-direction: column; align-items: stretch; padding: var(--sp-3); }
+.card.td-charts > * + * { margin-top: var(--sp-2); }
+.td-chart-title { font-size: var(--fs-sm); margin: 0; color: var(--c-text-muted); }
+.td-charts .donut { flex-direction: column; align-items: center; gap: var(--sp-3); }
+.td-charts .donut-legend { width: 100%; }
+.td-charts .donut-row { grid-template-columns: 12px minmax(0, 1fr); }
+.td-chart-note { font-size: 11px; color: var(--c-text-muted); margin: 0; text-align: center; }
+
+@media (max-width: 1023px) {
+  .td-layout { grid-template-columns: minmax(0, 1fr); }
+  .td-scroll { max-height: none; overflow-x: auto; }
+  .td-table { min-width: 640px; }
+}

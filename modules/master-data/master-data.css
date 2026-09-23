@@ -1,0 +1,13 @@
+/* modules/master-data/master-data.css */
+
+.md-owners { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
+.md-owner { border: 1px solid var(--c-border); border-radius: var(--radius-sm); padding: var(--sp-3); background: var(--c-surface-2); }
+.md-owner ul { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
+@media (max-width: 900px) {
+  .md-owners { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.md-table td { font-size: var(--fs-base); }
+.md-owner-badge { background: var(--c-primary-soft); color: var(--c-primary-strong); }
+.md-example { display: inline-block; margin-right: var(--sp-3); }
+.md-links { display: flex; flex-direction: column; font-size: var(--fs-sm); }
