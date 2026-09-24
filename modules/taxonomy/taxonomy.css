@@ -1,0 +1,6 @@
+/* modules/taxonomy/taxonomy.css — ตาราง Tree หมวดสินค้าและ Series (เลื่อนภายในการ์ด) */
+.page-taxonomy .module-body > * + * { margin-top: var(--sp-3); }
+.tx-cell { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.tx-root { font-weight: var(--fw-bold); }
+.tx-table .master-input { min-width: 16em; }
+.tx-table td .btn-sm { padding: 1px var(--sp-2); font-size: 12px; }

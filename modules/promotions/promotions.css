@@ -1,0 +1,71 @@
+/* modules/promotions/promotions.css — Promotion Price: แถบตัวกรอง · ปฏิทิน SKU × 12 เดือน (ชื่อ SKU ติดซ้าย หัวเดือนติดบน) · รายการ · ฟอร์มใน Drawer */
+.page-promotionPrice .module-body > * + * { margin-top: var(--sp-2); }
+
+.pr-toolbar { gap: var(--sp-2); }
+.pr-toolbar .seg { padding: 4px 10px; font-size: 13px; }
+.pr-search { min-width: 10em; flex: 0 1 14em; }
+.pr-toolbar .tool-right { flex-wrap: wrap; justify-content: flex-end; }
+.pr-legend { font-size: var(--fs-xs); gap: 4px var(--sp-2); }
+.pr-hint { margin: 0; font-size: var(--fs-xs); }
+.pr-locked { margin: 0; font-size: var(--fs-sm); }
+
+/* ตัวอย่างสีใน Legend (ใช้ class เดียวกับช่องปฏิทิน) */
+.pr-sw { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 14px; border-radius: 3px;
+  border: 1px solid var(--c-border); background: var(--c-surface); font-size: 10px; color: var(--c-text-muted); }
+.pr-sw.is-promo { background: var(--promo-bg); border-color: var(--promo-bd); }
+.pr-sw.has-draft { border: 1px dashed var(--c-text-muted); }
+.pr-sw.is-multi { background: var(--c-surface-2); }
+.pr-sw .promo-mark { position: absolute; top: 0; left: 0; font-size: 8px; line-height: 1.2; padding: 0 2px; }
+
+/* ปฏิทิน */
+.pr-table { font-size: 13px; table-layout: fixed; width: 100%; min-width: 1000px; }
+.pr-table th, .pr-table td { padding: 2px 6px; }
+.pr-table .pr-sku { position: sticky; left: 0; z-index: 2; width: 280px; background: var(--c-surface); border-right: 1px solid var(--c-border); text-align: left; }
+.pr-table thead .pr-sku { z-index: 4; background: var(--c-surface-2); }
+.pr-month.is-current { color: var(--c-primary-strong); box-shadow: inset 0 -2px 0 var(--c-primary); }
+.pr-group th { position: sticky; left: 0; background: var(--c-surface-2); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text-muted); text-align: left; }
+.pr-sku-line { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; font-weight: normal; }
+.pr-sku-line .thumb-sm { width: 26px; height: 26px; font-size: 10px; flex: 0 0 auto; }
+.pr-sku-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.pr-code { font-size: 11px; font-weight: var(--fw-bold); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.pr-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-cell { position: relative; height: 36px; border-left: 1px solid var(--c-border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pr-cell.is-rsp .pr-price { color: var(--c-text-muted); opacity: 0.75; }
+.pr-cell.is-promo { background: var(--promo-bg); }
+.pr-cell.is-promo .pr-price { font-weight: var(--fw-bold); }
+.pr-cell.has-draft { outline: 1px dashed var(--c-text-muted); outline-offset: -3px; }
+.pr-cell.is-multi .pr-price { font-style: italic; color: var(--c-text); opacity: 1; font-weight: normal; }
+.pr-cell.is-editable { cursor: pointer; }
+.pr-cell.is-editable:hover { box-shadow: inset 0 0 0 2px var(--c-primary); }
+.pr-cell:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.pr-off { display: block; font-size: 10px; line-height: 1; color: var(--promo-fg); }
+.pr-table .promo-mark { position: absolute; top: 2px; left: 2px; font-size: 9px; line-height: 1.3; padding: 0 2px; }
+.pr-tip-promo { color: var(--c-text); }
+.pr-tip-draft { color: var(--c-text-muted); font-style: italic; }
+
+/* รายการ */
+.pr-list { font-size: 13px; }
+.pr-list tr.is-draft td { color: var(--c-text-muted); }
+.pr-list tr.is-dirty-row > td:first-child { box-shadow: inset 3px 0 0 var(--c-dirty); }
+.pr-accs { max-width: 18em; white-space: normal; }
+.pr-draft-tag { border-style: dashed; }
+.nowrap { white-space: nowrap; }
+
+/* ฟอร์ม */
+.promo-drawer .pd-field { grid-template-columns: 10.5em minmax(0, 1fr); }
+.pr-check-list { display: grid; gap: 2px; max-height: 180px; overflow-y: auto; padding: 4px 6px; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
+.pr-sku-list { max-height: 200px; }
+.pr-check, .pr-check-group { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.pr-check-group { font-weight: var(--fw-bold); margin-top: 2px; }
+.pr-check.is-indent { padding-left: 18px; }
+.pr-sku-picker { display: grid; gap: 4px; }
+.pr-value { width: 8em; }
+.pr-suffix { color: var(--c-text-muted); }
+.pr-note { display: block; }
+.pr-preview { margin: 0; padding-left: 1.2em; font-size: var(--fs-sm); }
+.pr-msg { font-size: var(--fs-sm); }
+.pr-errors { margin: 0; padding-left: 1.2em; color: var(--c-danger-fg); }
+.pr-warnings { margin: 4px 0 0; padding-left: 1.2em; color: var(--c-warn-fg); }
+.pr-actions { flex-wrap: wrap; align-items: center; }
+.pr-spacer { flex: 1 1 auto; }
+.pr-copy-popover { min-width: 280px; }
