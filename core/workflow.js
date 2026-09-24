@@ -6,7 +6,7 @@
  *               | 'baseline' (ล็อกทั้งปี ทำที่หน้ารายงาน) | 'npd' (แผน NPD ต่อสินค้า เก็บใน master.npdPlans[].workflow)
  * - สถานะ: 'draft' ร่าง → 'submitted' รออนุมัติ → 'approved' อนุมัติแล้ว
  *          'returned' ส่งกลับแก้ (ต้องมีเหตุผล) / 'review' ต้องตรวจใหม่ (ขั้นบนอนุมัติใหม่และเป้าของหน่วยเปลี่ยน)
- *          baseline: 'draft' → 'locked'
+ *          baseline: 'draft' → 'locked' → (ปลดล็อก 'unlock' ต้องมีเหตุผล) 'draft' → ล็อกใหม่ = รายงานฉบับถัดไป (CR-12)
  * - state = { status, history: [{ action, by, at, note }], snapshot? (ตัวเลขตอนอนุมัติ ใช้ตรวจว่าเป้าเปลี่ยนไหม) }
  * - states (ทั้งปี) = { '<step>.<unitId|all>': state } ไม่มี Key = ร่าง
  * - role = { type: 'management' | 'director' | 'sales' | 'product' | 'supply' | 'trade', personId }
@@ -126,7 +126,9 @@
     approve: { from: ['submitted'], to: 'approved' },
     'return': { from: ['submitted'], to: 'returned' },
     reopen: { from: ['approved'], to: 'draft' },
-    lock: { from: ['draft'], to: 'locked' }
+    lock: { from: ['draft'], to: 'locked' },
+    // CR-12: ปลดล็อก Baseline (Sales Director ต้องมีเหตุผล) → เปิดให้แก้ไขแผนแล้วล็อกใหม่ได้ เลขฉบับรายงานเพิ่มขึ้นเมื่อล็อกครั้งถัดไป
+    unlock: { from: ['locked'], to: 'draft' }
   };
 
   function transition(state, action, payload) {
@@ -135,7 +137,7 @@
     var current = state || { status: 'draft', history: [] };
     if (!move || move.from.indexOf(current.status) < 0) return { ok: false, error: 'invalid' };
     var note = payload.note == null ? '' : String(payload.note).trim();
-    if (action === 'return' && !note) return { ok: false, error: 'noteRequired' };
+    if ((action === 'return' || action === 'unlock') && !note) return { ok: false, error: 'noteRequired' };
     var next = clone(current);
     next.history = (next.history || []).concat([{ action: action, by: payload.by || '', at: payload.at || '', note: note }]);
     next.status = move.to;
@@ -254,6 +256,59 @@
     return h.length ? h[h.length - 1] : null;
   }
 
+  // เหตุการณ์ล่าสุดของ action ที่ระบุ (เช่น 'approve') → { action, by, at, note } | null
+  function lastOf(state, action) {
+    var h = (state && state.history) || [];
+    for (var i = h.length - 1; i >= 0; i--) if (h[i].action === action) return h[i];
+    return null;
+  }
+
+  // ---------------------------------------------------------------------
+  // เลขฉบับของรายงานสรุปแผน (CR-12) — versions = plan.<ปี>.baselineVersions = [{ no, code, at, by }]
+  //   ล็อกครั้งแรก → {ปี}-BL-01 · ปลดล็อกแล้วล็อกใหม่ → {ปี}-BL-02 · ยังไม่ล็อก (หรือปลดล็อกอยู่) → {ปี}-DRAFT
+  // ---------------------------------------------------------------------
+  function versionCode(year, no) {
+    var S = SP.data.settings;
+    return String(S.BASELINE_CODE).replace('{year}', year).replace('{nn}', (no < 10 ? '0' : '') + no);
+  }
+
+  // → { code, no (0 = ฉบับร่าง), draft, at, by }
+  function baselineVersion(versions, year, locked) {
+    var list = versions || [];
+    var last = list[list.length - 1];
+    if (!locked) return { code: String(SP.data.settings.BASELINE_DRAFT_CODE).replace('{year}', year), no: 0, draft: true, at: null, by: null };
+    // ล็อกไว้ก่อนมีประวัติเลขฉบับ (ข้อมูลรุ่นก่อน) → ถือเป็นฉบับที่ 1
+    if (!last) return { code: versionCode(year, 1), no: 1, draft: false, at: null, by: null };
+    return { code: last.code, no: last.no, draft: false, at: last.at, by: last.by };
+  }
+
+  // ต่อท้ายฉบับใหม่ตอนล็อก Baseline → Array ใหม่ (ไม่แก้ของเดิม)
+  function addBaselineVersion(versions, year, payload) {
+    payload = payload || {};
+    var list = clone(versions || []);
+    var no = list.length ? list[list.length - 1].no + 1 : 1;
+    list.push({ no: no, code: versionCode(year, no), at: payload.at || '', by: payload.by || '' });
+    return list;
+  }
+
+  // ส่วน "การอนุมัติ" ของรายงาน: 1 แถวต่อขั้นตอน × หน่วยขาย จากประวัติ Workflow
+  // items = [{ step: 'topDown' | 'phasing' | 'sku', unitId (null = ทั้งปี) }]
+  // → [{ step, unitId, status, submittedBy, submittedAt, approvedBy, approvedAt }]
+  //   ผู้ส่ง = การส่งครั้งล่าสุดของรอบที่ยังมีผล (รออนุมัติ / อนุมัติแล้ว) / ผู้อนุมัติ = เฉพาะที่สถานะอนุมัติแล้ว (ไม่มี = null)
+  function approvalRows(states, items) {
+    return (items || []).map(function (it) {
+      var s = stateOf(states, it.step, it.unitId);
+      var active = s.status === 'submitted' || s.status === 'approved';
+      var sub = active ? lastOf(s, 'submit') : null;
+      var app = s.status === 'approved' ? lastOf(s, 'approve') : null;
+      return {
+        step: it.step, unitId: it.unitId || null, status: s.status,
+        submittedBy: sub ? sub.by : null, submittedAt: sub ? sub.at : null,
+        approvedBy: app ? app.by : null, approvedAt: app ? app.at : null
+      };
+    });
+  }
+
   SP.core.workflow = {
     EDITABLE: EDITABLE,
     key: key,
@@ -276,6 +331,11 @@
     applyAction: applyAction,
     canLock: canLock,
     isLocked: isLocked,
-    lastEvent: lastEvent
+    lastEvent: lastEvent,
+    lastOf: lastOf,
+    // รายงานสรุปแผน (CR-12)
+    baselineVersion: baselineVersion,
+    addBaselineVersion: addBaselineVersion,
+    approvalRows: approvalRows
   };
 })(window.SP);

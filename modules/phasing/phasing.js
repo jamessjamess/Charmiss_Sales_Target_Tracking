@@ -1,7 +1,8 @@
 /*
  * modules/phasing/phasing.js — กระจายเป้ารายเดือน (Monthly Phasing)
  *
- * หน้าที่:        แถบบริบทแถวเดียว: Channel | Account/เขต ‹ › | ผู้รับผิดชอบ · GP · เป้าหมายทั้งปี · ยอดขายปีก่อน · การเติบโต
+ * หน้าที่:        แถบบริบทแถวเดียว: Channel | หน่วยขาย ‹ › | ผู้รับผิดชอบ · GP (ป้ายตาม gpLabel ของ Channel) · เป้าหมายทั้งปี ·
+ *                 ยอดขายปี {ปีก่อน} ⓘ · การเติบโต / ส่งออก ▾ (Excel / CSV) 1 แถวต่อเดือน + รวมทั้งปี + คงเหลือ
  *                 (subChannelPicker ตัวเดียวกับหน้าวางแผน SKU)
  *                 กราฟ 12 เดือน (แท่งทึบ = เป้าหมายปีนี้, เส้นประ = ยอดขายปีก่อน, ตัวเลขใน Tooltip) + แถวผู้รับผิดชอบ (เฉพาะเมื่อมีหลายคนในปี)
  *                 + ตาราง: ยอดขายปีก่อน / สัดส่วนรายเดือน / เป้าหมาย Net Sales / การเติบโต / แถวคงเหลือ (components.remainingRow)
@@ -71,7 +72,7 @@
 
       if (!ch || !unit) {
         root.appendChild(h('div', { class: 'callout callout-info' },
-          h('strong', { class: 'callout-title' }, ch ? fill(page.noUnitsInChannel, { channel: ch.name, year: year }) : page.noChannels),
+          h('strong', { class: 'callout-title' }, ch ? fill(page.noUnitsInChannel, { channel: ch.name, year: year, unit: ch.unitLabel }) : page.noChannels),
           h('p', null, h('a', { href: SP.core.paths.to(SP.core.registry.byId('topDown').path) }, page.goTopDown))));
         return;
       }
@@ -87,15 +88,44 @@
       var owner = C.ownerInfo(data, unit.id, nowKey);
 
       C.contextStats([
-        ch.hasGP ? { label: L.context.gp, value: F.pct(calc.gpOf(data, unit.id), 0) } : null,
+        ch.hasGP ? { label: ch.gpLabel || L.context.gp, value: F.pct(calc.gpOf(data, unit.id), 0) } : null,
         { label: L.context.annual, value: F.baht(annual) + ' ' + L.baht },
-        { label: L.context.prior, value: F.baht(unit.prior) + ' ' + L.baht },
+        { label: C.priorLabel(tree.priorYear), value: F.baht(unit.prior) + ' ' + L.baht },
         { label: L.context.growth, value: C.growthText(unit.growth) }
       ]).forEach(function (el) { toolbar.appendChild(el); });
 
+      // ---------- ส่งออก ▾: เดือน · ยอดขายปีก่อน · สัดส่วนรายเดือน · เป้าหมาย Net Sales · การเติบโต + รวมทั้งปี + คงเหลือ ----------
+      var exportBtn = C.exportButton({
+        unsaved: dirty,
+        build: function (source) {
+          var X = page.exportSpec;
+          var pct = source === 'draft' && editing ? draftPct : savedPct;
+          var t = calc.phasingTotals(annual, pct);
+          var rows = F.MONTHS.map(function (m, i) {
+            return { month: F.monthYear(i, year), prior: prior ? prior[i] : null, pct: pct[i], amount: t.amounts[i], growth: prior ? calc.growth(t.amounts[i], prior[i]) : null };
+          });
+          var priorTotal = prior ? calc.sum(prior) : null;
+          rows.push({ month: page.totalColumn, prior: priorTotal, pct: t.pctSum, amount: t.amountSum, growth: prior ? calc.growth(t.amountSum, priorTotal) : null });
+          rows.push({ month: X.remaining + ' · ' + L.alert[t.remaining.status], prior: null, pct: t.remaining.status === 'empty' ? null : 1 - t.pctSum, amount: t.remaining.amount, growth: null });
+          var columns = [
+            { key: 'month', label: X.cols.month },
+            { key: 'prior', label: fill(R.prior, { year: tree.priorYear }), type: 'money' },
+            { key: 'pct', label: R.pct, type: 'pct' },
+            { key: 'amount', label: R.amount, type: 'money' },
+            { key: 'growth', label: X.cols.growth, type: 'pct', value: function (r) { return r.growth == null || isNaN(r.growth) ? null : r.growth; } }
+          ];
+          var status = W.stateOf(store.workflowStates(), 'phasing', unit.id).status;
+          var stamp = C.exportStamp(status);
+          return {
+            filename: fill(X.file, { year: year, unit: C.fileSafe(unit.name), status: stamp.status, date: stamp.date }),
+            sheets: [{ name: X.sheet, header: C.exportHeader(year, status, [[L.exporting.headerUnit, ch.name + ' · ' + unit.name], [L.context.annual, annual]]), columns: columns, rows: rows }]
+          };
+        }
+      });
+
       // ---------- Workflow ของรายการนี้ที่หัวหน้า ----------
       bar = C.workflowBar({
-        step: 'phasing', unitId: unit.id, year: year, ownerId: owner.id,
+        step: 'phasing', unitId: unit.id, year: year, ownerId: owner.id, extra: exportBtn,
         title: function () { return fill(page.workflowTitle, { unit: unit.name }); },
         editing: function () { return editing; },
         facts: function () { return { remaining: calc.phasingTotals(annual, savedPct).remaining.status }; },
@@ -159,7 +189,7 @@
       F.MONTHS.forEach(function (m) { table.appendChild(cell('ph-head num', m)); });
       table.appendChild(cell('ph-head num ph-total', page.totalColumn));
       // ยอดขายปีก่อน (ป้ายปีอยู่ในหัวแถว)
-      table.appendChild(cell('ph-label', [h('span', null, R.prior), prior ? C.historyTag(tree.priorYear) : null]));
+      table.appendChild(cell('ph-label', C.priorLabel(tree.priorYear, fill(R.prior, { year: tree.priorYear }))));
       F.MONTHS.forEach(function (m, i) { table.appendChild(cell('num ph-prior', F.baht(prior ? prior[i] : null))); });
       cells.totalPrior = cell('num ph-total');
       table.appendChild(cells.totalPrior);

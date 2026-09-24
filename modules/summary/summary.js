@@ -5,16 +5,19 @@
  *                 1. KPI 4 ใบ: Total Target + การเติบโต / แผน Bottom-up รวม + % ของเป้าหมาย / ส่วนต่าง (สีสถานะ) /
  *                    ความคืบหน้าการอนุมัติแผน SKU (x / y Account/เขต + แถบ) — บาทเต็ม
  *                 2. เป้าหมายเทียบแผน รายเดือน: แท่ง = เป้าหมาย (Phasing) · เส้น = แผน Bottom-up · เส้นประ = ยอดขายปีก่อน
+ *                    + ที่มาของการเติบโต (charts.waterfall) และสัดส่วน Channel ปีก่อนเทียบปีนี้ (charts.stackedShare) ชุดเดียวกับหน้า Top-down
  *                 3. ตาราง Channel → Account/เขต: ยอดขายปีก่อน · เป้าหมาย · แผน · ส่วนต่าง · สถานะอนุมัติ 3 ขั้น · ผู้รับผิดชอบ
  *                    (แถว Channel พับได้ / ชื่อ Account/เขต → หน้าวางแผนราย SKU ของรายการนั้น)
- *                 4. สัดส่วนแผนตามกลุ่มสินค้า: ตาม Status และตาม Series (Top 8 + อื่นๆ)
+ *                 4. สัดส่วนแผนตามกลุ่มสินค้า: ตาม Status (Planned / New / Active / Clearance / Discontinued) และตาม Series หรือ Category
+ *                    (Top 8 + อื่นๆ) — หลังล็อก Baseline แผนคำนวณด้วยราคาตอนล็อก (snapshot)
  *                 5. เป้าหมายรายผู้รับผิดชอบ (เฉพาะเดือนที่รับผิดชอบ: calc.performanceByPerson)
  *                 6. รายการที่ต้องดำเนินการ พร้อมลิงก์ไปหน้าที่ต้องแก้
  *                 ตัวเลขข้อ 2–6 เป็นล้านบาท 2 ตำแหน่ง (หน่วยอยู่ที่หัวข้อ) / พิมพ์ A4 แนวนอน ขึ้นหน้าใหม่ก่อนข้อ 3 และ 5
- * อ่านจาก data/:  channels, history, pricing, settings, content (pages.summary, labels) + Master ผ่าน store.data()
+ * อ่านจาก data/:  channels, history, settings, content (pages.summary, labels) + Master ผ่าน store.data() (priceList, promotions, taxonomy)
  * store อ่าน:     app.planYear, plan.<ปี>.topDown, plan.<ปี>.phasing.<unitId>, plan.<ปี>.sku.<unitId>, plan.<ปี>.workflow.*,
  *                 master.*, ui.role, ui.currentMonth
- * store เขียน:    ui.selection (ก่อนพาไปหน้าของรายการที่กด) / plan.<ปี>.workflow.baseline.all (ล็อก Baseline ผ่าน core/workflow.js)
+ * store เขียน:    ui.selection (ก่อนพาไปหน้าของรายการที่กด) / plan.<ปี>.workflow.baseline.all (ล็อก Baseline ผ่าน core/workflow.js
+ *                 snapshot = { gp ต่อหน่วยขาย, priceList, promotions ที่ยืนยันแล้ว } — ราคาและ Promotion ที่แก้ภายหลังไม่เปลี่ยน Baseline)
  */
 (function (SP) {
   'use strict';
@@ -28,9 +31,10 @@
   var fill = C.fill;
 
   var channelFilter = [];   // Channel ที่เลือก ([] = ทุก Channel)
-  var collapsed = {};       // <channelId>: true = พับแถว Account/เขต
+  var collapsed = {};       // <channelId>: true = พับแถวหน่วยขาย
+  var mixBy = 'series';     // กราฟกลุ่มสินค้าที่ 2: 'series' | 'category'
   // สีแท่งตาม Status ของ SKU (ชื่อ Token)
-  var STATUS_TOKENS = { existing: '--c-st-existing-fg', npd: '--c-st-npd-fg', clearance: '--c-st-clearance-fg', upcoming: '--c-st-upcoming-fg', ended: '--c-st-ended-fg' };
+  var STATUS_TOKENS = { planned: '--c-st-planned-fg', 'new': '--c-st-new-fg', active: '--c-st-active-fg', clearance: '--c-st-clearance-fg', discontinued: '--c-st-discontinued-fg' };
 
   function mb(v) { return F.millionPlain(v, 2); }
 
@@ -59,15 +63,22 @@
       return h('span', { class: 'rp-gap text-' + rem.status }, C.remainingText(rem, mb));
     }
 
+    // หลังล็อก Baseline: แผนครั้งแรกคำนวณด้วยราคา GP และ Promotion ตอนล็อก
+    function snapshotOf(states) {
+      var s = W.stateOf(states, 'baseline');
+      return W.isLocked(states) && s.snapshot && s.snapshot.priceList ? s.snapshot : null;
+    }
+
     // ---------- ตัวเลขทั้งหมดของรายงาน (ตาม Channel ที่เลือก) ----------
     function model() {
       var tree = calc.topDown(data, store.get(store.planKey('topDown')), year);
       var states = store.workflowStates();
+      var snap = snapshotOf(states);
       var channels = tree.children.filter(function (c) { return !channelFilter.length || channelFilter.indexOf(c.id) >= 0; });
       var units = [];
       channels.forEach(function (ch) {
         ch.children.forEach(function (u) {
-          var grid = calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year, mode: 'initial' });
+          var grid = calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year, mode: 'initial', snapshot: snap, target: u.amount });
           units.push({
             id: u.id, name: u.name, channel: ch, target: u.amount, prior: u.prior,
             targetM: calc.phasingTotals(u.amount, store.get(store.planKey('phasing.' + u.id)).monthPct).amounts,
@@ -95,7 +106,7 @@
       root.appendChild(h('div', { class: 'rp-print-head print-only' }, fill(page.printHeader, { year: year, at: F.dateTime(new Date().toISOString()) })));
       root.appendChild(toolbar(M));
       root.appendChild(kpis(M));
-      root.appendChild(monthly(M));
+      root.appendChild(h('div', { class: 'rp-row2' }, monthly(M), growth(M)));
       root.appendChild(unitTable(M));
       root.appendChild(mix(M));
       root.appendChild(people(M));
@@ -127,7 +138,7 @@
         : check.pending.length ? fill(page.lockPending, { n: check.pending.length }) : null;
       function lock() {
         var totals = calc.sum(allUnits.map(function (u) {
-          return calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year }).yearTotal.net;
+          return calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year, target: u.amount }).yearTotal.net;
         }));
         C.dialog({
           title: fill(page.lockConfirm, { year: year }),
@@ -139,7 +150,7 @@
           allUnits.forEach(function (u) { gp[u.id] = calc.gpOf(data, u.id); });
           var res = W.applyAction(store.workflowStates(), {
             step: 'baseline', unitId: null, action: 'lock', by: L.roles.director, at: new Date().toISOString(),
-            snapshot: { gp: gp, prices: SP.data.pricing.priceList }
+            snapshot: { gp: gp, priceList: data.priceList, promotions: (data.promotions || []).filter(function (p) { return p.status === 'CONFIRMED'; }) }
           });
           if (!res.ok) return;
           store.saveWorkflowStates(res.states);
@@ -178,18 +189,49 @@
       var line = calc.addMonthly(M.units.map(function (u) { return u.planM; }));
       var dashed = calc.addMonthly(M.units.map(function (u) { return u.priorM; }));
       return h('section', { class: 'card rp-section rp-monthly' }, h('h2', null, page.monthlyTitle),
-        SP.core.charts.barLine({ bars: bars, line: line, dashed: dashed, months: F.MONTHS, labels: page.monthlyLegend, format: mb, height: 240 }));
+        SP.core.charts.barLine({ bars: bars, line: line, dashed: dashed, months: F.MONTHS, labels: { bar: page.monthlyLegend.bar, line: page.monthlyLegend.line, dashed: fill(page.monthlyLegend.dashed, { year: year - 1 }) }, format: mb, height: 240 }));
+    }
+
+    // ---------- 2b. ที่มาของการเติบโต + สัดส่วน Channel (กราฟชุดเดียวกับหน้า Top-down) ----------
+    function growth(M) {
+      var TD = SP.data.content.pages.topDown;
+      var sub = { prior: M.prior, amount: M.target, children: M.channels, remaining: channelFilter.length ? null : M.tree.remaining };
+      var wf = calc.growthWaterfall(sub);
+      var share = calc.channelShareRows(sub);
+      var charts = SP.core.charts;
+      function parts(list) {
+        return list.map(function (p) { var ch = calc.findById(M.channels, p.id); return { id: p.id, value: p.share, colorToken: ch.color, title: fill(TD.shareTip, { name: ch.name, pct: F.pct(p.share, 1) }) }; });
+      }
+      return h('section', { class: 'card rp-section rp-growth' }, h('h2', null, TD.wfTitle),
+        charts.waterfall({
+          start: { label: fill(TD.wfStart, { year: year - 1 }), value: wf.start }, end: { label: fill(TD.wfEnd, { year: year }), value: wf.end },
+          steps: wf.steps.map(function (s) { return s.unallocated ? { id: '_rest', label: s.delta >= 0 ? TD.unallocated : TD.overAllocated, value: s.delta } : { id: s.id, label: s.name, value: s.delta, tag: s.isNew ? L.growthNew : null }; }),
+          format: mb, signed: function (v) { return (v < 0 ? '−' : '+') + mb(Math.abs(v)); },
+          axisNote: function (lo) { return fill(TD.wfAxis, { value: F.millionPlain(lo, 0) }); }
+        }),
+        h('h3', { class: 'rp-growth-share' }, fill(TD.shareTitle, { prior: year - 1, year: year })),
+        charts.stackedShare({
+          rows: [{ label: String(year - 1), parts: parts(share.prior) }, { label: String(year), parts: parts(share.target) }],
+          legend: M.channels.map(function (c) { return { id: c.id, label: c.name, colorToken: c.color }; })
+        }));
     }
 
     // ---------- 3. ตาราง Channel → Account/เขต ----------
     function unitTable(M) {
       var T = page.tableColumns;
+      var V = L.vsLastYear;
       var rowCount = 1 + M.channels.length + M.units.length;
+      // แท่งเป้าหมายเทียบปีก่อน: สเกลจริงเดียวกันทั้งตาราง (แถว Channel และหน่วยขายตาม Filter รวมแถวที่พับอยู่) แบบเดียวกับหน้าจัดสรรเป้าหมายประจำปี
+      var scaleValues = [];
+      M.channels.forEach(function (ch) { scaleValues.push(ch.amount, ch.prior); });
+      M.units.forEach(function (u) { scaleValues.push(u.target, u.prior); });
+      var scaleMax = SP.core.charts.niceScaleMax(scaleValues);
+      function bar(target, prior, color) { return h('td', { class: 'rp-vly' }, SP.core.charts.vsLastYearBar(target, prior, scaleMax, { colorToken: color, year: year - 1 })); }
       var body = h('tbody');
       var totalRem = calc.remaining(M.target, M.plan);
       body.appendChild(h('tr', { class: 'rp-total-row' },
         h('th', { scope: 'row' }, page.totalRow),
-        h('td', { class: 'num' }, mb(M.prior)), h('td', { class: 'num' }, mb(M.target)), h('td', { class: 'num' }, mb(M.plan)),
+        h('td', { class: 'num' }, mb(M.prior)), h('td', { class: 'num' }, mb(M.target)), h('td', { class: 'rp-vly' }), h('td', { class: 'num' }, mb(M.plan)),
         h('td', null, gapText(totalRem)),
         h('td', { class: 'rp-topdown', rowspan: String(rowCount) }, link('topDown', wfText(M.topDown), null, null, reg.byId('topDown').title)),
         h('td'), h('td'), h('td')));
@@ -205,13 +247,13 @@
               onClick: function () { collapsed[ch.id] = !collapsed[ch.id]; draw(); }
             }, isCollapsed ? '▸' : '▾'),
             ch.name + ' · ' + ch.fullName),
-          h('td', { class: 'num' }, mb(ch.prior)), h('td', { class: 'num' }, mb(ch.amount)), h('td', { class: 'num' }, mb(plan)),
+          h('td', { class: 'num' }, mb(ch.prior)), h('td', { class: 'num' }, mb(ch.amount)), bar(ch.amount, ch.prior, ch.color), h('td', { class: 'num' }, mb(plan)),
           h('td', null, gapText(calc.remaining(ch.amount, plan))),
           h('td', { class: 'rp-approved' }, approved('phasing')), h('td', { class: 'rp-approved' }, approved('sku')), h('td')));
         list.forEach(function (u) {
           body.appendChild(h('tr', { class: 'rp-unit-row', hidden: isCollapsed, style: { '--c': C.tokenVar(ch.color) } },
             h('th', { scope: 'row' }, link('skuPlanning', u.name, ch.id, u.id, fill(page.openPlan, { name: u.name }))),
-            h('td', { class: 'num' }, mb(u.prior)), h('td', { class: 'num' }, mb(u.target)), h('td', { class: 'num' }, mb(u.plan)),
+            h('td', { class: 'num' }, mb(u.prior)), h('td', { class: 'num' }, mb(u.target)), bar(u.target, u.prior, ch.color), h('td', { class: 'num' }, mb(u.plan)),
             h('td', null, gapText(calc.remaining(u.target, u.plan))),
             h('td', null, link('phasing', wfText(M.locked ? 'locked' : u.phasing), ch.id, u.id, reg.byId('phasing').title + ' · ' + u.name)),
             h('td', null, link('skuPlanning', wfText(M.locked ? 'locked' : u.sku), ch.id, u.id, reg.byId('skuPlanning').title + ' · ' + u.name)),
@@ -219,12 +261,13 @@
         });
       });
       var table = h('table', { class: 'data-table rp-table' },
-        h('colgroup', null, h('col', { class: 'rp-col-name' }), h('col', { class: 'rp-col-num' }), h('col', { class: 'rp-col-num' }), h('col', { class: 'rp-col-num' }),
+        h('colgroup', null, h('col', { class: 'rp-col-name' }), h('col', { class: 'rp-col-num' }), h('col', { class: 'rp-col-num' }), h('col', { class: 'rp-col-vly' }), h('col', { class: 'rp-col-num' }),
           h('col', { class: 'rp-col-gap' }), h('col', { class: 'rp-col-wf' }), h('col', { class: 'rp-col-wf' }), h('col', { class: 'rp-col-wf' }), h('col', { class: 'rp-col-owner' })),
         h('thead', null,
           h('tr', null,
             h('th', { scope: 'col', rowspan: '2' }, T.name),
-            h('th', { scope: 'col', rowspan: '2', class: 'num' }, T.prior), h('th', { scope: 'col', rowspan: '2', class: 'num' }, T.target),
+            h('th', { scope: 'col', rowspan: '2', class: 'num' }, C.priorLabel(year - 1)), h('th', { scope: 'col', rowspan: '2', class: 'num' }, T.target),
+            h('th', { scope: 'col', rowspan: '2', class: 'rp-vly-head', title: V.headerTip }, h('span', { class: 'has-tip' }, V.header), SP.core.charts.vsLastYearAxis(scaleMax)),
             h('th', { scope: 'col', rowspan: '2', class: 'num' }, T.plan), h('th', { scope: 'col', rowspan: '2' }, T.gap),
             h('th', { scope: 'colgroup', colspan: '3', class: 'rp-wf-head' }, page.approvalHead),
             h('th', { scope: 'col', rowspan: '2' }, T.owner)),
@@ -244,11 +287,20 @@
         });
       }
       var byStatus = items(calc.planMix(rows, 'status'), function (k) { return L.status[k] || k; }, function (k) { return STATUS_TOKENS[k] || '--c-bar'; });
-      var bySeries = items(calc.planMix(rows, 'series', 8), function (k) { return k === null ? page.mixOther : k || L.series.none; }, function () { return '--c-bar'; });
+      var tax = master.taxonomy;
+      var kind = mixBy === 'category' ? 'category' : 'series';
+      var byGroup = items(calc.planMix(rows, kind, 8), function (k) {
+        return k === null ? page.mixOther : calc.taxonomyName(tax, kind, k) || (kind === 'series' ? L.series.none : page.mixNoCategory);
+      }, function () { return '--c-bar'; });
       return h('section', { class: 'card rp-section rp-mix' }, h('h2', null, page.mixTitle),
         h('div', { class: 'grid-2 rp-mix-grid' },
           h('div', null, h('h3', null, page.mixByStatus), SP.core.charts.hbars({ items: byStatus })),
-          h('div', null, h('h3', null, page.mixBySeries), SP.core.charts.hbars({ items: bySeries }))));
+          h('div', null,
+            h('div', { class: 'rp-mix-head' }, h('h3', null, page.mixGroupLabel),
+              h('span', { class: 'no-print' }, C.segmented({ label: page.mixGroupLabel, value: kind, options: ['series', 'category'].map(function (v) { return { value: v, label: page.mixBy[v] }; }),
+                onChange: function (v) { mixBy = v; draw(); } })),
+              h('span', { class: 'print-only' }, page.mixBy[kind])),
+            SP.core.charts.hbars({ items: byGroup }))));
     }
 
     // ---------- 5. เป้าหมายรายผู้รับผิดชอบ ----------

@@ -10,6 +10,8 @@
  * - โหลดครบแล้วเรียก SP.core.layout.boot()
  *
  * รายการไฟล์ core/ และ data/ อยู่ที่นี่ที่เดียว ถ้าเพิ่มไฟล์ใน core/ หรือ data/ ให้เพิ่มใน FILES
+ * data/seed/ (ข้อมูลจริงจาก Excel ห้ามแก้ด้วยมือ) โหลดก่อน data/products.js แล้ว core/seed.js แปลงเข้าโครง Product Master
+ * หลัง core/calc.js และก่อน core/store.js
  */
 (function () {
   'use strict';
@@ -23,20 +25,28 @@
     'data/territories.js',
     'data/salespeople.js',
     'data/assignments.js',
+    'data/taxonomy.js',
+    'data/seed/seed-charmiss.js',
     'data/products.js',
     'data/listings.js',
     'data/pricing.js',
+    'data/promotions.js',
+    'data/npd.js',
     'data/targets.js',
     'data/history.js',
     'data/actuals.js',
     'data/plan-seeds.js',
+    'data/erp-snapshot.js',
     'data/content.js',
     'core/calc.js',
+    'core/seed.js',
     'core/workflow.js',
     'core/registry.js',
     'core/store.js',
     'core/components.js',
     'core/charts.js',
+    'core/export.js',
+    'core/report.js',
     'core/layout.js'
   ];
 

@@ -3,11 +3,13 @@
  *
  * boot() ถูกเรียกจาก loader.js เมื่อโหลดไฟล์ครบ:
  *   1. หา Module ของหน้านี้จาก registry (เทียบ Path) และจาก SP.modules
- *      ถ้าเป็น index.html ที่ Root และหน้านั้นถูกซ่อน (visible: false) → พาไปหน้าแรกของ Sales Planning
- *   2. Header แถวเดียว: ชื่อระบบ · ปีแผน · ดูในบทบาท (จำลอง) · รีเซ็ตข้อมูล (+ ☰ เมื่อจอแคบกว่า 1024px)
- *   3. Side Menu ซ้าย 3 กลุ่มจาก registry (group) พับเหลือไอคอนได้ (ui.sidebarCollapsed)
- *      หน้าวางแผน SKU พับให้เองเมื่อจอกว้างน้อยกว่า 1920px / ไอคอนสถานะ Workflow ข้างหน้าใน Sales Planning
- *   4. หัวข้อและคำอธิบาย (จาก content.js) — แถวหัวข้อส่งให้ Module ใส่ workflowBar ได้ (ctx.intro)
+ *      index.html ที่ Root (ไม่มี Module) → พาไปหน้าแรกของ Sales Planning ตามลำดับ Tour ใน registry
+ *   2. Header แถวเดียว: ชื่อระบบ + Prototype · มุมมองผู้ใช้ (จำลอง) · เกี่ยวกับ Prototype · รีเซ็ตข้อมูล (+ ☰ เมื่อจอแคบกว่า 1024px)
+ *      ปีแผนไม่อยู่ใน Header (CR-10): อยู่ต่อท้ายชื่อหน้า (components.planYearPicker) เฉพาะหน้าที่ registry ตั้ง year: true
+ *   3. Side Menu ซ้าย 4 กลุ่มจาก registry (group) พับเหลือไอคอนได้ (ui.sidebarCollapsed)
+ *      หน้าวางแผน SKU พับให้เองเมื่อจอกว้างน้อยกว่า 2200px (รวมจอ 1920px — CR-11) / ไอคอนสถานะ Workflow ข้างหน้าใน Sales Planning
+ *   4. หัวข้อ (+ Tooltip pages.<id>.titleTip) ปีแผน และคำอธิบาย (จาก content.js) — แถวหัวข้อส่งให้ Module ใส่ workflowBar ได้ (ctx.intro)
+ *      ชื่อในเมนูของ Sales Planning = ชื่อเต็ม ถ้ายาวเกินบรรทัดเดียวใช้ชื่อย่อ (pages.<id>.short) / ปุ่มก่อนหน้า/ถัดไปใช้ชื่อย่อ
  *      กล่องสิ่งที่ต้องการให้อนุมัติ (เฉพาะหน้าที่มี approve ใน content.js ตอนนี้คือหน้าเกี่ยวกับ Prototype)
  *   5. เรียก SP.modules.<id>.render(bodyElement, ctx)
  *   6. แถบก่อนหน้า/ถัดไปติดล่างจอ และปุ่มลูกศรซ้าย/ขวา เฉพาะหน้าในกลุ่ม Sales Planning
@@ -34,21 +36,11 @@
     };
   }
   function fillTitle(text) { return C.fill(text, titleVars()).replace(/\s*\(\)$/, ''); }
-  function menuLabel(e) { return fillTitle(e.short || e.title); }
-
-  function buildYearPicker() {
-    var S = SP.data.settings;
-    var store = SP.core.store;
-    var site = SP.data.content.site;
-    return h('label', { class: 'year-picker' },
-      h('span', { class: 'field-label' }, site.yearLabel),
-      C.select({
-        label: site.yearLabel,
-        value: String(store.year()),
-        options: S.PLAN_YEARS.map(function (y) { return { value: String(y), label: String(y) }; }),
-        onChange: function (v) { store.set('app.planYear', Number(v)); location.reload(); }
-      }));
-  }
+  // ชื่อหน้า: เต็ม = pages.<id>.title / ย่อ = pages.<id>.short (ค่าสำรองจาก registry) — Module ไม่เขียนชื่อหน้าเอง
+  function pageOf(e) { return SP.data.content.pages[e.id] || {}; }
+  function fullLabel(e) { return fillTitle(pageOf(e).title || e.title); }
+  function shortLabel(e) { return fillTitle(pageOf(e).short || e.short || pageOf(e).title || e.title); }
+  function menuLabel(e) { return e.group === 'sales-planning' ? fullLabel(e) : shortLabel(e); }
 
   // บทบาทจำลอง: Management / Sales Director / Sales Person (เลือกชื่อ ที่ยังทำงานอยู่ในเดือนปัจจุบันจำลอง)
   function buildRolePicker() {
@@ -61,6 +53,7 @@
     var people = store.get('master.salespeople').filter(function (p) { return calc.employedIn(p, key) || (role.type === 'sales' && role.personId === p.id); });
     var value = role.type === 'sales' ? 'sales:' + role.personId : role.type;
     var options = [{ value: 'management', label: R.management }, { value: 'director', label: R.director }]
+      .concat(['product', 'supply', 'trade'].map(function (t) { return { value: t, label: R[t], group: site.roleGroupProduct }; }))
       .concat(people.map(function (p) { return { value: 'sales:' + p.id, label: p.name, group: site.roleGroupSales }; }));
     return h('div', { class: 'role-picker' },
       h('label', { class: 'role-field' },
@@ -104,7 +97,7 @@
         h('a', { class: 'brand', href: SP.core.paths.to('index.html') },
           h('span', { class: 'brand-name' }, site.name),
           h('span', { class: 'brand-badge' }, site.badge)),
-        h('div', { class: 'header-actions' }, warning, buildYearPicker(), buildRolePicker(),
+        h('div', { class: 'header-actions' }, warning, buildRolePicker(),
           about ? h('a', { class: 'header-link', href: link(about) }, site.aboutLink) : null, reset)));
   }
 
@@ -119,7 +112,7 @@
     var calc = SP.core.calc;
     var states = store.workflowStates();
     if (e.id === 'topDown') return W.stateOf(states, 'topDown').status;
-    if (e.id === 'summary') return W.isLocked(states) ? 'locked' : null;
+    if (e.id === 'summary') return null;
     if (e.id !== 'phasing' && e.id !== 'skuPlanning') return null;
     var tree = calc.topDown(store.data(), store.get(store.planKey('topDown')), store.year());
     var unit = calc.resolveSelection(tree, store.get('ui.selection')).unit;
@@ -129,16 +122,33 @@
   }
 
   // ไอคอนสถานะข้างชื่อ (เมื่อขยายเมนู) และสถานะใน Tooltip ของลิงก์ (ทั้งพับและขยาย)
+  // ขั้นที่ 4 (CR-12) = จำนวนรายการที่ต้องดำเนินการ (core/report.js) คำนวณหลังหน้าแสดงแล้ว / ไม่มีรายการ + ล็อก Baseline แล้ว = ไอคอนล็อก
+  var countTimer = null;
   function refreshMenu() {
     var W = SP.data.content.labels.workflow;
     Object.keys(menuState.links).forEach(function (id) {
       var ref = menuState.links[id];
+      if (id === 'summary' && ref.status) { scheduleCount(ref); return; }
       var st = ref.status ? workflowOfEntry(ref.entry) : null;
       ref.link.title = ref.label + (st ? ' · ' + W.status[st] : '');
       if (!ref.status) return;
       C.clear(ref.status);
       if (st) ref.status.appendChild(C.wfIcon(st));
     });
+  }
+  function scheduleCount(ref) {
+    if (countTimer) clearTimeout(countTimer);
+    countTimer = setTimeout(function () {
+      countTimer = null;
+      var site = SP.data.content.site;
+      var n = SP.core.report ? SP.core.report.actionCount() : 0;
+      var locked = SP.core.workflow.isLocked(SP.core.store.workflowStates());
+      var text = n ? C.fill(site.actionCount, { n: n }) : locked ? SP.data.content.labels.workflow.status.locked : '';
+      ref.link.title = ref.label + (text ? ' · ' + text : '');
+      C.clear(ref.status);
+      if (n) ref.status.appendChild(h('span', { class: 'side-count', title: text, 'aria-label': text }, String(n)));
+      else if (locked) ref.status.appendChild(C.wfIcon('locked'));
+    }, 0);
   }
 
   function buildSideMenu(entry) {
@@ -163,7 +173,7 @@
             h('span', { class: 'side-icon' + (planning ? ' is-step' : '') }, icon),
             h('span', { class: 'side-label' }, label),
             status);
-          menuState.links[e.id] = { entry: e, status: status, link: a, label: label };
+          menuState.links[e.id] = { entry: e, status: status, link: a, label: label, short: planning ? shortLabel(e) : null };
           return h('li', null, a);
         }))));
     });
@@ -175,6 +185,7 @@
         document.body.classList.toggle('sidebar-collapsed', collapsed);
         store.set('ui.sidebarCollapsed', collapsed);
         setCollapseLabel();
+        nav.fitLabels();
       }
     });
     function setCollapseLabel() {
@@ -185,6 +196,17 @@
     }
     nav.appendChild(collapse);
     nav.setCollapseLabel = setCollapseLabel;
+    // ชื่อเต็มยาวเกินบรรทัดเดียว → ใช้ชื่อย่อ (เรียกหลังวางเมนูในหน้าแล้ว และเมื่อ Font โหลดเสร็จ)
+    nav.fitLabels = function () {
+      if (document.body.classList.contains('sidebar-collapsed')) return;
+      Object.keys(menuState.links).forEach(function (id) {
+        var ref = menuState.links[id];
+        if (!ref.short) return;
+        var span = ref.link.querySelector('.side-label');
+        span.textContent = ref.label;
+        if (span.scrollWidth > span.clientWidth + 1) span.textContent = ref.short;
+      });
+    };
     return nav;
   }
 
@@ -195,7 +217,8 @@
     if (!title) return null;
     var line = h('div', { class: 'intro-line' },
       idx >= 0 ? h('span', { class: 'eyebrow' }, C.fill(site.stepOf, { n: idx + 1, total: tour.length })) : null,
-      h('h1', null, fillTitle(title)));
+      h('h1', { title: page.titleTip || null }, fillTitle(title)),
+      entry && entry.year ? C.planYearPicker() : null);
     var intro = h('div', { class: 'page-intro' }, line, (page.lead || []).slice(0, 1).map(function (t) { return h('p', { class: 'lead' }, fillTitle(t)); }));
     intro.line = line;
     return intro;
@@ -207,8 +230,8 @@
     var next = tour[idx + 1];
     return h('nav', { class: 'tour-nav', 'aria-label': site.prev + ' / ' + site.next },
       h('div', { class: 'tour-nav-inner' },
-        prev ? h('a', { class: 'btn btn-secondary btn-sm tour-prev', href: link(prev), rel: 'prev' }, '← ' + site.prev + ': ' + menuLabel(prev)) : h('span'),
-        next ? h('a', { class: 'btn btn-primary btn-sm tour-next', href: link(next), rel: 'next' }, site.next + ': ' + menuLabel(next) + ' →')
+        prev ? h('a', { class: 'btn btn-secondary btn-sm tour-prev', href: link(prev), rel: 'prev', title: fullLabel(prev) }, '← ' + site.prev + ': ' + shortLabel(prev)) : h('span'),
+        next ? h('a', { class: 'btn btn-primary btn-sm tour-next', href: link(next), rel: 'next', title: fullLabel(next) }, site.next + ': ' + shortLabel(next) + ' →')
           : h('a', { class: 'btn btn-primary btn-sm tour-next', href: link(tour[0]) }, site.finish + ' ↺')));
   }
 
@@ -237,8 +260,8 @@
     var entry = registry.byPath(SP.core.paths.current());
     var tour = registry.tour();
 
-    // index.html ที่ Root ถูกซ่อน → ไปหน้าแรกของ Sales Planning
-    if (entry && entry.path === 'index.html' && !entry.visible && tour.length) {
+    // index.html ที่ Root → ไปหน้าแรกของ Sales Planning
+    if (!entry && SP.core.paths.current() === 'index.html' && tour.length) {
       location.replace(link(tour[0]));
       return;
     }
@@ -249,7 +272,9 @@
     var page = content.pages[entry ? entry.id : moduleId] || {};
     var idx = entry ? tour.indexOf(entry) : -1;
 
-    document.title = fillTitle(page.title || (entry && entry.title) || '') + ' · ' + content.site.name;
+    // หน้าที่ไม่มีหัวข้อใน content.js (เช่น หน้า Test) ใช้ <title> เดิมของไฟล์
+    var pageTitle = page.title || (entry && entry.title);
+    if (pageTitle) document.title = fillTitle(pageTitle) + ' · ' + content.site.name;
 
     var root = document.getElementById('module-root');
     if (!root) { root = h('main', { id: 'module-root' }); document.body.appendChild(root); }
@@ -259,8 +284,8 @@
     if (entry) document.body.classList.add('page-' + entry.id);
     if (entry && entry.fit) document.body.classList.add('fit-screen');
 
-    // พับเมนู: ค่าที่จำไว้ / หน้าวางแผน SKU พับเองเมื่อจอกว้างน้อยกว่า 1920px ให้ 12 เดือนพอดีจอ
-    var autoCollapse = entry && entry.id === 'skuPlanning' && window.innerWidth < 1920;
+    // พับเมนู: ค่าที่จำไว้ / หน้าวางแผน SKU พับเองเมื่อจอกว้างน้อยกว่า 2200px (รวมจอ 1920px) ให้ 12 เดือน + ยอดปีก่อนพอดีจอ (CR-11)
+    var autoCollapse = entry && entry.id === 'skuPlanning' && window.innerWidth < 2200;
     if (store.get('ui.sidebarCollapsed') || autoCollapse) document.body.classList.add('sidebar-collapsed');
 
     var header = buildHeader();
@@ -271,7 +296,11 @@
     document.body.insertBefore(header, root);
     document.body.insertBefore(shell, root);
     mainCol.appendChild(root);
-    if (side) side.setCollapseLabel();
+    if (side) {
+      side.setCollapseLabel();
+      side.fitLabels();
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(side.fitLabels);
+    }
 
     var body = h('div', { class: 'module-body' });
     var intro = buildIntro(page, entry, tour, idx);

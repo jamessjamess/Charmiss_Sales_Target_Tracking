@@ -1,31 +1,29 @@
-/* modules/top-down/top-down.css — ตาราง (~75%) + Donut (~25%) ให้อยู่ในหน้าเดียว
+/* modules/top-down/top-down.css — ขั้นที่ 1 จัดสรรเป้าหมายประจำปี: แถบ Total + ตารางเต็มความกว้าง (CR-10 ไม่มีแผงกราฟ) หัวคอลัมน์บรรทัดเดียว
  * ทดสอบที่ viewport 1920×937 (จอ 1080 หักแถบ Chrome/Taskbar) และ 1366×625 ต้องไม่เลื่อน ไม่มี Scrollbar แนวนอน
  * จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ (body.fit-screen) ตารางเลื่อนแนวตั้งภายในการ์ด / ห้ามตัดตัวเลขด้วย "…" */
 
 .page-topDown {
   --td-row-h: 34px;
-  --td-col-prior: 160px;
-  --td-col-pct: 92px;
-  --td-col-amount: 130px;
-  --td-col-growth: 84px;
-  --td-col-compare: 150px;
+  --td-col-prior: 200px;
+  --td-col-pct: 104px;
+  --td-col-amount: 136px;
+  --td-col-growth: 88px;
+  --td-col-compare: 240px;
   --td-col-manage: 176px;
-  --donut-size: 180px;
 }
 @media (max-width: 1599px) {
   .page-topDown {
     --fs-table: 13px;
-    --td-col-prior: 142px;
-    --td-col-pct: 80px;
+    --td-col-prior: 168px;
+    --td-col-pct: 88px;
     --td-col-amount: 112px;
-    --td-col-growth: 72px;
-    --td-col-compare: 104px;
-    --td-col-manage: 152px;
-    --donut-size: 150px;
+    --td-col-growth: 68px;
+    --td-col-compare: 160px;
+    --td-col-manage: 148px;
   }
 }
 @media (max-height: 700px) {
-  .page-topDown { --td-row-h: 30px; --donut-size: 128px; }
+  .page-topDown { --td-row-h: 30px; }
 }
 
 .page-topDown .module-body > * + * { margin-top: var(--sp-2); }
@@ -45,11 +43,13 @@
 .td-total-value { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
 .td-total .num-input input { font-weight: var(--fw-bold); width: 8.2em; }
 .td-total-item { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.td-total-growth { display: inline-flex; gap: var(--sp-1); align-items: baseline; }
+.td-growth-amount { font-weight: var(--fw-medium); }
 @media (max-width: 560px) { .td-total-item { white-space: normal; } }
 
-/* ---------- ตาราง (ซ้าย) + Donut (ขวา) ---------- */
-.td-layout { display: grid; grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr); gap: var(--sp-3); align-items: stretch; }
-.card.td-tree, .card.td-charts { padding: 0; min-height: 0; overflow: hidden; }
+/* ---------- ตาราง (ซ้าย) + แผงกราฟ (ขวา) ---------- */
+.td-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+.card.td-tree { padding: 0; min-height: 0; overflow: hidden; }
 .card.td-tree > * + * { margin-top: 0; }
 .td-scroll { overflow-y: auto; overflow-x: hidden; max-height: 100%; }
 
@@ -90,6 +90,12 @@
 @media (max-width: 1599px) { .td-table thead th { font-size: 11px; } }
 .has-tip { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
 .td-prior { color: var(--c-text-muted); }
+/* % ที่คำนวณจากคอลัมน์อื่น (อ่านอย่างเดียว) สีจาง — ช่องกรอกอยู่คนละคอลัมน์ตามระดับ */
+.td-table td.is-derived { color: var(--c-text-muted); font-weight: var(--fw-medium); opacity: 0.8; }
+.td-table thead .prior-label { display: inline; }
+.td-table thead .prior-label .info-dot { margin-left: 4px; }
+/* หัวคอลัมน์บรรทัดเดียวทุกคอลัมน์ (ตารางเต็มความกว้าง) */
+.td-table thead th { white-space: nowrap; }
 
 /* แถว Channel: แถบสีซ้ายตาม colorToken (--c) */
 .td-ch-row > * { background: var(--c-surface-2); font-weight: var(--fw-bold); }
@@ -97,7 +103,10 @@
 .td-toggle { font: inherit; font-size: var(--fs-sm); width: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--c-text-muted); }
 .td-ch-name { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
 .td-unit-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-3) + 24px); font-weight: var(--fw-medium); cursor: help; }
-.td-unit-row .td-unit-name span { border-bottom: 1px dotted var(--c-border); }
+.td-unit-row .td-unit-name > span:first-child { border-bottom: 1px dotted var(--c-border); }
+/* ผู้รับผิดชอบปัจจุบันต่อท้ายชื่อหน่วยขาย */
+.td-owner { margin-left: var(--sp-2); font-size: 11px; font-weight: var(--fw-medium); color: var(--c-text-muted); white-space: nowrap; }
+.td-owner.is-vacant { font-style: italic; }
 .td-table tr.is-hl > * { background: var(--c-primary-soft); }
 
 /* แถวคงเหลือ (components.remainingRow) */
@@ -105,9 +114,14 @@
 .td-table .remaining-row > .rem-label { box-shadow: inset 5px 0 0 var(--c, var(--c-border-strong)); padding-left: calc(var(--sp-3) + 24px); }
 .td-table .td-rem-total > * { border-top: 2px solid var(--c-border-strong); height: 34px; }
 .td-table .td-rem-total > .rem-label { padding-left: var(--sp-3); box-shadow: none; }
+/* ป้ายคงเหลือขึ้นบรรทัดใหม่ได้เมื่อคอลัมน์ชื่อแคบ (โหมดแก้ไขมีคอลัมน์จัดการ) */
+.td-table .remaining-row > .rem-label { white-space: normal; line-height: 1.15; }
+@media (max-width: 1599px) { .td-table.is-editing .remaining-row > .rem-label { padding-left: calc(var(--sp-2) + 8px); } }
 
 /* แท่งเทียบปีก่อน */
 .td-compare { padding-right: var(--sp-3) !important; }
+/* หัวคอลัมน์เป้าหมายเทียบปีก่อน: ชื่อ + แกน 0 · … · สูงสุด ล้าน (ระยะขอบเท่าช่องในตาราง ให้แกนตรงกับแท่ง) */
+.td-table thead th.td-vly-head { padding-right: var(--sp-3); vertical-align: bottom; padding-bottom: 2px; }
 
 /* โหมดแก้ไข: ช่อง % และบาท (percentAmountInput) + คอลัมน์จัดการ */
 .td-table .num-input { width: 100%; }
@@ -122,17 +136,7 @@
 .td-add-channel td { height: auto; padding: 4px var(--sp-3); background: var(--c-surface); }
 .td-add-channel .account-picker .btn { border: 1px solid var(--c-border-strong); background: var(--c-surface); }
 
-/* ---------- Donut ---------- */
-.card.td-charts { display: flex; flex-direction: column; align-items: stretch; padding: var(--sp-3); }
-.card.td-charts > * + * { margin-top: var(--sp-2); }
-.td-chart-title { font-size: var(--fs-sm); margin: 0; color: var(--c-text-muted); }
-.td-charts .donut { flex-direction: column; align-items: center; gap: var(--sp-3); }
-.td-charts .donut-legend { width: 100%; }
-.td-charts .donut-row { grid-template-columns: 12px minmax(0, 1fr); }
-.td-chart-note { font-size: 11px; color: var(--c-text-muted); margin: 0; text-align: center; }
-
 @media (max-width: 1023px) {
-  .td-layout { grid-template-columns: minmax(0, 1fr); }
   .td-scroll { max-height: none; overflow-x: auto; }
   .td-table { min-width: 640px; }
 }

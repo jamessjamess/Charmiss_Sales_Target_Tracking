@@ -10,6 +10,8 @@
  *   group   = กลุ่มใน Side Menu: 'sales-planning' | 'product-master' | 'account-master' | 'project-info' (null = ไม่อยู่ในเมนู)
  *   tour    = ลำดับขั้นใน Sales Planning (null = ไม่มีเลขขั้นและปุ่มก่อนหน้า/ถัดไป)
  *   visible = แสดงใน Side Menu หรือไม่ (false = ซ่อนไว้ ไฟล์ยังอยู่ เปิดตรงได้ เปิดกลับได้โดยเปลี่ยนเป็น true)
+ *   year    = true → หน้าอิงปีแผน แสดงตัวเลือกปี (components.planYearPicker) ต่อท้ายชื่อหน้า
+ *   ชื่อที่แสดงจริงมาจาก content.js (pages.<id>.title / short / titleTip) title / short ในนี้เป็นค่าสำรอง
  *   fit     = true → หน้าสูงเท่าจอ (จอกว้างตั้งแต่ 1024px) ตาราง/กราฟเลื่อนภายในพื้นที่ของตัวเอง (body.fit-screen)
  * เลขขั้น "ขั้นที่ x/n" และปุ่มก่อนหน้า/ถัดไป นับเฉพาะหน้า visible ในกลุ่ม Sales Planning
  * index.html ที่ Root พาไปหน้าแรกของกลุ่ม Sales Planning
@@ -20,21 +22,19 @@
   var GROUPS = ['sales-planning', 'product-master', 'account-master', 'project-info'];
 
   var LIST = [
-    { id: 'home',          title: 'ภาพรวม',                     short: 'ภาพรวม',                path: 'index.html',                          group: null,             tour: null, visible: false },
-    { id: 'topDown',       title: 'แบ่งเป้า Top-down',           short: 'แบ่งเป้า Top-down',      path: 'modules/top-down/index.html',         group: 'sales-planning', tour: 1,    visible: true, fit: true },
-    { id: 'phasing',       title: 'กระจายเป้ารายเดือน',          short: 'กระจายเป้ารายเดือน',     path: 'modules/phasing/index.html',          group: 'sales-planning', tour: 2,    visible: true },
-    { id: 'skuPlanning',   title: 'วางแผนราย SKU',               short: 'วางแผนราย SKU',          path: 'modules/sku-planning/index.html',     group: 'sales-planning', tour: 3,    visible: true, fit: true },
-    { id: 'summary',       title: 'รายงานสรุปแผน',               short: 'รายงานสรุปแผน',          path: 'modules/summary/index.html',          group: 'sales-planning', tour: 4,    visible: true },
-    { id: 'productMaster', title: 'Listing และวันเริ่มขาย',      short: 'Listing และวันเริ่มขาย', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: true },
-    { id: 'accounts',      title: 'Account',                     short: 'Account',               icon: 'A', path: 'modules/accounts/index.html',       group: 'account-master', tour: null, visible: true },
+    { id: 'topDown',       title: 'จัดสรรเป้าหมายประจำปี',       short: 'เป้าหมายประจำปี',        path: 'modules/top-down/index.html',         group: 'sales-planning', tour: 1,    visible: true, fit: true, year: true },
+    { id: 'phasing',       title: 'จัดสรรเป้าหมายรายเดือน',      short: 'เป้าหมายรายเดือน',       path: 'modules/phasing/index.html',          group: 'sales-planning', tour: 2,    visible: true, year: true },
+    { id: 'skuPlanning',   title: 'วางแผนยอดขายราย SKU',         short: 'แผนยอดขายราย SKU',       path: 'modules/sku-planning/index.html',     group: 'sales-planning', tour: 3,    visible: true, fit: true, year: true },
+    { id: 'summary',       title: 'รายงานสรุปแผน',               short: 'รายงานสรุปแผน',          path: 'modules/summary/index.html',          group: 'sales-planning', tour: 4,    visible: true, year: true },
+    { id: 'productList',   title: 'รายการสินค้า',                short: 'รายการสินค้า',           icon: 'P', path: 'modules/products/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
+    { id: 'npdPlan',       title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)', short: 'แผน NPD',             icon: 'N', path: 'modules/npd-plan/index.html',       group: 'product-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'promotionPrice', title: 'Promotion Price',            short: 'Promotion Price',        icon: '%', path: 'modules/promotions/index.html',     group: 'product-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'productMaster', title: 'Listing และวันเริ่มขาย',      short: 'Listing และวันเริ่มขาย', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'taxonomy',      title: 'หมวดสินค้าและ Series',        short: 'หมวดสินค้าและ Series',   icon: 'C', path: 'modules/taxonomy/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
+    { id: 'accounts',      title: 'Account',                     short: 'Account',               icon: 'A', path: 'modules/accounts/index.html',       group: 'account-master', tour: null, visible: true, fit: true },
     { id: 'territories',   title: 'เขตการขาย',                   short: 'เขตการขาย ({territoryChannels})', icon: 'T', path: 'modules/territories/index.html', group: 'account-master', tour: null, visible: true },
-    { id: 'salespeople',   title: 'ผู้รับผิดชอบ',                short: 'ผู้รับผิดชอบ',           icon: 'S', path: 'modules/salespeople/index.html', group: 'account-master', tour: null, visible: true, fit: true },
-    { id: 'aboutPrototype', title: 'เกี่ยวกับ Prototype',        short: 'เกี่ยวกับ Prototype',     icon: 'i', path: 'modules/about-prototype/index.html', group: 'project-info', tour: null, visible: true, fit: true },
-    // ซ่อนไว้ (ห้ามลบไฟล์): เนื้อหาย้ายไปอยู่ในหน้าอื่นแล้ว
-    { id: 'masterData',    title: 'ใครดูแลข้อมูลอะไร',            short: 'เจ้าของข้อมูล',           path: 'modules/master-data/index.html',      group: null,             tour: null, visible: false },
-    { id: 'skuStatus',     title: 'Status vs วิธีเติมยอด',         short: 'Status SKU',            path: 'modules/sku-status/index.html',       group: null,             tour: null, visible: false },
-    { id: 'measureChain',  title: 'จากจำนวนชิ้นถึง Net Sales',     short: 'ชิ้น → Net Sales',       path: 'modules/measure-chain/index.html',    group: null,             tour: null, visible: false },
-    { id: 'approval',      title: 'อนุมัติ ล็อกเป้า Forecast',      short: 'อนุมัติ',                path: 'modules/approval/index.html',         group: null,             tour: null, visible: false }
+    { id: 'salespeople',   title: 'ผู้รับผิดชอบ',                short: 'ผู้รับผิดชอบ',           icon: 'S', path: 'modules/salespeople/index.html', group: 'account-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'aboutPrototype', title: 'เกี่ยวกับ Prototype',        short: 'เกี่ยวกับ Prototype',     icon: 'i', path: 'modules/about-prototype/index.html', group: 'project-info', tour: null, visible: true, fit: true }
   ];
 
   function byTour(a, b) { return (a.tour == null ? 999 : a.tour) - (b.tour == null ? 999 : b.tour); }

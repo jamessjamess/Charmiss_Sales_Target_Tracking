@@ -7,15 +7,24 @@
  *                                     default: data/targets.js years.<ปี> / ไม่มี = 0 + defaultChannels/defaultUnits
  *   plan.<ปี>.phasing.<unitId>        { monthPct: [12 สัดส่วน], edited: bool }       default: Seasonality ปีก่อนของหน่วย
  *                                     → ไม่มี ใช้ของ Channel → ไม่มี เท่ากันทุกเดือน (calc.defaultPhasing)
- *   plan.<ปี>.sku.<unitId>            { items: { <sku>: { startMonth, qty: [12], overrides: [12 bool], stopped } } }
- *                                     แผนครั้งแรก (Baseline)  default: calc.defaultSkuPlan (SKU ที่ Listing และขายอยู่
- *                                     + ค่าตั้งต้นรายช่องจาก data/plan-seeds.js)
+ *   plan.<ปี>.sku.<unitId>            { method, items: { <productKey>: { startMonth, qty: [12], overrides: [12 bool], stopped } } }
+ *                                     method = วิธีเติมยอดของช่องระบบเติม 'lastYear' | 'runRate' (ไม่มี = DEFAULT_FILL_METHOD)
+ *                                     แผนครั้งแรก (Baseline)  default: calc.defaultSkuPlan (สินค้าที่ Listing และขายอยู่
+ *                                     + NPD ที่แผน NPD อนุมัติแล้ว + ค่าตั้งต้นรายช่องจาก data/plan-seeds.js)
  *   plan.<ปี>.forecast.<unitId>       โครงเดียวกัน ใช้ในโหมดปรับแผน   default: สำเนาของ plan.<ปี>.sku.<unitId>
  *                                     (โหมดปรับแผนเขียนที่นี่เท่านั้น ไม่เขียนทับ Baseline)
  *   plan.<ปี>.workflow.<step>.<unitId|all>  { status, history: [{ action, by, at, note }], snapshot }
- *                                     step = topDown (all) | phasing | sku | forecast | baseline (all)  default: ร่าง
+ *                                     step = topDown (all) | phasing | sku | forecast | baseline (all)  default: ฉบับร่าง
+ *                                     baseline.snapshot = { gp, priceList, promotions } ราคาตอนล็อก (ใช้คำนวณแผนครั้งแรกหลังล็อก)
+ *                                     + report (CR-12) = ตัวเลขทั้งหมดของรายงานสรุปแผนตอนล็อก (core/report.js build) — รายงานที่ล็อกแล้วอ่านจากที่นี่
+ *   plan.<ปี>.baselineVersions        [{ no, code, at, by }] ประวัติเลขฉบับของรายงาน ({ปี}-BL-{nn}) ต่อท้ายทุกครั้งที่ล็อก Baseline   default: []
  *   master.products                   Product Master (ไม่แยกปี)   default: data/products.js
- *   master.listings                   [{ sku, accountId (= unitId) }] (ไม่แยกปี)   default: data/listings.js
+ *   master.listings                   [{ productKey, accountId (= unitId) }] (ไม่แยกปี)   default: data/listings.js
+ *   master.taxonomy                   หมวดสินค้าและ Series   default: data/taxonomy.js
+ *   master.priceList                  ราคาตามวันที่มีผล   default: data/pricing.js
+ *   master.promotions                 Promotion Price   default: data/promotions.js
+ *   master.npdPlans                   แผน NPD (มี workflow ของตัวเอง)   default: data/npd.js
+ *   master.audit                      Audit log [{ entity, key, field, oldValue, newValue, by, at }]   default: []
  *   master.accounts / master.territories / master.salespeople / master.assignments
  *                                     Account, เขตการขาย, Sales Person, ผู้รับผิดชอบตามช่วงเดือน (ไม่แยกปี)
  *                                     default: data/accounts.js, territories.js, salespeople.js, assignments.js
@@ -26,15 +35,22 @@
  *   ui.masterChannel                  Channel ที่เลือกในหน้า Account (หรือ 'all')
  *   ui.role                           บทบาทจำลอง { type: 'management' | 'director' | 'sales', personId }  default: DEFAULT_ROLE
  *   ui.sidebarCollapsed               Side Menu พับอยู่หรือไม่
- *   ui.seriesFilter                   [Series ที่เลือก] (หน้าวางแผน SKU และ Product Master ใช้ร่วมกัน ว่าง = ทุก Series)
+ *   ui.seriesFilter                   [Series / Sub Series ที่เลือก] (หน้าวางแผน SKU และ Product Master ใช้ร่วมกัน ว่าง = ทุก Series)
+ *   ui.productColumns                 คอลัมน์เพิ่มเติมที่เลือกในหน้ารายการสินค้า
+ *   ui.skuShowLastYear                หน้าวางแผน SKU แสดงยอดปีก่อน (บรรทัดเล็กใต้ตัวเลข + คอลัมน์ปีก่อน / การเติบโต)
+ *   ui.summaryTab                     แท็บล่าสุดของขั้นที่ 4: 'status' ติดตามสถานะ | 'report' รายงานสรุปแผน   default: null
+ *                                     (null = ตามสถานะ: ยังไม่ล็อก Baseline → ติดตามสถานะ / ล็อกแล้ว → รายงานสรุปแผน)
+ *   app.dataVersion                   รุ่นโครงข้อมูลของค่าที่เก็บไว้ (เปลี่ยนรุ่น = ล้างค่าที่ลองแก้ไว้ครั้งเดียว)
  *
  * API: get(key) / set(key, value) / remove(key) กลับไปใช้ค่าตั้งต้น / reset() ล้างทุก Key
  *      isSet(key) / keys() / onChange(fn) / status { persistent, crossPage }
  *      year() = ปีแผนที่เลือก / planKey('topDown') = 'plan.<ปีที่เลือก>.topDown'
- *      master() = { products, listings, accounts, territories, salespeople, assignments } จาก master.*
- *      data()   = SP.data ที่แทน accounts/territories/salespeople/assignments/products/listings ด้วยค่าใน master.*
+ *      master() = { products, listings, taxonomy, priceList, promotions, npdPlans, audit, accounts, territories, salespeople,
+ *                   assignments } จาก master.*
+ *      data()   = SP.data ที่แทน Master ทุกชุดด้วยค่าใน master.*
  *                 (ส่งให้ calc แทน SP.data เพื่อให้ค่าที่แก้ในหน้า Master มีผลทุกหน้า)
- *      role() = บทบาทจำลอง / currentKey() = เดือนปัจจุบันจำลองแบบ 'YYYY-MM'
+ *      role() = บทบาทจำลอง / currentKey() = เดือนปัจจุบันจำลองแบบ 'YYYY-MM' / today() = วันแรกของเดือนนั้น 'YYYY-MM-01'
+ *      appendAudit(entries) = ต่อท้าย master.audit
  *      workflowStates() = { '<step>.<unitId|all>': state } ของปีที่เลือก / saveWorkflowStates(map)
  * get() คืนสำเนาเสมอ แก้ค่าที่ได้โดยไม่ set() จะไม่มีผล
  *
@@ -46,6 +62,9 @@
   'use strict';
 
   var PREFIX = 'SP:';
+  // รุ่นโครงข้อมูล: v6 เปลี่ยนสินค้าเป็น productKey (TR Code / รหัสชั่วคราว) / 7 = CR-11 สินค้าจริงจาก data/seed/
+  // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด)
+  var DATA_VERSION = 7;
 
   function sessionAdapter() {
     var ss;
@@ -125,8 +144,14 @@
       match: /^plan\.(\d{4})\.workflow\.(.+)$/,
       make: function () { return { status: 'draft', history: [] }; }
     },
+    { match: /^plan\.(\d{4})\.baselineVersions$/, make: function () { return []; } },
     { match: /^master\.products$/, make: function () { return clone(SP.data.products); } },
     { match: /^master\.listings$/, make: function () { return clone(SP.data.listings); } },
+    { match: /^master\.taxonomy$/, make: function () { return clone(SP.data.taxonomy); } },
+    { match: /^master\.priceList$/, make: function () { return clone(SP.data.priceList); } },
+    { match: /^master\.promotions$/, make: function () { return clone(SP.data.promotions); } },
+    { match: /^master\.npdPlans$/, make: function () { return clone(SP.data.npdPlans); } },
+    { match: /^master\.audit$/, make: function () { return []; } },
     { match: /^master\.accounts$/, make: function () { return clone(SP.data.accounts); } },
     { match: /^master\.territories$/, make: function () { return clone(SP.data.territories); } },
     { match: /^master\.salespeople$/, make: function () { return clone(SP.data.salespeople); } },
@@ -148,7 +173,11 @@
     { match: /^ui\.masterChannel$/, make: function () { return 'all'; } },
     { match: /^ui\.role$/, make: function () { return { type: SP.data.settings.DEFAULT_ROLE, personId: null }; } },
     { match: /^ui\.sidebarCollapsed$/, make: function () { return false; } },
-    { match: /^ui\.seriesFilter$/, make: function () { return []; } }
+    { match: /^ui\.seriesFilter$/, make: function () { return []; } },
+    { match: /^ui\.productColumns$/, make: function () { return []; } },
+    { match: /^ui\.skuShowLastYear$/, make: function () { return false; } },
+    { match: /^ui\.summaryTab$/, make: function () { return null; } },
+    { match: /^app\.dataVersion$/, make: function () { return DATA_VERSION; } }
   ];
 
   function defaultFor(key) {
@@ -172,6 +201,15 @@
   // ---------------------------------------------------------------------
   function migrate() {
     var changed = [];
+    // รุ่นโครงข้อมูลเปลี่ยน → ล้างค่าที่ลองแก้ไว้ทั้งหมด (คงปีแผนและการพับเมนู) ครั้งเดียว
+    if (Object.keys(values).length && values['app.dataVersion'] !== DATA_VERSION) {
+      Object.keys(values).forEach(function (k) {
+        if (k === 'app.planYear' || k === 'ui.sidebarCollapsed') return;
+        delete values[k];
+        adapter.remove(k);
+      });
+    }
+    if (values['app.dataVersion'] !== DATA_VERSION) put('app.dataVersion', DATA_VERSION);
     function put(k, v) { values[k] = v; changed.push(k); }
     Object.keys(values).forEach(function (k) {
       if (/^plan\.\d{4}\.phasing\./.test(k) && Array.isArray(values[k])) put(k, { monthPct: values[k], edited: true });
@@ -186,14 +224,6 @@
     if (values['ui.phasing.selection'] && !values['ui.selection']) put('ui.selection', values['ui.phasing.selection']);
     var sel = values['ui.selection'];
     if (sel && sel.account && !sel.unit) put('ui.selection', { channel: sel.channel, unit: sel.account });
-    if (Array.isArray(values['master.products']) && values['master.products'].some(function (p) { return 'campaign' in p; })) {
-      put('master.products', values['master.products'].map(function (p) {
-        if (!('campaign' in p)) return p;
-        if (p.series == null) p.series = p.campaign;
-        delete p.campaign;
-        return p;
-      }));
-    }
     var old = Object.keys(values).filter(function (k) { return /^plan\.\d{4}\.salesPerson\./.test(k); });
     if (old.length) {
       var list = values['master.assignments'] ? values['master.assignments'] : clone(SP.data.assignments);
@@ -237,6 +267,11 @@
     return {
       products: get('master.products'),
       listings: get('master.listings'),
+      taxonomy: get('master.taxonomy'),
+      priceList: get('master.priceList'),
+      promotions: get('master.promotions'),
+      npdPlans: get('master.npdPlans'),
+      audit: get('master.audit'),
       accounts: get('master.accounts'),
       territories: get('master.territories'),
       salespeople: get('master.salespeople'),
@@ -261,17 +296,27 @@
 
   function currentKey() { return SP.core.calc.monthKey(year(), Number(get('ui.currentMonth')) || 0); }
 
-  function workflowStates() {
-    var prefix = planKey('workflow.');
+  // วันที่ "วันนี้" จำลอง = วันแรกของเดือนปัจจุบันจำลอง (ใช้ตัดสินราคาปัจจุบัน Status ของรายการสินค้า และวันที่มีผลตั้งต้น)
+  function today() { return currentKey() + '-01'; }
+
+  // ต่อท้าย Audit log (master.audit) entries จาก calc.auditDiff
+  function appendAudit(entries) {
+    if (!entries || !entries.length) return;
+    set('master.audit', get('master.audit').concat(entries));
+  }
+
+  // สถานะ Workflow ทั้งปี (y = ปีแผน ไม่ส่ง = ปีที่เลือก)
+  function workflowStates(y) {
+    var prefix = 'plan.' + (y || year()) + '.workflow.';
     var out = {};
     Object.keys(values).forEach(function (k) { if (k.indexOf(prefix) === 0) out[k.slice(prefix.length)] = clone(values[k]); });
     return out;
   }
 
-  function saveWorkflowStates(map) {
-    var before = workflowStates();
+  function saveWorkflowStates(map, y) {
+    var before = workflowStates(y);
     Object.keys(map).forEach(function (k) {
-      if (JSON.stringify(before[k]) !== JSON.stringify(map[k])) set(planKey('workflow.' + k), map[k]);
+      if (JSON.stringify(before[k]) !== JSON.stringify(map[k])) set('plan.' + (y || year()) + '.workflow.' + k, map[k]);
     });
   }
 
@@ -282,6 +327,8 @@
     data: data,
     role: role,
     currentKey: currentKey,
+    today: today,
+    appendAudit: appendAudit,
     workflowStates: workflowStates,
     saveWorkflowStates: saveWorkflowStates,
     planKey: planKey,
@@ -295,6 +342,9 @@
     reset: function () {
       values = {};
       adapter.clear();
+      // เก็บรุ่นข้อมูลไว้ ไม่อย่างนั้นค่าที่ตั้งหลังรีเซ็ต (เช่น มุมมองผู้ใช้) ถูกล้างอีกครั้งตอนเปิดหน้าถัดไป
+      values['app.dataVersion'] = DATA_VERSION;
+      adapter.save('app.dataVersion', DATA_VERSION);
       emit(null);
     },
     isSet: function (key) { return Object.prototype.hasOwnProperty.call(values, key); },

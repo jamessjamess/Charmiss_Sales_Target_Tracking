@@ -6,14 +6,20 @@
  * ตัวเลขทั้งหมดมาจาก SP.core.calc ห้ามคำนวณใน Component
  *
  *   h(tag, props, ...children) / clear / fill(ข้อความ, { ค่า })
- *   Badge และ Legend: alertBadge, statusBadge, sourceChip, legend, sourceLegend, alertLegend, wfIcon, wfBadge
- *   remainingBar, table, numberInput, percentAmountInput, accountPicker, growthText, historyTag, pctInput,
- *   select, subChannelSelect, segmented, card, callout, approveBox, monthStrip, barChart, searchSelect
+ *   Badge และ Legend: alertBadge, statusBadge, sourceChip, legend, wfIcon, wfBadge
+ *   remainingBar, table, numberInput, percentAmountInput, accountPicker, growthText,
+ *   select, segmented, card, callout, approveBox, barChart, searchSelect
  *   subChannelPicker (Channel | หน่วยแบ่งเป้า ‹ › | ผู้รับผิดชอบปัจจุบัน) ใช้ร่วมกันหน้า Phasing และวางแผน SKU
  *   ownerInfo, ownerStrip (แถบผู้รับผิดชอบรายเดือน), personColor
- *   workflowBar (สถานะ + ปุ่มแก้ไข/บันทึก/ส่ง/อนุมัติ ที่หัวหน้า), editBanner, guardUnsaved, confirmDiscard
+ *   workflowBar (สถานะ + ปุ่มแก้ไข/บันทึก/ส่ง/อนุมัติ ที่หัวหน้า), editBanner, guardUnsaved, confirmDiscard,
+ *   planYearPicker (ปีแผนต่อท้ายชื่อหน้า — layout ใส่ให้หน้าที่ registry ตั้ง year: true)
  *   dialog (กล่องยืนยัน), popover, menuButton, seriesFilter, rulesContent, rulesPanel, rulesButton
- *   calcExplainer (ⓘ วิธีคำนวณ), cellBreakdown (Tooltip รายช่อง), bindArrowNav, diagram (Mermaid + fallback)
+ *   calcExplainer (ⓘ วิธีคำนวณ), cellBreakdown (Tooltip รายช่อง), bindArrowNav
+ *   Product Master: productThumb (รูปย่อ / ตัวอักษรย่อของ Series), resizeImage (ย่อรูปด้วย Canvas), completenessBadge,
+ *   statusStrip (เส้นเวลา Status 12 เดือน), cascadeSelect (Dropdown หมวดสินค้า/Series แบบลำดับชั้น), drawer (แผงด้านขวา),
+ *   hoverTip (Tooltip ทั่วไป), choiceDialog, exportButton (ส่งออก ▾ Excel / CSV ผ่าน SP.core.export), priorLabel (ยอดขายปี {ปี} ⓘ)
+ *   CR-11: gridKeys (คีย์บอร์ด เลือกช่วง คัดลอก/วางกับ Excel เติมลง/ขวา ล้างค่า ย้อนกลับ ไฮไลต์แถวและคอลัมน์ ของตารางกรอกตัวเลข),
+ *   undoStack (ประวัติสำหรับ Ctrl+Z ภายในรอบแก้ไข), promptNumber (กล่องกรอกตัวเลข), dialog opts.body (เนื้อหาเพิ่มเติม)
  */
 (function (SP) {
   'use strict';
@@ -106,6 +112,7 @@
   function remainingAmount(rem, format) { return rem.status === 'empty' ? '–' : (format || F.baht)(Math.abs(rem.amount)); }
   function remainingPct(rem) { return rem.status === 'empty' ? '–' : F.pct(Math.abs(rem.pct), 2); }
 
+  // Status สินค้า (calc.productStatus): planned | new | active | clearance | discontinued — สีจาก class st-<status>
   function statusBadge(status, suffix) {
     return h('span', { class: 'badge st-' + status }, labels().status[status] + (suffix ? ' ' + suffix : ''));
   }
@@ -119,16 +126,6 @@
     return h('div', { class: 'legend' }, items.map(function (it) {
       return h('span', { class: 'legend-item' }, h('span', { class: 'swatch ' + it.className }), it.label);
     }));
-  }
-
-  function sourceLegend() {
-    var L = labels().source;
-    return legend(['locked', 'manual', 'system', 'clearance'].map(function (s) { return { className: 'src-' + s, label: L[s] }; }));
-  }
-
-  function alertLegend() {
-    var L = labels().alert;
-    return legend(['ok', 'short', 'over'].map(function (s) { return { className: 'alert-' + s, label: L[s] }; }));
   }
 
   // ไอคอนเล็กของสถานะ Workflow (มี title + aria-label บอกชื่อสถานะ)
@@ -244,7 +241,8 @@
     input.addEventListener('focus', function () { input.select(); });
     var wrap = h('span', { class: 'num-input' }, input, opts.suffix ? h('span', { class: 'num-suffix' }, opts.suffix) : null);
     wrap.input = input;
-    wrap.setValue = function (v) { if (document.activeElement !== input) show(v); };
+    // force = แสดงค่าใหม่แม้ช่องกำลังโฟกัส (ค่าที่มาจากเครื่องมือ เช่น วางจาก Excel หรือย้อนกลับ)
+    wrap.setValue = function (v, force) { if (force || document.activeElement !== input) show(v); };
     return wrap;
   }
 
@@ -330,24 +328,6 @@
     return h('span', { class: 'growth ' + cls }, F.growth(g, labels().growthNew));
   }
 
-  // ป้ายปีของ History เช่น '2026 (Actual 8M + Est.)' (ข้อความจาก content.labels.historyTag)
-  function historyTag(year) {
-    var y = SP.data.history.years[year];
-    var t = labels().historyTag;
-    var text = !y ? t.none : y.actualMonths < 12 ? t.actualEst : t.actual;
-    return h('span', { class: 'history-tag' }, text.replace('{year}', year).replace('{n}', y ? y.actualMonths : ''));
-  }
-
-  // ช่องกรอก % รับและส่งค่าเป็นสัดส่วน (0.45)
-  function pctInput(opts) {
-    return numberInput({
-      value: F.pctInput(opts.value),
-      min: 0, max: 100, step: opts.step || 1,
-      suffix: '%', label: opts.label, className: 'pct ' + (opts.className || ''),
-      onChange: function (v) { opts.onChange(v / 100); }
-    });
-  }
-
   // options = [{ value, label, group }]
   function select(opts) {
     var el = h('select', { class: 'select' + (opts.className ? ' ' + opts.className : ''), 'aria-label': opts.label, disabled: opts.disabled, onChange: function () { opts.onChange(el.value); } });
@@ -361,14 +341,6 @@
       parent.appendChild(h('option', { value: o.value, selected: String(o.value) === String(opts.value), disabled: o.disabled }, o.label));
     });
     return el;
-  }
-
-  // เลือกหน่วยจากแผนของปีนั้น (tree = calc.topDown(...)) จัดกลุ่มตาม Channel
-  function subChannelSelect(tree, value, onChange, label) {
-    var options = SP.core.calc.planUnits(tree).map(function (a) {
-      return { value: a.id, label: a.name, group: a.channel.name + ' · ' + a.channel.fullName };
-    });
-    return select({ options: options, value: value, onChange: onChange, label: label });
   }
 
   // options = [{ value, label, title, disabled }]
@@ -403,20 +375,6 @@
     return h('aside', { class: 'approve-box' },
       h('h2', null, title || SP.data.content.site.approveTitle),
       h('ol', null, items.map(function (t) { return h('li', null, t); })));
-  }
-
-  // ---------------------------------------------------------------------
-  // แถบ 12 เดือน: cells = [{ className, text, title }]
-  // ---------------------------------------------------------------------
-  function monthStrip(cells, opts) {
-    opts = opts || {};
-    return h('div', { class: 'month-strip' + (opts.className ? ' ' + opts.className : '') },
-      opts.label ? h('div', { class: 'ms-label' }, opts.label) : null,
-      h('div', { class: 'ms-cells' }, cells.map(function (c, i) {
-        return h('div', { class: 'ms-cell ' + (c.className || ''), title: c.title },
-          opts.showMonths === false ? null : h('span', { class: 'ms-month' }, F.month(i)),
-          h('span', { class: 'ms-text' }, c.text == null ? '' : c.text));
-      })));
   }
 
   // ---------------------------------------------------------------------
@@ -476,6 +434,7 @@
   //         buttonLabel (ถ้ากำหนด = ปุ่มคำสั่ง เช่น "+ เพิ่ม SKU" ไม่แสดงค่าที่เลือก),
   //         plainButton (ปุ่มตอนปิดแสดงเฉพาะชื่อ — sub, badge และ meta แสดงเฉพาะในรายการ),
   //         fixed (รายการลอยตามตำแหน่งปุ่มบนจอ ใช้เมื่อปุ่มอยู่ในตารางที่ตัดส่วนเกิน ปิดเองเมื่อเลื่อนหน้า) }
+  //   option.disabled + option.reason = แสดงในรายการแต่เลือกไม่ได้ พร้อมเหตุผล (เช่น สินค้าขาดข้อมูลจำเป็น)
   // คืน element ที่มี .update(options, value) และ .open(filter) (เปิดรายการโดยกรองเฉพาะที่ filter(option) = true)
   // ---------------------------------------------------------------------
   function statusDot(status) {
@@ -493,7 +452,8 @@
     function find(v) { return state.options.filter(function (o) { return o.value === v; })[0] || null; }
     function optionBody(o) {
       return [statusDot(o.status), h('span', { class: 'ss-label' }, o.label), o.badge ? o.badge.cloneNode(true) : null, o.sub ? h('span', { class: 'ss-sub' }, o.sub) : null,
-        o.meta ? h('span', { class: 'ss-meta' }, o.meta.map(function (m) { return m.cloneNode(true); })) : null];
+        o.meta ? h('span', { class: 'ss-meta' }, o.meta.map(function (m) { return m.cloneNode(true); })) : null,
+        o.disabled && o.reason ? h('span', { class: 'ss-reason' }, o.reason) : null];
     }
     function renderButton() {
       clear(button);
@@ -512,9 +472,9 @@
       if (!state.shown.length) { list.appendChild(h('li', { class: 'ss-empty' }, opts.emptyText)); return; }
       state.shown.forEach(function (o, i) {
         list.appendChild(h('li', {
-          role: 'option', class: 'ss-option' + (i === state.active ? ' is-active' : '') + (o.value === state.value ? ' is-selected' : ''),
-          'aria-selected': o.value === state.value ? 'true' : 'false',
-          onMousedown: function (e) { e.preventDefault(); choose(o.value); }
+          role: 'option', class: 'ss-option' + (i === state.active ? ' is-active' : '') + (o.value === state.value ? ' is-selected' : '') + (o.disabled ? ' is-disabled' : ''),
+          'aria-selected': o.value === state.value ? 'true' : 'false', 'aria-disabled': o.disabled ? 'true' : null, title: o.disabled ? o.reason : null,
+          onMousedown: function (e) { e.preventDefault(); if (!o.disabled) choose(o.value); }
         }, optionBody(o)));
       });
     }
@@ -557,7 +517,7 @@
     search.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown') { e.preventDefault(); state.active = Math.min(state.active + 1, state.shown.length - 1); renderList(); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); state.active = Math.max(state.active - 1, 0); renderList(); }
-      else if (e.key === 'Enter') { e.preventDefault(); if (state.shown[state.active]) choose(state.shown[state.active].value); }
+      else if (e.key === 'Enter') { e.preventDefault(); var o = state.shown[state.active]; if (o && !o.disabled) choose(o.value); }
       else if (e.key === 'Escape') { e.preventDefault(); close(); button.focus(); }
     });
     search.addEventListener('blur', function () { setTimeout(function () { if (!inside(document.activeElement)) close(); }, 0); });
@@ -671,7 +631,7 @@
     if (!unit) return wrap;
 
     var units = ch.children;
-    var typeLabel = L.unitType[ch.allocationUnit] || P.unit;
+    var typeLabel = ch.unitLabel || P.unit;
     function options() {
       return units.map(function (u) {
         var o = opts.ownerOf ? opts.ownerOf(u.id) : null;
@@ -744,15 +704,15 @@
   }
 
   // ---------------------------------------------------------------------
-  // กล่องยืนยัน (<dialog>) opts: { title, lines: [ข้อความ], text, note: { label, required, requiredText },
-  //   confirmLabel, cancelLabel } → Promise<{ ok, note }>
+  // กล่องยืนยัน (<dialog>) opts: { title, lines: [ข้อความ], text, body (node เนื้อหาเพิ่มเติม), note: { label, required, requiredText },
+  //   confirmLabel, cancelLabel, danger, wide } → Promise<{ ok, note }>
   // ---------------------------------------------------------------------
   function dialog(opts) {
     var D = labels().dialog;
     return new Promise(function (resolve) {
       var note = opts.note ? h('textarea', { class: 'dlg-note', rows: '3', 'aria-label': opts.note.label }) : null;
       var err = h('p', { class: 'dlg-error', role: 'alert', hidden: true });
-      var dlg = h('dialog', { class: 'sp-dialog', 'aria-label': opts.title });
+      var dlg = h('dialog', { class: 'sp-dialog' + (opts.wide ? ' is-wide' : ''), 'aria-label': opts.title });
       var finished = false;
       function done(ok) {
         if (finished) return;
@@ -772,6 +732,7 @@
         h('h2', { class: 'dlg-title' }, opts.title),
         opts.lines && opts.lines.length ? h('ul', { class: 'dlg-lines' }, opts.lines.map(function (l) { return h('li', null, l); })) : null,
         opts.text ? h('p', { class: 'dlg-text' }, opts.text) : null,
+        opts.body || null,
         note ? h('label', { class: 'dlg-note-label' }, h('span', { class: 'field-label' }, opts.note.label), note) : null,
         err,
         h('div', { class: 'dlg-actions' },
@@ -841,14 +802,19 @@
     return { open: open, close: close, isOpen: function () { return !!panel; } };
   }
 
-  // ปุ่ม ⋯ ที่เปิดรายการคำสั่ง items = [{ label, title, onClick }]
-  function menuButton(items, label) {
-    var btn = h('button', { type: 'button', class: 'icon-btn more-btn', title: label || labels().more, 'aria-label': label || labels().more }, '⋯');
+  // ปุ่ม ⋯ ที่เปิดรายการคำสั่ง items = [{ label, title, onClick, disabled, danger }] (items เป็นฟังก์ชันได้ = สร้างรายการตอนเปิด)
+  function menuButton(items, label, opts) {
+    var btn = h('button', { type: 'button', class: 'icon-btn more-btn' + (opts && opts.className ? ' ' + opts.className : ''), title: label || labels().more, 'aria-label': label || labels().more }, opts && opts.text ? opts.text : '⋯');
     popover(btn, function (close) {
-      return h('ul', { class: 'menu-list' }, items.map(function (it) {
-        return h('li', null, h('button', { type: 'button', class: 'menu-item', title: it.title, onClick: function () { close(); it.onClick(); } }, it.label));
+      var list = typeof items === 'function' ? items() : items;
+      return h('ul', { class: 'menu-list' }, list.filter(Boolean).map(function (it) {
+        return h('li', null, h('button', {
+          type: 'button', class: 'menu-item' + (it.danger ? ' is-danger' : '') + (it.current ? ' is-current' : ''), title: it.title, disabled: !!it.disabled,
+          'aria-current': it.current ? 'true' : null,
+          onClick: function () { close(); it.onClick(); }
+        }, it.label));
       }));
-    }, { className: 'menu-popover', label: label || labels().more, align: 'right' });
+    }, { className: 'menu-popover', label: label || labels().more, align: opts && opts.align ? opts.align : 'right' });
     return btn;
   }
 
@@ -900,7 +866,7 @@
             pending = pending.filter(function (v) { return v !== o.value; });
             if (box.checked) pending.push(o.value);
           });
-          list.appendChild(h('li', null, h('label', { class: 'series-option' }, box,
+          list.appendChild(h('li', { class: o.depth ? 'series-depth-' + o.depth : null }, h('label', { class: 'series-option' }, box,
             h('span', { class: 'series-name' }, o.label), o.count != null ? h('span', { class: 'series-count' }, o.count) : null)));
         });
       }
@@ -917,12 +883,13 @@
     return wrap;
   }
 
-  // Filter Series: options = calc.seriesList(products) [{ value, count }]
+  // Filter Series: options = calc.seriesList(taxonomy, products) [{ value, label, depth, count }]
+  //   Series และ Sub Series (เยื้อง) เลือก Series = รวม Sub Series ทั้งหมด (calc.inSeries)
   function seriesFilter(opts) {
     var S = labels().series;
     return multiSelect({
       label: S.label, allLabel: S.all, search: S.search, clear: S.clear, empty: S.empty, selected: S.selected,
-      options: opts.options.map(function (o) { return { value: o.value, label: o.value || S.none, count: fill(S.count, { n: o.count }) }; }),
+      options: opts.options.map(function (o) { return { value: o.value, label: o.label || S.none, depth: o.depth, count: fill(S.count, { n: o.count }) }; }),
       value: opts.value, onChange: opts.onChange, guard: opts.guard
     });
   }
@@ -989,7 +956,7 @@
 
   // ---------------------------------------------------------------------
   // Tooltip รายช่อง (Hover หรือโฟกัสด้วยคีย์บอร์ด) — root = ตาราง / ช่องที่มี data-cell
-  // resolve(el) → { heading, breakdown (calc.cellBreakdown), hasGP, lockText, sourceText } | null
+  // resolve(el) → { heading, breakdown (calc.cellBreakdown), hasGP, lockText, sourceText, notes: [บรรทัดเพิ่มเติม] } | null
   // ---------------------------------------------------------------------
   var TIP = null;
 
@@ -1029,6 +996,7 @@
         }))));
       }
       if (info.sourceText) TIP.appendChild(h('div', { class: 'tip-source' }, B.source + ': ' + info.sourceText));
+      (info.notes || []).forEach(function (n) { if (n) TIP.appendChild(h('div', { class: 'tip-source' }, n)); });
       TIP.hidden = false;
       place(target);
     }
@@ -1066,6 +1034,33 @@
     });
   }
 
+  // ตัวเลือกปีแผนในแถวหัวข้อ (CR-10) ขนาดตัวอักษรเท่าหัวข้อหน้า มี ▾ และ Tooltip "เปลี่ยนปีแผน"
+  // ค่าเก็บที่ app.planYear (ทุกหน้าใช้ร่วมกัน) เปลี่ยนแล้วโหลดหน้าใหม่ / มีรายการที่ยังไม่บันทึก (guardUnsaved) → ถามยืนยันก่อน
+  function planYearPicker() {
+    var store = SP.core.store;
+    var site = SP.data.content.site;
+    var year = store.year();
+    var btn = h('button', { type: 'button', class: 'year-title', title: site.yearChange, 'aria-label': site.yearChange + ' ' + year },
+      h('span', { class: 'year-title-value' }, String(year)),
+      h('span', { class: 'year-title-caret no-print', 'aria-hidden': 'true' }, '▾'));
+    popover(btn, function (close) {
+      return h('ul', { class: 'menu-list year-list' }, SP.data.settings.PLAN_YEARS.map(function (y) {
+        return h('li', null, h('button', {
+          type: 'button', class: 'menu-item year-option' + (y === year ? ' is-current' : ''), 'aria-current': y === year ? 'true' : null,
+          onClick: function () {
+            close();
+            if (y === year) return;
+            if (!confirmDiscard(dirtyFn ? dirtyFn() || 0 : 0)) return;
+            guardUnsaved(null);
+            store.set('app.planYear', y);
+            location.reload();
+          }
+        }, String(y)));
+      }));
+    }, { className: 'menu-popover year-popover', label: site.yearChange });
+    return btn;
+  }
+
   // มีค่าที่ยังไม่บันทึก n ค่า → ถามก่อนทิ้ง (true = ไปต่อได้)
   function confirmDiscard(n) {
     if (!n) return true;
@@ -1083,6 +1078,8 @@
   //         onEdit(), onSave(), onCancel(), onChange(result) (หลังเปลี่ยนสถานะ) }
   // คืน element (display: contents → ส่วนสถานะและปุ่มเป็น item ของแถวหัวข้อ) ที่มี .update()
   // ---------------------------------------------------------------------
+  // opts เพิ่มเติม: extra = node ที่วางหน้าปุ่มเสมอ (เช่น ส่งออก ▾) / editRoles = บทบาทที่แก้หน้า Master ได้ (simple)
+  //   getState() + onAction(action, payload) → { ok, error } = สถานะที่ไม่ได้เก็บใน plan.<ปี>.workflow (แผน NPD)
   function workflowBar(opts) {
     var W = SP.core.workflow;
     var store = SP.core.store;
@@ -1096,19 +1093,21 @@
     wrap.appendChild(actionsEl);
 
     function title() { return typeof opts.title === 'function' ? opts.title() : (opts.title || ''); }
-    function roleName(r) {
-      if (!r) return '';
-      if (r.type === 'sales') return personName(store.get('master.salespeople'), r.personId) || L.roles.sales;
-      return L.roles[r.type] || r.type;
-    }
     function approverName() { return opts.step === 'topDown' ? L.roles.management : L.roles.director; }
     function submitterName() {
+      if (opts.step === 'npd') return L.roles.product;
       if (opts.step === 'topDown' || !opts.ownerId) return L.roles.director;
       return personName(store.get('master.salespeople'), opts.ownerId);
     }
 
     function apply(action, extra) {
       extra = extra || {};
+      if (opts.onAction) {
+        var r = opts.onAction(action, { by: roleName(store.role()), at: new Date().toISOString(), note: extra.note });
+        if (!r.ok) { window.alert(r.error === 'noteRequired' ? WL.noteRequired : r.error); return; }
+        if (opts.onChange) opts.onChange(r);
+        return;
+      }
       var res = W.applyAction(store.workflowStates(), {
         step: opts.step, unitId: opts.unitId, action: action,
         by: roleName(store.role()), at: new Date().toISOString(), note: extra.note,
@@ -1183,14 +1182,22 @@
     function render() {
       clear(statusEl);
       clear(actionsEl);
+      if (opts.extra) actionsEl.appendChild(opts.extra);
       var editing = !!(opts.editing && opts.editing());
       if (opts.simple) {
+        var mv = W.masterViewState(store.role(), opts.editRoles);
+        if (mv.kind === 'readOnly') {
+          var editor = roleName(mv.switchTo);
+          actionsEl.appendChild(h('span', { class: 'wf-hint' }, fill(WL.readOnlyMaster, { name: editor })));
+          actionsEl.appendChild(switchButton(mv.switchTo, fill(WL.switchToEditor, { name: editor })));
+          return;
+        }
         (editing ? ['save', 'cancel'] : ['edit']).forEach(function (a) { actionsEl.appendChild(button(a, a !== 'cancel')); });
         return;
       }
       var states = store.workflowStates();
-      var locked = W.isLocked(states);
-      var state = W.stateOf(states, opts.step, opts.unitId);
+      var locked = opts.step === 'npd' ? false : W.isLocked(states);
+      var state = opts.getState ? opts.getState() : W.stateOf(states, opts.step, opts.unitId);
       var preparerName = submitterName();
       statusEl.appendChild(wfBadge(state.status));
       if (locked && LOCKABLE.indexOf(opts.step) >= 0) statusEl.appendChild(h('span', { class: 'history-tag wf-locked' }, '🔒 ' + WL.lockedTag));
@@ -1211,7 +1218,7 @@
       view.actions.forEach(function (a) {
         if (a === 'submit') {
           var facts = opts.facts ? opts.facts() : {};
-          var cs = W.canSubmit(opts.step, opts.unitId, opts.year, { states: states, remaining: facts.remaining, baselineLocked: locked });
+          var cs = W.canSubmit(opts.step, opts.unitId, opts.year, { states: states, remaining: facts.remaining, ready: facts.ready, baselineLocked: locked });
           var reason = cs.ok ? null : cs.reason === 'baseline' ? WL.reasons.baseline : (WL.reasons[cs.reason] || {})[opts.step];
           if (reason) actionsEl.appendChild(h('span', { class: 'wf-reason', role: 'note' }, reason));
           actionsEl.appendChild(button('submit', true, { disabled: !cs.ok, title: reason }));
@@ -1240,64 +1247,537 @@
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Diagram: ใช้ Mermaid จาก CDN ถ้าโหลดไม่ได้แสดง fallback (HTML ธรรมดา)
-  // ---------------------------------------------------------------------
-  var MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
-  var mermaidPromise = null;
-  var diagramCount = 0;
+  // =====================================================================
+  // Product Master และส่วนกลางที่เพิ่มใน v6 / v7
+  // =====================================================================
 
-  function loadMermaid() {
-    if (mermaidPromise) return mermaidPromise;
-    mermaidPromise = new Promise(function (resolve, reject) {
-      if (window.mermaid) { resolve(window.mermaid); return; }
-      var s = document.createElement('script');
-      var timer = setTimeout(function () { reject(new Error('timeout')); }, 6000);
-      s.src = MERMAID_URL;
-      s.onload = function () { clearTimeout(timer); window.mermaid ? resolve(window.mermaid) : reject(new Error('no mermaid')); };
-      s.onerror = function () { clearTimeout(timer); reject(new Error('load failed')); };
-      document.head.appendChild(s);
-    });
-    return mermaidPromise;
+  function placeTip(tip, target) {
+    var r = target.getBoundingClientRect();
+    var w = tip.offsetWidth, ht = tip.offsetHeight;
+    var vw = document.documentElement.clientWidth;
+    var left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, vw - w - 8));
+    var top = r.bottom + 6;
+    if (top + ht > window.innerHeight - 8) top = r.top - ht - 6;
+    tip.style.left = left + 'px';
+    tip.style.top = Math.max(8, top) + 'px';
   }
 
-  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  // Tooltip ทั่วไป (Hover หรือโฟกัสด้วยคีย์บอร์ด) root = กล่องที่ครอบ / selector = องค์ประกอบที่มี Tooltip
+  // build(el) → node | null → { hide, refresh }
+  var HOVER_TIP = null;
+  function hoverTip(root, selector, build) {
+    if (!HOVER_TIP) { HOVER_TIP = h('div', { class: 'cell-tip hover-tip', role: 'tooltip', hidden: true }); document.body.appendChild(HOVER_TIP); }
+    var current = null;
+    function hide() { if (current) { HOVER_TIP.hidden = true; current = null; } }
+    function show(t) {
+      var node = build(t);
+      if (!node) { hide(); return; }
+      current = t;
+      clear(HOVER_TIP);
+      append(HOVER_TIP, node);
+      HOVER_TIP.hidden = false;
+      placeTip(HOVER_TIP, t);
+    }
+    function find(e) { var t = e.target.closest ? e.target.closest(selector) : null; return t && root.contains(t) ? t : null; }
+    root.addEventListener('mouseover', function (e) { var t = find(e); if (t) { if (t !== current) show(t); } else hide(); });
+    root.addEventListener('mouseleave', hide);
+    root.addEventListener('focusin', function (e) { var t = find(e); if (t) show(t); });
+    root.addEventListener('focusout', hide);
+    root.addEventListener('scroll', hide, true);
+    return { hide: hide, refresh: function () { if (current && document.body.contains(current)) show(current); } };
+  }
 
-  // opts: { source (Mermaid), fallback (node), label }
-  function diagram(opts) {
-    var box = h('div', { class: 'diagram', role: 'img', 'aria-label': opts.label || '' }, opts.fallback);
-    // รอ Font โหลดเสร็จก่อน ไม่อย่างนั้น Mermaid วัดความกว้างข้อความผิดและตัดข้อความในกล่อง
-    var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
-    fontsReady.then(loadMermaid).then(function (mermaid) {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: 'base',
-        securityLevel: 'strict',
-        flowchart: { padding: 16, nodeSpacing: 36, rankSpacing: 56 },
-        fontFamily: cssVar('--font-sans'),
-        themeVariables: {
-          fontFamily: cssVar('--font-sans'),
-          fontSize: '16px',
-          primaryColor: cssVar('--c-surface'),
-          primaryBorderColor: cssVar('--c-border-strong'),
-          primaryTextColor: cssVar('--c-text'),
-          lineColor: cssVar('--c-text-muted'),
-          clusterBkg: cssVar('--c-surface-2'),
-          clusterBorder: cssVar('--c-border')
-        }
-      });
-      diagramCount += 1;
-      return mermaid.render('sp-diagram-' + diagramCount, opts.source);
-    }).then(function (res) {
-      box.classList.add('is-mermaid');
-      box.innerHTML = res.svg;
-    }).catch(function () {
-      box.classList.add('is-fallback');
+  // สีของ Series (ภาพแทนรูปสินค้า) = --ser-1 ถึง --ser-8 ตามลำดับ Series ใน Master
+  function seriesToken(tax, seriesId) {
+    var ids = SP.core.calc.taxonomyChildren(tax, 'series', null).map(function (n) { return n.id; });
+    var i = ids.indexOf(seriesId);
+    return '--ser-' + ((i < 0 ? 5 : i) % 8 + 1);
+  }
+
+  function initials(name) {
+    var words = String(name || '').split(/\s+/).filter(Boolean);
+    if (!words.length) return '–';
+    return (words[0].charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase();
+  }
+
+  // รูปสินค้าย่อ: image (data URL) หรือภาพแทน = ตัวอักษรย่อของ Series บนพื้นสีของ Series
+  // opts = { size: 'sm' | 'md' | 'lg' }
+  function productThumb(product, tax, opts) {
+    var size = (opts && opts.size) || 'sm';
+    if (product && product.image) return h('img', { class: 'thumb thumb-' + size, src: product.image, alt: product.name || '', loading: 'lazy' });
+    var sname = product ? SP.core.calc.taxonomyName(tax, 'series', product.seriesId) : '';
+    return h('span', {
+      class: 'thumb thumb-' + size + ' thumb-empty', role: 'img', 'aria-label': labels().product.noImage,
+      title: labels().product.noImage, style: { '--c': tokenVar(seriesToken(tax, product && product.seriesId)) }
+    }, initials(sname));
+  }
+
+  // ย่อรูปที่เลือกจากเครื่องด้วย Canvas ให้ด้านยาวไม่เกิน maxPx แล้วคืน data URL (ไม่เก็บไฟล์ต้นฉบับ) → Promise<string>
+  function resizeImage(file, maxPx) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\//.test(file.type)) { reject(new Error('type')); return; }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('read')); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('decode')); };
+        img.onload = function () {
+          var scale = Math.min(1, maxPx / Math.max(img.width || 1, img.height || 1));
+          var w = Math.max(1, Math.round(img.width * scale)), ht = Math.max(1, Math.round(img.height * scale));
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = ht;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, ht);
+          resolve(canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
     });
-    return box;
+  }
+
+  // ป้ายความครบถ้วน (calc.productCompleteness): ครบ / ขาดจำเป็น n / ขาดที่ควรมี n — Tooltip บอกชื่อฟิลด์
+  function completenessBadge(c) {
+    var P = labels().product;
+    var names = labels().productFields;
+    var list = c.missingRequired.concat(c.missingRecommended).map(function (f) { return names[f] || f; });
+    var text = c.level === 'ok' ? P.complete : c.level === 'required' ? fill(P.missingRequired, { n: c.missingRequired.length }) : fill(P.missingRecommended, { n: c.missingRecommended.length });
+    var title = c.level === 'ok' ? P.completeTitle : [
+      c.missingRequired.length ? fill(P.missingRequiredTitle, { fields: c.missingRequired.map(function (f) { return names[f] || f; }).join(', ') }) : null,
+      c.missingRecommended.length ? fill(P.missingRecommendedTitle, { fields: c.missingRecommended.map(function (f) { return names[f] || f; }).join(', ') }) : null
+    ].filter(Boolean).join(' · ');
+    return h('span', { class: 'badge ' + (c.level === 'ok' ? 'tag-ok' : c.level === 'required' ? 'tag-danger' : 'tag-warn'), title: title, 'aria-label': text + (list.length ? ' · ' + title : '') }, text);
+  }
+
+  // เส้นเวลา Status 12 เดือน (calc.statusSegments) ช่องละเดือน สีตาม Status มีชื่อเดือนและ Status ใน Tooltip
+  function statusStrip(segments, year) {
+    var S = labels().status;
+    var cells = [];
+    segments.forEach(function (seg) {
+      for (var m = seg.from; m <= seg.to; m++) cells.push({ className: 'st-' + seg.status, text: F.month(m), title: F.monthYear(m, year) + ' · ' + S[seg.status] });
+    });
+    return h('div', { class: 'status-strip', role: 'list' }, cells.map(function (c) { return h('span', { class: 'status-cell ' + c.className, role: 'listitem', title: c.title }, c.text); }));
+  }
+
+  // Dropdown แบบลำดับชั้นของหมวดสินค้า (Category → Sub Category → Type) หรือ Series (Series → Sub Series)
+  // เลือกระดับบนแล้วระดับล่างแสดงเฉพาะรายการใต้ระดับนั้น / รายการที่ปิดใช้งานเลือกใหม่ไม่ได้ (ค่าปัจจุบันยังแสดงชื่อได้)
+  // opts: { tax, kind: 'category' | 'series', value: { <field>: id }, labels: [ป้ายต่อระดับ], placeholder, onChange(value), dirty(field) }
+  function cascadeSelect(opts) {
+    var calc = SP.core.calc;
+    var fields = opts.kind === 'category' ? ['categoryId', 'subCategoryId', 'typeId'] : ['seriesId', 'subSeriesId'];
+    var value = {};
+    fields.forEach(function (f) { value[f] = opts.value[f] || null; });
+    var wrap = h('span', { class: 'cascade' });
+    function render() {
+      clear(wrap);
+      fields.forEach(function (f, i) {
+        var parentId = i === 0 ? null : value[fields[i - 1]];
+        var disabled = i > 0 && !parentId;
+        var sel = h('select', { class: 'select select-sm' + (opts.dirty && opts.dirty(f) ? ' is-dirty-cell' : ''), 'aria-label': opts.labels[i], disabled: disabled });
+        sel.appendChild(h('option', { value: '' }, opts.placeholder));
+        (disabled ? [] : calc.taxonomyChildren(opts.tax, opts.kind, parentId)).forEach(function (n) {
+          var off = n.active === false && n.id !== value[f];
+          sel.appendChild(h('option', { value: n.id, disabled: off }, n.name + (n.active === false ? ' (' + labels().inactive + ')' : '')));
+        });
+        sel.value = value[f] || '';
+        sel.addEventListener('change', function () {
+          value[f] = sel.value || null;
+          for (var j = i + 1; j < fields.length; j++) value[fields[j]] = null;
+          opts.onChange(JSON.parse(JSON.stringify(value)));
+          render();
+        });
+        wrap.appendChild(h('label', { class: 'cascade-field' }, h('span', { class: 'field-label' }, opts.labels[i]), sel));
+      });
+    }
+    render();
+    return wrap;
+  }
+
+  // แผงรายละเอียดด้านขวา (Drawer) opts: { label, className, beforeClose() → bool, onClose }
+  // → { el, head, body, open(), close(), isOpen() } Module เติมเนื้อหาใน head / body เอง / ปิดด้วย × หรือ Esc หรือคลิกพื้นหลัง
+  function drawer(opts) {
+    opts = opts || {};
+    var D = labels().dialog;
+    var head = h('div', { class: 'drawer-head' });
+    var body = h('div', { class: 'drawer-body' });
+    var backdrop = h('div', { class: 'drawer-backdrop no-print', hidden: true, onClick: function () { close(); } });
+    var el = h('aside', { class: 'drawer ' + (opts.className || ''), role: 'dialog', 'aria-label': opts.label || '', hidden: true },
+      h('div', { class: 'drawer-top' }, head, h('button', { type: 'button', class: 'icon-btn drawer-close no-print', title: D.close, 'aria-label': D.close, onClick: function () { close(); } }, '×')),
+      body);
+    document.body.appendChild(backdrop);
+    document.body.appendChild(el);
+    function esc(e) {
+      if (e.key !== 'Escape' || el.hidden) return;
+      if (document.querySelector('dialog[open]') || document.querySelector('.popover')) return;
+      close();
+    }
+    function open() {
+      el.hidden = false;
+      backdrop.hidden = false;
+      document.addEventListener('keydown', esc);
+    }
+    function close() {
+      if (el.hidden) return;
+      if (opts.beforeClose && !opts.beforeClose()) return;
+      el.hidden = true;
+      backdrop.hidden = true;
+      document.removeEventListener('keydown', esc);
+      if (opts.onClose) opts.onClose();
+    }
+    return { el: el, head: head, body: body, open: open, close: close, isOpen: function () { return !el.hidden; } };
+  }
+
+  // กล่องให้เลือก 1 ทางเลือก opts: { title, lines, choices: [{ value, label, primary }] } → Promise<value | null (ยกเลิก)>
+  function choiceDialog(opts) {
+    var D = labels().dialog;
+    return new Promise(function (resolve) {
+      var dlg = h('dialog', { class: 'sp-dialog', 'aria-label': opts.title });
+      var finished = false;
+      function done(v) {
+        if (finished) return;
+        finished = true;
+        if (dlg.open) dlg.close();
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+        resolve(v);
+      }
+      dlg.appendChild(h('div', { class: 'dlg-body' },
+        h('h2', { class: 'dlg-title' }, opts.title),
+        opts.lines && opts.lines.length ? h('ul', { class: 'dlg-lines' }, opts.lines.map(function (l) { return h('li', null, l); })) : null,
+        h('div', { class: 'dlg-actions' },
+          h('button', { type: 'button', class: 'btn btn-ghost dlg-cancel', onClick: function () { done(null); } }, D.cancel),
+          opts.choices.map(function (c) {
+            return h('button', { type: 'button', class: 'btn dlg-choice dlg-choice-' + c.value + (c.primary ? ' btn-primary dlg-confirm' : ' btn-secondary'), onClick: function () { done(c.value); } }, c.label);
+          }))));
+      dlg.addEventListener('cancel', function (e) { e.preventDefault(); done(null); });
+      document.body.appendChild(dlg);
+      if (typeof dlg.showModal === 'function') dlg.showModal();
+      else { finished = true; dlg.parentNode.removeChild(dlg); resolve(opts.choices[0].value); }
+    });
+  }
+
+  // ปุ่ม "ส่งออก ▾" (Excel / CSV) ในแถวหัวหน้า
+  // opts: { build(source) → { filename (ไม่มีนามสกุล), sheets: [{ name, header, columns, rows }] }, unsaved() → จำนวนรายการที่ยังไม่บันทึก }
+  //   มีรายการที่ยังไม่บันทึก → ถามก่อนว่า ส่งออกค่าที่ยังไม่บันทึก (source 'draft') หรือค่าที่บันทึกล่าสุด ('saved')
+  //   CSV ใช้ Sheet แรก (ไม่มีแถวหัวไฟล์) / Excel โหลด SheetJS ครั้งแรกที่กด โหลดไม่ได้ → เสนอ CSV แทน
+  function exportButton(opts) {
+    var X = labels().exporting;
+    var E = SP.core['export'];
+    var btn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm export-btn no-print' }, X.button);
+    function pickSource() {
+      var n = opts.unsaved ? opts.unsaved() : 0;
+      if (!n) return Promise.resolve('saved');
+      return choiceDialog({ title: fill(X.unsavedTitle, { n: n }), choices: [{ value: 'draft', label: X.useDraft, primary: true }, { value: 'saved', label: X.useSaved }] });
+    }
+    function csv(spec) { var sh = spec.sheets[0]; E.downloadCsv(spec.filename + '.csv', sh.rows, sh.columns); }
+    function run(kind) {
+      pickSource().then(function (source) {
+        if (!source) return;
+        var spec = opts.build(source);
+        if (kind === 'csv') { csv(spec); return; }
+        btn.disabled = true;
+        btn.textContent = X.loading;
+        function reset() { btn.disabled = false; btn.textContent = X.button; }
+        E.toXlsx(spec.sheets, { filename: spec.filename + '.xlsx' }).then(reset, function () {
+          reset();
+          dialog({ title: X.xlsxFailed, confirmLabel: X.csv }).then(function (r) { if (r.ok) csv(spec); });
+        });
+      });
+    }
+    popover(btn, function (close) {
+      return h('ul', { class: 'menu-list' }, [['xlsx', X.xlsx], ['csv', X.csv]].map(function (it) {
+        return h('li', null, h('button', { type: 'button', class: 'menu-item export-' + it[0], onClick: function () { close(); run(it[0]); } }, it[1]));
+      }));
+    }, { className: 'menu-popover', label: X.button, align: 'right' });
+    return btn;
+  }
+
+  // ข้อความ ⓘ ของยอดขายปีก่อน: ยอดขายปี {ปี} = ยอดขายจริง ม.ค.–{เดือนตัดยอด} + ประมาณการ {เดือนถัดไป}–ธ.ค. (คำนวณจาก history.actualMonths)
+  function priorNote(year) {
+    var y = SP.data.history.years[year];
+    var P = labels().priorInfo;
+    if (!y) return fill(P.none, { year: year });
+    var n = y.actualMonths;
+    if (n >= 12) return fill(P.actual, { year: year });
+    if (!n) return fill(P.estimate, { year: year });
+    return fill(P.mixed, { year: year, actual: F.monthRange(0, n - 1), estimate: F.monthRange(n, 11) });
+  }
+
+  // ชื่อบทบาทจำลอง (Sales Person = ชื่อคน)
+  function roleName(r) {
+    if (!r) return '';
+    if (r.type === 'sales') return personName(SP.core.store.get('master.salespeople'), r.personId) || labels().roles.sales;
+    return labels().roles[r.type] || r.type;
+  }
+
+  // แถวหัวไฟล์ส่งออก (Excel เท่านั้น): ปีแผน · สถานะ · วันเวลาที่ส่งออก · มุมมองผู้ใช้ (+ extra = [[ป้าย, ค่า]])
+  function exportHeader(year, status, extra) {
+    var X = labels().exporting;
+    return [[X.headerYear, year], [X.headerStatus, labels().workflow.status[status] || status],
+      [X.headerAt, F.dateTime(new Date().toISOString())], [X.headerRole, roleName(SP.core.store.role())]].concat(extra || []);
+  }
+
+  // ส่วนท้ายชื่อไฟล์: สถานะภาษาอังกฤษสั้น + วันที่ YYYYMMDD / ชื่อหน่วยขายตัดอักขระที่ใช้ในชื่อไฟล์ไม่ได้
+  function exportStamp(status) {
+    var d = new Date();
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return { status: labels().exporting.statusCode[status] || status, date: d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) };
+  }
+  function fileSafe(text) { return String(text || '').replace(/[\\/:*?"<>|\s]+/g, '-'); }
+
+  // ป้าย "ยอดขายปี {ปี}" + ⓘ (Tooltip ที่มาของตัวเลข) ใช้ในแถบ Total, หัวคอลัมน์, แถบบริบท และรายงาน
+  function priorLabel(year, text) {
+    var note = priorNote(year);
+    return h('span', { class: 'prior-label' }, text || fill(labels().priorInfo.label, { year: year }),
+      h('span', { class: 'info-dot', title: note, 'aria-label': note, tabindex: '0', role: 'note' }, 'ⓘ'));
+  }
+
+  // =====================================================================
+  // CR-11: ตารางกรอกตัวเลข — คีย์บอร์ด, เลือกช่วง, คัดลอก/วางกับ Excel, เติมลง/ขวา, ล้างค่า, ย้อนกลับ, ไฮไลต์แถวและคอลัมน์
+  // =====================================================================
+
+  // ประวัติสำหรับย้อนกลับ (Ctrl+Z) ภายในรอบแก้ไข: push(ค่าก่อนเปลี่ยน) / pop() → ค่าล่าสุด | null / clear() / size()
+  function undoStack(limit) {
+    var list = [];
+    var max = limit || 50;
+    return {
+      push: function (state) { list.push(JSON.parse(JSON.stringify(state))); if (list.length > max) list.shift(); },
+      pop: function () { return list.length ? list.pop() : null; },
+      clear: function () { list = []; },
+      size: function () { return list.length; }
+    };
+  }
+
+  // กล่องกรอกตัวเลข opts: { title, label, suffix, value, hint, invalidText } → Promise<{ ok, value }>
+  function promptNumber(opts) {
+    var D = labels().dialog;
+    return new Promise(function (resolve) {
+      var input = h('input', { type: 'text', inputmode: 'decimal', class: 'num dlg-number', 'aria-label': opts.label, value: opts.value != null ? String(opts.value) : '' });
+      var err = h('p', { class: 'dlg-error', role: 'alert', hidden: true });
+      var dlg = h('dialog', { class: 'sp-dialog', 'aria-label': opts.title });
+      var finished = false;
+      function done(ok) {
+        if (finished) return;
+        var v = parseNumber(input.value);
+        if (ok && v == null) { err.textContent = opts.invalidText || ''; err.hidden = false; input.focus(); return; }
+        finished = true;
+        if (dlg.open) dlg.close();
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+        resolve({ ok: ok, value: v });
+      }
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); done(true); } });
+      dlg.appendChild(h('div', { class: 'dlg-body' },
+        h('h2', { class: 'dlg-title' }, opts.title),
+        h('label', { class: 'dlg-number-label' }, h('span', { class: 'field-label' }, opts.label), h('span', { class: 'dlg-number-wrap' }, input, opts.suffix ? h('span', { class: 'num-suffix' }, opts.suffix) : null)),
+        opts.hint ? h('p', { class: 'dlg-text' }, opts.hint) : null,
+        err,
+        h('div', { class: 'dlg-actions' },
+          h('button', { type: 'button', class: 'btn btn-ghost dlg-cancel', onClick: function () { done(false); } }, D.cancel),
+          h('button', { type: 'button', class: 'btn btn-primary dlg-confirm', onClick: function () { done(true); } }, D.confirm))));
+      dlg.addEventListener('cancel', function (e) { e.preventDefault(); done(false); });
+      document.body.appendChild(dlg);
+      if (typeof dlg.showModal === 'function') { dlg.showModal(); input.focus(); input.select(); }
+      else {
+        dlg.parentNode.removeChild(dlg);
+        finished = true;
+        var raw = window.prompt(opts.title, input.value);
+        var v = raw == null ? null : parseNumber(raw);
+        resolve({ ok: raw != null && v != null, value: v });
+      }
+    });
+  }
+
+  // ผูกคีย์บอร์ดและเมาส์กับตาราง: แถวข้อมูลมี data-row (key) ช่องมี data-col (0 ถึง cols − 1) ช่องที่แก้ได้มี <input>
+  //   หัวคอลัมน์ที่มี data-col เดียวกันไฮไลต์ตามช่องที่ชี้ / แถวที่ hidden ไม่นับ (ค้นหา, พับกลุ่ม)
+  // opts: { editing, cols, pasteCols (คอลัมน์ที่วาง/เติม/ล้างได้ ค่าตั้งต้น = cols), valueAt(key, col) → ตัวเลข (ค่าที่คัดลอก),
+  //         apply(writes) (writes = [{ key, m, qty }]), undo() }
+  // คีย์: ลูกศร / Enter (ลงล่าง) / Tab (ไปขวา) / Shift+ลูกศร (เลือกช่วง) / Ctrl+C / Ctrl+V / Delete / Ctrl+D / Ctrl+R / Ctrl+Z
+  // แปลงช่วงเป็น writes ด้วย calc.pasteCells / fillCells / parseTsv / toTsv — ช่องที่แก้ไม่ได้ข้ามเสมอ
+  function gridKeys(table, opts) {
+    var calc = SP.core.calc;
+    var sel = null;          // { r0, c0 } จุดเริ่ม / { r1, c1 } ช่องปัจจุบัน
+    var quiet = false;       // โฟกัสจากโค้ด (ไม่รีเซ็ตช่วงที่เลือก)
+    var dragging = false;
+    var pasteCols = opts.pasteCols == null ? opts.cols : opts.pasteCols;
+
+    function rows() {
+      return Array.prototype.filter.call(table.querySelectorAll('tbody tr[data-row]'), function (tr) { return !tr.hidden; });
+    }
+    function cellEl(r, c) { var tr = rows()[r]; return tr ? tr.querySelector('[data-col="' + c + '"]') : null; }
+    function posOf(node) {
+      var td = node && node.closest ? node.closest('[data-col]') : null;
+      var tr = td && td.closest('tr[data-row]');
+      if (!tr || !table.contains(tr)) return null;
+      var r = rows().indexOf(tr);
+      return r < 0 ? null : { r: r, c: Number(td.dataset.col), td: td, tr: tr };
+    }
+    function cellAt(r, c) {
+      var td = cellEl(r, c);
+      if (!td || c >= pasteCols) return td ? { key: td.closest('tr').dataset.row, m: c, editable: false } : null;
+      return { key: td.closest('tr').dataset.row, m: c, editable: !!opts.editing && !!td.querySelector('input') };
+    }
+    function range() {
+      if (!sel) return null;
+      return { r0: Math.min(sel.r0, sel.r1), r1: Math.max(sel.r0, sel.r1), c0: Math.min(sel.c0, sel.c1), c1: Math.max(sel.c0, sel.c1) };
+    }
+    function multi() { var g = range(); return !!g && (g.r0 !== g.r1 || g.c0 !== g.c1); }
+    function paint() {
+      Array.prototype.forEach.call(table.querySelectorAll('.is-sel'), function (el) { el.classList.remove('is-sel'); });
+      if (!multi()) return;
+      var g = range();
+      for (var r = g.r0; r <= g.r1; r++) for (var c = g.c0; c <= g.c1; c++) { var td = cellEl(r, c); if (td) td.classList.add('is-sel'); }
+    }
+    function focusCell(r, c) {
+      var td = cellEl(r, c);
+      if (!td) return false;
+      var inp = td.querySelector('input');
+      quiet = true;
+      (inp || td).focus();
+      quiet = false;
+      if (inp) inp.select();
+      return true;
+    }
+    function moveTo(r, c, extend) {
+      var n = rows().length;
+      if (!n) return;
+      r = Math.max(0, Math.min(n - 1, r));
+      c = Math.max(0, Math.min(opts.cols - 1, c));
+      if (!sel || !extend) sel = { r0: r, c0: c, r1: r, c1: c };
+      else { sel.r1 = r; sel.c1 = c; }
+      focusCell(r, c);
+      paint();
+    }
+    function writesClear() {
+      var g = range(), out = [];
+      if (!g) return out;
+      for (var r = g.r0; r <= g.r1; r++) for (var c = g.c0; c <= g.c1; c++) {
+        var cell = cellAt(r, c);
+        if (cell && cell.editable) out.push({ key: cell.key, m: cell.m, qty: 0 });
+      }
+      return out;
+    }
+    function valueAtPos(r, c) { var tr = rows()[r]; return tr ? opts.valueAt(tr.dataset.row, c) : null; }
+    function matrix() {
+      var g = range(), out = [];
+      for (var r = g.r0; r <= g.r1; r++) {
+        var line = [];
+        for (var c = g.c0; c <= g.c1; c++) { var v = valueAtPos(r, c); line.push(v == null ? '' : Math.round(v)); }
+        out.push(line);
+      }
+      return out;
+    }
+    function typing(input) { return !!input && input.dataset.committed != null && input.value !== input.dataset.committed; }
+
+    table.addEventListener('focusin', function (e) {
+      var p = posOf(e.target);
+      if (!p || quiet) return;
+      sel = { r0: p.r, c0: p.c, r1: p.r, c1: p.c };
+      var inp = p.td.querySelector('input');
+      if (inp) inp.dataset.committed = inp.value;
+      paint();
+    });
+    table.addEventListener('keydown', function (e) {
+      var p = posOf(e.target);
+      if (!p) return;
+      var input = e.target.tagName === 'INPUT' ? e.target : null;
+      var ctrl = e.ctrlKey || e.metaKey;
+      var k = e.key;
+      if (ctrl && (k === 'd' || k === 'D' || k === 'r' || k === 'R')) {
+        e.preventDefault();
+        if (!opts.editing || !sel) return;
+        var ws = calc.fillCells(range(), k.toLowerCase() === 'd' ? 'down' : 'right', valueAtPos, cellAt);
+        if (ws.length) opts.apply(ws);
+        return;
+      }
+      if (ctrl && (k === 'z' || k === 'Z') && !e.shiftKey) {
+        if (!opts.editing || typing(input)) return;
+        e.preventDefault();
+        opts.undo();
+        return;
+      }
+      if (ctrl) return;
+      if (k === 'Delete' || (k === 'Backspace' && (multi() || !input))) {
+        if (!opts.editing || (input && !multi() && !(input.selectionStart === 0 && input.selectionEnd === input.value.length))) return;
+        e.preventDefault();
+        var cw = writesClear();
+        if (cw.length) opts.apply(cw);
+        return;
+      }
+      var at = sel ? { r: sel.r1, c: sel.c1 } : { r: p.r, c: p.c };
+      if (k === 'Enter') {
+        // ช่องกรอกส่งค่าเอง (components.onCommit) แล้วเลื่อนลง (Shift+Enter ขึ้น)
+        e.preventDefault();
+        moveTo(at.r + (e.shiftKey ? -1 : 1), at.c, false);
+        return;
+      }
+      if (k === 'Tab') {
+        e.preventDefault();
+        var nc = at.c + (e.shiftKey ? -1 : 1), nr = at.r;
+        if (nc >= opts.cols) { nc = 0; nr += 1; } else if (nc < 0) { nc = opts.cols - 1; nr -= 1; }
+        moveTo(nr, nc, false);
+        return;
+      }
+      var dir = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[k];
+      if (!dir) return;
+      if (input && !e.shiftKey && dir[1] !== 0) {
+        var all = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+        if (!all && !((dir[1] > 0 && input.selectionStart === input.value.length) || (dir[1] < 0 && input.selectionEnd === 0))) return;
+      }
+      e.preventDefault();
+      if (input && !e.shiftKey) input.blur();
+      moveTo(at.r + dir[0], at.c + dir[1], e.shiftKey);
+    });
+    table.addEventListener('copy', function (e) {
+      if (!sel || !posOf(document.activeElement)) return;
+      var input = document.activeElement.tagName === 'INPUT' ? document.activeElement : null;
+      if (input && !multi() && !(input.selectionStart === 0 && input.selectionEnd === input.value.length)) return;
+      if (!e.clipboardData) return;
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', calc.toTsv(matrix()));
+    });
+    table.addEventListener('paste', function (e) {
+      if (!opts.editing || !sel || !posOf(e.target) || !e.clipboardData) return;
+      var text = e.clipboardData.getData('text/plain');
+      var m = calc.parseTsv(text);
+      if (!m.length) return;
+      e.preventDefault();
+      var g = range();
+      var ws = calc.pasteCells(m, g.r0, g.c0, cellAt, multi() ? { rows: g.r1 - g.r0 + 1, cols: g.c1 - g.c0 + 1 } : null);
+      if (ws.length) opts.apply(ws);
+    });
+    table.addEventListener('mousedown', function (e) {
+      var p = posOf(e.target);
+      if (!p || e.button !== 0) return;
+      if (e.shiftKey && sel) { e.preventDefault(); sel.r1 = p.r; sel.c1 = p.c; focusCell(p.r, p.c); paint(); return; }
+      dragging = true;
+    });
+    table.addEventListener('mouseover', function (e) {
+      var p = posOf(e.target);
+      Array.prototype.forEach.call(table.querySelectorAll('.is-hover-row, .is-hover-col'), function (el) { el.classList.remove('is-hover-row', 'is-hover-col'); });
+      if (!p) return;
+      p.tr.classList.add('is-hover-row');
+      var head = table.querySelector('thead [data-col="' + p.c + '"]');
+      if (head) head.classList.add('is-hover-col');
+      if (dragging && sel && (p.r !== sel.r1 || p.c !== sel.c1)) { sel.r1 = p.r; sel.c1 = p.c; paint(); }
+    });
+    table.addEventListener('mouseleave', function () {
+      Array.prototype.forEach.call(table.querySelectorAll('.is-hover-row, .is-hover-col'), function (el) { el.classList.remove('is-hover-row', 'is-hover-col'); });
+    });
+    document.addEventListener('mouseup', function () { dragging = false; });
+    return {
+      // หลังค่าเปลี่ยนจากเครื่องมือ: จำค่าในช่องที่โฟกัสใหม่ (ใช้ตัดสินว่ากำลังพิมพ์อยู่หรือไม่) และทาสีช่วงเดิม
+      refresh: function () {
+        var a = document.activeElement;
+        if (a && a.tagName === 'INPUT' && table.contains(a)) a.dataset.committed = a.value;
+        paint();
+      },
+      clear: function () { sel = null; paint(); }
+    };
   }
 
   SP.core.components = {
+    undoStack: undoStack,
+    promptNumber: promptNumber,
+    gridKeys: gridKeys,
     h: h,
     clear: clear,
     fill: fill,
@@ -1314,25 +1794,19 @@
     statusBadge: statusBadge,
     sourceChip: sourceChip,
     legend: legend,
-    sourceLegend: sourceLegend,
-    alertLegend: alertLegend,
     wfIcon: wfIcon,
     wfBadge: wfBadge,
     remainingBar: remainingBar,
     table: table,
     numberInput: numberInput,
-    pctInput: pctInput,
     percentAmountInput: percentAmountInput,
     accountPicker: accountPicker,
     growthText: growthText,
-    historyTag: historyTag,
     select: select,
-    subChannelSelect: subChannelSelect,
     segmented: segmented,
     card: card,
     callout: callout,
     approveBox: approveBox,
-    monthStrip: monthStrip,
     barChart: barChart,
     statusDot: statusDot,
     searchSelect: searchSelect,
@@ -1353,8 +1827,24 @@
     editBanner: editBanner,
     guardUnsaved: guardUnsaved,
     confirmDiscard: confirmDiscard,
+    planYearPicker: planYearPicker,
     workflowBar: workflowBar,
     bindArrowNav: bindArrowNav,
-    diagram: diagram
+    hoverTip: hoverTip,
+    seriesToken: seriesToken,
+    productThumb: productThumb,
+    resizeImage: resizeImage,
+    completenessBadge: completenessBadge,
+    statusStrip: statusStrip,
+    cascadeSelect: cascadeSelect,
+    drawer: drawer,
+    choiceDialog: choiceDialog,
+    exportButton: exportButton,
+    priorNote: priorNote,
+    roleName: roleName,
+    exportHeader: exportHeader,
+    exportStamp: exportStamp,
+    fileSafe: fileSafe,
+    priorLabel: priorLabel
   };
 })(window.SP);

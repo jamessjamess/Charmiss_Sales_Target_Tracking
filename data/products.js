@@ -1,63 +1,74 @@
 /*
- * data/products.js — Product Master ตั้งต้น (ข้อมูลเท่านั้น ไม่มี Logic)
+ * data/products.js — กฎนำเข้า Product Master จากข้อมูลจริง + สินค้าใหม่ปี 2027 (ข้อมูลเท่านั้น ไม่มี Logic)
  *
- * เจ้าของข้อมูล: ทีม Product (clearance → Supply Chain)
- *   sku              = รหัส SKU (ใช้เป็น Key ในแผน plan.<ปี>.sku.<accountId>.items)
- *   name, series     = ชื่อและ Series (กลุ่มสินค้า/แคมเปญ ใช้ Filter Series) / note = คำอธิบายสั้น (tooltip)
- *                      (รุ่นก่อนเรียก campaign — store แปลง master.products เดิมให้ตอนโหลด)
- *   launchDate       = วันเริ่มขาย 'YYYY-MM-DD' (NPD = 3 เดือนนับจากเดือนนี้)
- *   discontinueMonth = เดือนสุดท้ายที่ขาย 'YYYY-MM' หลังจากนี้ = 0 (null = ยังขายอยู่)
- *   clearance        = { fromMonth, toMonth, stockQty } ช่วงระบาย Stock ระดับ SKU | null
- *                      (เดโมแบ่ง stockQty เท่ากันทุก Account ที่ Listing — ดูคำถามที่ค้าง)
- *   manualDefault    = ค่าตั้งต้นของช่อง "กรอกเอง" (ชิ้น/เดือน ต่อหน่วยแบ่งเป้า) เฉพาะปีที่มีใน data/targets.js years
- * หน่วยที่ขายได้อยู่ใน data/listings.js / ราคาอยู่ใน data/pricing.js (priceList)
- * Series "Summer Launch 2027" มี 2 SKU (A, H) ไว้เดโม "เพิ่มทั้ง Series"
- * ค่าที่แก้ในหน้า Product Master เก็บที่ store: master.products
+ * CR-11: สินค้าทั้งหมดมาจาก data/seed/seed-charmiss.js (สร้างจาก Sales_Planning_2026_R2.xlsx ห้ามแก้ด้วยมือ)
+ *   core/seed.js แปลงเข้าโครง Product Master ตอนโหลด แล้วเก็บที่ SP.data.products (ไม่มีสินค้าตัวอย่างเดิมแล้ว)
+ *
+ * โครงของสินค้าหลังนำเข้า (เจ้าของข้อมูล: ทีม Product · clearance → Supply Chain / ค่าที่แก้เก็บที่ store: master.products)
+ *   trCode / tempCode   = รหัสหลัก / รหัสชั่วคราว NPD_{ปี}Q{ไตรมาส}_{ลำดับ} (ใช้เมื่อยังไม่มี TR Code)
+ *                         productKey = trCode ถ้ามี ไม่มีใช้ tempCode (calc.productKey) — ใช้อ้างสินค้าทุกที่
+ *   name                = ชื่อเต็ม / shortName = ชื่อย่อ (Product Nickname ใน Excel) ใช้แสดงในหน้าวางแผน SKU (calc.displayName)
+ *   internalCode, barcode, nameEn
+ *   categoryId, subCategoryId, typeId = หมวดสินค้า (data/taxonomy.js) / inferred = true → ระบบกำหนดจากคำในชื่อ ควรตรวจสอบ
+ *   seriesId, subSeriesId = Series (สร้างจาก Campaign ใน Excel / Existing = ไม่ใช่ Series → ว่าง = ขาดข้อมูลจำเป็น)
+ *   itemType            = SALE | TESTER | GIFT | PREMIUM (หน้าวางแผน SKU ใช้เฉพาะ SALE)
+ *   packSize, uom       = ขนาดบรรจุ (อ่านจากชื่อ เช่น 5g, 50ml) / image = data URL ของภาพย่อ หรือ null
+ *   launchDate          = วันเริ่มขาย 'YYYY-MM-DD' / discontinueMonth = เดือนสุดท้ายที่ขาย 'YYYY-MM' (null = ยังขายอยู่)
+ *                         sourceStatus ใน Excel ใช้กำหนดวันที่เท่านั้น Status คำนวณจากวันที่ (calc.productStatus)
+ *   clearance           = { fromMonth, toMonth, stockQty } ช่วงระบาย Stock (Supply Chain) | null
+ *   note, createdAt, updatedAt
+ * ราคา → data/pricing.js / Listing → data/listings.js / ยอดขายปีก่อนราย SKU → SP.data.history.years.<ปี>.skuQty
  */
 (function (SP) {
   'use strict';
 
-  SP.data.products = [
-    {
-      sku: 'A', name: 'SKU A', series: 'Summer Launch 2027', note: 'สินค้าใหม่ (NPD)',
-      launchDate: '2027-04-01', discontinueMonth: null, clearance: null,
-      manualDefault: {
-        shopee: 1200, lazada: 600, tiktok: 900,
-        watsons: 800, eveandboy: 400,
-        'tt-north': 500, 'tt-northeast': 500, 'tt-central': 500
-      }
-    },
-    {
-      sku: 'B', name: 'SKU B', series: 'Core', note: 'สินค้าขายดี ราคาต่อชิ้นต่ำ',
-      launchDate: '2023-06-01', discontinueMonth: null, clearance: null
-    },
-    {
-      sku: 'C', name: 'SKU C', series: 'Core', note: 'มี Promo บางวัน',
-      launchDate: '2024-02-01', discontinueMonth: null, clearance: null
-    },
-    {
-      sku: 'D', name: 'SKU D', series: 'Phase-out', note: 'ระบายสต็อกก่อนเลิกขาย',
-      launchDate: '2022-09-01', discontinueMonth: '2027-05',
-      clearance: { fromMonth: '2027-03', toMonth: '2027-05', stockQty: 8000 }
-    },
-    {
-      sku: 'E', name: 'SKU E', series: 'Core', note: 'สินค้าหลัก',
-      launchDate: '2025-01-01', discontinueMonth: null, clearance: null
-    },
-    {
-      sku: 'F', name: 'SKU F', series: 'Online Exclusive', note: 'ขายช่องทางอื่นอยู่แล้ว เพิ่งเข้า Shopee',
-      launchDate: '2025-08-01', discontinueMonth: null, clearance: null,
-      manualDefault: { shopee: 150 }
-    },
-    {
-      sku: 'G', name: 'SKU G', series: 'Holiday 2027', note: 'สินค้าใหม่ปลายปี',
-      launchDate: '2027-10-15', discontinueMonth: null, clearance: null,
-      manualDefault: { shopee: 900, lazada: 500, tiktok: 700, watsons: 600 }
-    },
-    {
-      sku: 'H', name: 'SKU H', series: 'Summer Launch 2027', note: 'สินค้าใหม่ชุดเดียวกับ SKU A',
-      launchDate: '2027-05-15', discontinueMonth: null, clearance: null,
-      manualDefault: { shopee: 700, lazada: 400, tiktok: 500, eveandboy: 300 }
-    }
-  ];
+  SP.data.productImport = {
+    // ไฟล์ใน data/seed/ ที่ใช้ (SP.data.<seed>)
+    seed: 'seedCharmiss',
+
+    // วันที่มีผลของราคาตั้งต้น (ถ้าวันเริ่มขายหลังวันนี้ ใช้วันเริ่มขาย) / ผู้บันทึกข้อมูลตั้งต้น
+    priceFrom: '2024-01-01',
+    importedBy: 'นำเข้าจาก Excel',
+
+    // Campaign ใน Excel ที่ไม่ใช่ Series (ปล่อย Series ว่าง → หน้ารายการสินค้าแสดง "ขาดข้อมูลจำเป็น")
+    notSeries: ['Existing'],
+    notSeriesNote: 'Campaign ใน Excel = Existing (ยังไม่ได้กำหนด Series)',
+
+    // หมวดสินค้าจากคำในชื่อสินค้า (ไม่สนตัวพิมพ์ ตรงทั้งคำ) ตรวจตามลำดับ ใช้กฎแรกที่ตรง
+    //   Cushion / Foundation / Powder / Primer / Setting Spray → Face · Blush / Highlighter → Cheek ·
+    //   Brow / Eyeliner / Palette → Eye · Toner → Skincare · Tint / Gloss / Stick / Lip → Lip
+    //   (Blush มาก่อน Tint เพื่อให้ "Water Tint Blush Stick" เป็น Cheek)
+    categoryRules: [
+      { word: 'cushion', typeId: 'type-cushion' },
+      { word: 'foundation', typeId: 'type-foundation' },
+      { word: 'setting spray', typeId: 'type-setting-spray' },
+      { word: 'powder', typeId: 'type-powder' },
+      { word: 'primer', typeId: 'type-primer' },
+      { word: 'blush', typeId: 'type-blush' },
+      { word: 'highlighter', typeId: 'type-highlighter' },
+      { word: 'brow', typeId: 'type-brow' },
+      { word: 'eyeliner', typeId: 'type-eyeliner' },
+      { word: 'palette', typeId: 'type-palette' },
+      { word: 'toner', typeId: 'type-toner-pad' },
+      { word: 'tint', typeId: 'type-tint' },
+      { word: 'gloss', typeId: 'type-gloss' },
+      { word: 'stick', typeId: 'type-lip-stick' },
+      { word: 'lip', typeId: 'type-lip-care' }
+    ],
+
+    // สินค้าใหม่ (NPD) ปี 2027 ที่ยังไม่มี TR Code — ชื่อลงท้าย (ชื่อชั่วคราว) เพื่อไม่ให้สับสนกับสินค้าจริง
+    //   โครงเดียวกับรายการใน data/seed/ + tempCode / Listing ที่ 7-Eleven และ EVEANDBOY (data/listings.js)
+    //   แผนการเปิดตัวอยู่ที่ data/npd.js
+    newProducts: [
+      { tempCode: 'NPD_2027Q2_01', name: 'Charmiss Blooming Heart Gloss 03 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
+        rsp: 199, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-15T14:00:00' },
+      { tempCode: 'NPD_2027Q2_02', name: 'Charmiss Blooming Heart Lip Serum 05 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
+        rsp: 239, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-15T14:00:00' },
+      { tempCode: 'NPD_2027Q2_03', name: 'Charmiss Juicy Pop Tint 10 (ชื่อชั่วคราว)', series: 'Charming Lips',
+        rsp: 199, dealerPrice: 90, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-20T10:00:00' }
+    ]
+  };
+
+  // เติมโดย core/seed.js ตอนโหลด (ห้ามใส่รายการที่นี่ ให้แก้ข้อมูลที่ Excel หรือ productImport.newProducts)
+  SP.data.products = [];
 })(window.SP);

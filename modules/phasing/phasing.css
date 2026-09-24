@@ -10,7 +10,7 @@
   .page-phasing { --bar-height: 120px; }
 }
 @media (max-height: 700px) {
-  .page-phasing { --bar-height: 84px; --row-h: 30px; }
+  .page-phasing { --bar-height: 66px; --row-h: 30px; }
   .page-phasing .page { padding-top: var(--sp-3); }
   .page-phasing .page-intro { margin-bottom: var(--sp-2); }
   .card.ph-card { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }

@@ -8,7 +8,7 @@
  *   4. เพิ่ม 1 บรรทัดใน core/registry.js และข้อความหน้าใน data/content.js → pages.<id>
  *
  * หน้าที่:        (อธิบายว่า Module นี้ทำอะไร)
- * อ่านจาก data/:  (เช่น SP.data.products, SP.data.pricing)
+ * อ่านจาก data/:  (เช่น SP.data.channels — Master ให้อ่านผ่าน SP.core.store.data())
  * store อ่าน:     (เช่น app.planYear, plan.<ปี>.topDown — สร้าง Key ด้วย SP.core.store.planKey('topDown'))
  * store เขียน:    (เช่น <id>.<key>)
  *

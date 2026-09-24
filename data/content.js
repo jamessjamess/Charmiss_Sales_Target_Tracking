@@ -32,9 +32,11 @@
       finish: 'กลับขั้นแรก',
       stepOf: 'ขั้นที่ {n}/{total}',
       yearLabel: 'ปีแผน',
+      yearChange: 'เปลี่ยนปีแผน',
       roleLabel: 'มุมมองผู้ใช้',
       roleNote: '(จำลองสำหรับการนำเสนอ)',
       roleGroupSales: 'Sales Person',
+      roleGroupProduct: 'ทีมดูแลข้อมูลสินค้า',
       approveTitle: 'สิ่งที่ต้องการให้อนุมัติ',
       leaveConfirm: 'มีรายการที่ยังไม่บันทึก หากออกจากหน้านี้ รายการดังกล่าวจะหายไป',
       discardConfirm: 'มีรายการที่ยังไม่บันทึก {n} รายการ ต้องการยกเลิกรายการดังกล่าวหรือไม่'
@@ -42,12 +44,66 @@
 
     labels: {
       source: { locked: 'ล็อก 0', manual: 'กรอกเอง', system: 'ระบบเติม', clearance: 'Clearance' },
-      sourceShort: { locked: '0', manual: 'กรอก', system: 'ระบบ', clearance: 'Clear' },
       // สถานะคงเหลือ: ขาด = แดง, เกิน = เหลือง, จัดสรรครบ = เขียว, ยังไม่กำหนด = เทา
       alert: { ok: 'จัดสรรครบ', short: 'ขาด', over: 'เกิน', empty: 'ยังไม่กำหนด' },
       remainingText: { ok: 'จัดสรรครบ', short: 'ขาด {amount}', over: 'เกิน {amount}', empty: 'ยังไม่กำหนด' },
-      status: { upcoming: 'ยังไม่วางขาย', npd: 'NPD', existing: 'Existing', clearance: 'Clearance', ended: 'เลิกขาย' },
-      window: { past: 'ผ่านไปแล้ว', current: 'เดือนปัจจุบัน', locked: 'ล็อก', open: 'ปรับได้' },
+      // Status สินค้า (calc.productStatus) ชุดเดียวทั้งระบบ คำนวณจากวันที่
+      status: { planned: 'Planned', 'new': 'New', active: 'Active', clearance: 'Clearance', discontinued: 'Discontinued' },
+      statusHint: { planned: 'ก่อนวันเริ่มขาย', 'new': '3 เดือนแรกนับจากวันเริ่มขาย', active: 'พ้นช่วง New แล้ว', clearance: 'อยู่ในช่วง Clearance', discontinued: 'หลังเดือนเลิกขาย' },
+      itemTypes: { SALE: 'ขายจริง', TESTER: 'Tester', GIFT: 'Gift', PREMIUM: 'Premium' },
+      inactive: 'ปิดใช้งาน',
+      // รายการสินค้า / ความครบถ้วน (components.productThumb, completenessBadge)
+      product: {
+        noImage: 'ยังไม่มีรูปสินค้า',
+        complete: 'ครบ',
+        completeTitle: 'ข้อมูลครบทุกฟิลด์',
+        missingRequired: 'ขาดจำเป็น {n}',
+        missingRecommended: 'ขาดที่ควรมี {n}',
+        missingRequiredTitle: 'ขาดข้อมูลจำเป็น: {fields}',
+        missingRecommendedTitle: 'ขาดข้อมูลที่ควรมี: {fields}',
+        tempTag: 'ชั่วคราว',
+        blockedIncomplete: 'ขาดข้อมูลจำเป็น: {fields} · แก้ไขได้ที่รายการสินค้า',
+        // CR-11: หมวดสินค้าที่ระบบกำหนดจากคำในชื่อสินค้า (inferred)
+        inferredTag: 'ระบบกำหนด',
+        inferredTitle: 'หมวดสินค้ากำหนดจากคำในชื่อสินค้า (Excel ยังไม่มี Category) ควรตรวจสอบ'
+      },
+      // ปุ่ม "ส่งออก ▾" (components.exportButton + core/export.js)
+      exporting: {
+        button: 'ส่งออก ▾',
+        xlsx: 'Excel (.xlsx)',
+        csv: 'CSV',
+        loading: 'กำลังส่งออก…',
+        unsavedTitle: 'มีรายการที่ยังไม่บันทึก {n} รายการ ต้องการส่งออกค่าชุดใด',
+        useDraft: 'ส่งออกค่าที่ยังไม่บันทึก',
+        useSaved: 'ส่งออกค่าที่บันทึกล่าสุด',
+        xlsxFailed: 'ส่งออก Excel ไม่ได้ในขณะนี้ · ส่งออกเป็น CSV แทนได้',
+        headerYear: 'ปีแผน',
+        headerStatus: 'สถานะ',
+        headerAt: 'วันเวลาที่ส่งออก',
+        headerRole: 'มุมมองผู้ใช้',
+        headerUnit: 'หน่วยขาย',
+        headerView: 'มุมมอง',
+        statusCode: { draft: 'Draft', submitted: 'Submitted', approved: 'Approved', returned: 'Returned', review: 'Review', locked: 'Locked' }
+      },
+      // แท่งเป้าหมายเทียบปีก่อน (charts.vsLastYearBar) หน้าจัดสรรเป้าหมายประจำปีและรายงานสรุปแผน
+      vsLastYear: {
+        header: 'เป้าหมายเทียบปีก่อน',
+        headerTip: 'ความยาวแท่ง = เป้าหมาย · ขีดตั้ง = ยอดขายปีก่อน · ทุกแถวใช้สเกลเดียวกัน',
+        tip: 'เป้าหมาย {target} บาท · ยอดขายปี {year} {prior} บาท · {pct}',
+        newTip: 'เป้าหมาย {target} บาท · ไม่มียอดขายปี {year}',
+        newTag: 'ใหม่',
+        axisUnit: 'ล้าน'
+      },
+      // ⓘ ของยอดขายปีก่อน (components.priorLabel) — เดือนตัดยอดคำนวณจาก history.actualMonths
+      priorInfo: {
+        label: 'ยอดขายปี {year}',
+        column: 'ยอดขายปี {year} (ล้านบาท)',
+        columnBaht: 'ยอดขายปี {year} (บาท)',
+        mixed: 'ยอดขายปี {year} = ยอดขายจริง {actual} + ประมาณการ {estimate}',
+        actual: 'ยอดขายปี {year} = ยอดขายจริงทั้งปี',
+        estimate: 'ยอดขายปี {year} = ประมาณการทั้งปี',
+        none: 'ไม่มีข้อมูลยอดขายปี {year}'
+      },
       views: { units: 'จำนวนชิ้น', sellOut: 'Sell-out Amount', net: 'Net Sales' },
       remaining: 'คงเหลือ',
       allocated: 'จัดสรรแล้ว',
@@ -57,7 +113,6 @@
       units: 'ชิ้น',
       million: 'ล้าน',
       millionBaht: 'ล้านบาท',
-      pending: 'รอยืนยัน',
       edited: 'แก้ไขแล้ว',
       defaultValue: 'ค่าตั้งต้น',
       prior: 'ยอดขายปีก่อน',
@@ -67,19 +122,24 @@
       other: 'อื่นๆ',
       yes: 'ใช่',
       no: 'ไม่ใช่',
-      // ป้ายปีของยอดขายปีก่อน: {year} = ปี, {n} = จำนวนเดือนที่เป็นยอดจริง
-      historyTag: { actual: '{year}', actualEst: '{year} (Actual {n}M + Est.)', none: 'ไม่มีข้อมูลปี {year}' },
-      // Account หรือเขตการขาย ตาม allocationUnit ของ Channel
-      unitType: { ACCOUNT: 'Account', TERRITORY: 'เขต' },
-      unitTypeFull: { ACCOUNT: 'Account', TERRITORY: 'เขตการขาย' },
-      unitAll: { ACCOUNT: 'รวมทั้ง Account', TERRITORY: 'รวมทั้งเขต' },
-      addUnit: { ACCOUNT: '+ Account', TERRITORY: '+ เขต' },
-      noUnits: { ACCOUNT: 'ยังไม่มี Account', TERRITORY: 'ยังไม่มีเขตการขาย' },
-      unitGeneric: 'Account / เขตการขาย',
+      unitAllText: 'รวมทั้ง {unit}',
+      // ปุ่มเพิ่มหน่วยขายในแถว Channel ({unit} = unitLabel ของ Channel เช่น Account, เขตการขาย, Platform)
+      addUnitButton: '+ {unit}',
+      noUnitsOf: 'ยังไม่มี {unit}',
+      noMoreUnitsOf: 'เพิ่ม {unit} ที่เปิดใช้งานครบแล้ว · เปิดใช้งาน {unit} ใหม่ได้ที่ {master}',
+      masterOf: { ACCOUNT: 'Account Master', TERRITORY: 'หน้าเขตการขาย' },
+      // ชื่อฟิลด์ของสินค้า (ความครบถ้วน, Audit log, ฟอร์ม)
+      productFields: {
+        code: 'รหัส', trCode: 'TR Code', tempCode: 'รหัสชั่วคราว', internalCode: 'Internal Code', barcode: 'Barcode',
+        name: 'ชื่อ', nameEn: 'ชื่อภาษาอังกฤษ', shortName: 'ชื่อย่อ', inferred: 'หมวดสินค้าที่ระบบกำหนด', categoryId: 'Category', subCategoryId: 'Sub Category', typeId: 'Type',
+        seriesId: 'Series', subSeriesId: 'Sub Series', itemType: 'Item Type', packSize: 'ขนาดบรรจุ', uom: 'หน่วย', image: 'รูป',
+        rsp: 'RSP', launchDate: 'วันเริ่มขาย', discontinueMonth: 'เดือนเลิกขาย', clearance: 'Clearance', note: 'หมายเหตุ',
+        create: 'สร้างรายการ', 'delete': 'ลบรายการ', listing: 'Listing', price: 'ราคา', manualDefault: 'ค่าตั้งต้นช่องกรอกเอง'
+      },
       // แถบบริบท (subChannelPicker) หน้า Phasing และวางแผน SKU
       picker: {
         channel: 'Channel',
-        unit: 'Account / เขตการขาย',
+        unit: 'หน่วยขาย',
         search: 'ค้นหาชื่อหรือผู้รับผิดชอบ',
         noMatch: 'ไม่พบรายการ',
         prev: 'รายการก่อนหน้าใน Channel นี้',
@@ -98,7 +158,7 @@
         tip: 'ผู้รับผิดชอบ: {name}'
       },
       personStatus: { active: 'ทำงานอยู่', leaving: 'ลาออก {month}', resigned: 'ลาออก {month}', future: 'เริ่มงาน {month}' },
-      roles: { management: 'Management', director: 'Sales Director', sales: 'Sales Person' },
+      roles: { management: 'Management', director: 'Sales Director', sales: 'Sales Person', product: 'ทีม Product', supply: 'Supply Chain', trade: 'Trade Marketing' },
       // Workflow ต่อขั้น (core/workflow.js + components.workflowBar)
       workflow: {
         status: { draft: 'ฉบับร่าง', submitted: 'รออนุมัติ', approved: 'อนุมัติแล้ว', returned: 'ส่งกลับแก้ไข', review: 'ต้องตรวจสอบใหม่', locked: 'ล็อกแล้ว' },
@@ -111,6 +171,8 @@
         approver: 'ผู้อนุมัติ: {name}',
         readOnly: 'อ่านอย่างเดียว · ผู้จัดทำคือ {name}',
         readOnlyApprover: 'อ่านอย่างเดียว · รอ {name} อนุมัติ',
+        readOnlyMaster: 'อ่านอย่างเดียว · ผู้แก้ไขคือ {name}',
+        switchToEditor: 'สลับเป็นมุมมอง {name}',
         waiting: 'อ่านอย่างเดียว · รอผู้จัดทำส่งอนุมัติ (ผู้จัดทำคือ {name})',
         switchToPreparer: 'สลับเป็นมุมมองผู้จัดทำ',
         switchToApprover: 'สลับเป็นมุมมองผู้อนุมัติ',
@@ -118,7 +180,8 @@
         reasons: {
           upstream: { phasing: 'ส่งอนุมัติได้หลังจาก Top-down ได้รับอนุมัติ', sku: 'ส่งอนุมัติได้หลังจาก Phasing ของรายการนี้ได้รับอนุมัติ' },
           remaining: { topDown: 'ส่งอนุมัติไม่ได้ เนื่องจากยังจัดสรรไม่ครบ', phasing: 'ส่งอนุมัติไม่ได้ เนื่องจากยังจัดสรรไม่ครบ', sku: 'ส่งอนุมัติไม่ได้ เนื่องจากแผนต่ำกว่าเป้าหมาย' },
-          baseline: 'ใช้งานได้หลังจากล็อก Baseline'
+          baseline: 'ใช้งานได้หลังจากล็อก Baseline',
+          incomplete: { npd: 'ส่งอนุมัติได้เมื่อกำหนดวันเปิดตัวและหน่วยขายที่วางแผนแล้ว' }
         },
         confirm: {
           submit: 'ส่ง{title} ให้ {approver} อนุมัติ',
@@ -127,10 +190,10 @@
           reopen: 'เปิด{title} ให้แก้ไข สถานะจะกลับเป็นฉบับร่าง',
           recall: 'ดึง{title} กลับเป็นฉบับร่าง'
         },
-        approveNote: 'หากเป้าหมายของ Account / เขตการขายใดเปลี่ยนจากการอนุมัติครั้งก่อน ขั้นถัดไปของรายการนั้นจะเปลี่ยนเป็น "ต้องตรวจสอบใหม่"',
+        approveNote: 'หากเป้าหมายของ หน่วยขายใดเปลี่ยนจากการอนุมัติครั้งก่อน ขั้นถัดไปของรายการนั้นจะเปลี่ยนเป็น "ต้องตรวจสอบใหม่"',
         returnNote: 'เหตุผลที่ส่งกลับแก้ไข (จำเป็น)',
         noteRequired: 'กรุณาระบุเหตุผลก่อนส่งกลับแก้ไข',
-        invalidateNote: { topDown: 'เป้าหมายจาก Top-down เปลี่ยน', phasing: 'เป้าหมายรายเดือนจาก Phasing เปลี่ยน' },
+        invalidateNote: { topDown: 'เป้าหมายจาก Top-down เปลี่ยน', phasing: 'เป้าหมายรายเดือนจาก Phasing เปลี่ยน', npd: 'เลื่อนวันเปิดตัว NPD หลังอนุมัติ' },
         editing: 'โหมดแก้ไข · มีรายการที่ยังไม่บันทึก {n} รายการ',
         editingClean: 'โหมดแก้ไข · ยังไม่มีรายการที่เปลี่ยนแปลง',
         lockedTag: 'ล็อก Baseline แล้ว'
@@ -155,19 +218,29 @@
         title: 'คำอธิบายสถานะและวิธีเติมยอด',
         button: 'คำอธิบายสัญลักษณ์และกฎ',
         legendTitle: 'สัญลักษณ์ในตาราง',
-        statusTitle: 'Status ระดับ SKU (เหมือนกันทุก Account / เขตการขาย)',
-        statusRules: [
-          { status: 'npd', text: '3 เดือนแรกนับจากวันเริ่มขาย (เดือนที่เริ่มขายนับเป็นเดือนที่ 1)' },
-          { status: 'existing', text: 'พ้นช่วง NPD แล้ว' },
-          { status: 'clearance', text: 'ช่วงระบายสต็อกที่ Supply Chain กำหนด มาก่อน Status อื่นเสมอ' },
-          { status: 'ended', text: 'หลังเดือนเลิกขาย มีค่าเป็น 0' },
-          { status: 'upcoming', text: 'ก่อนวันเริ่มขาย มีค่าเป็น 0' }
+        // คีย์ลัดของตารางกรอกตัวเลข (components.gridKeys) — แสดงในแผง ? หน้าวางแผน SKU
+        keysTitle: 'คีย์ลัดในตาราง (โหมดแก้ไข)',
+        keys: [
+          ['Enter / Tab', 'ส่งค่าแล้วเลื่อนลงล่าง / ไปขวา'],
+          ['ลูกศร · Shift + ลูกศร', 'เลื่อนช่อง · เลือกช่วง'],
+          ['Ctrl + C / Ctrl + V', 'คัดลอก / วางหลายช่องกับ Excel (ข้ามช่องที่ล็อก)'],
+          ['Delete', 'ล้างค่าช่องที่เลือก'],
+          ['Ctrl + D / Ctrl + R', 'เติมลงล่าง / เติมไปขวา'],
+          ['Ctrl + Z', 'ย้อนกลับภายในรอบแก้ไข']
         ],
-        sourceTitle: 'วิธีเติมยอด ระดับ SKU × Account / เขตการขาย',
+        statusTitle: 'Status สินค้า (คำนวณจากวันที่ เหมือนกันทุกหน่วยขาย)',
+        statusRules: [
+          { status: 'planned', text: 'ก่อนวันเริ่มขาย มีค่าเป็น 0' },
+          { status: 'new', text: '3 เดือนแรกนับจากวันเริ่มขาย (เดือนที่เริ่มขายนับเป็นเดือนที่ 1)' },
+          { status: 'active', text: 'พ้นช่วง New แล้ว' },
+          { status: 'clearance', text: 'ช่วงระบายสต็อกที่ Supply Chain กำหนด มาก่อน Status อื่นเสมอ' },
+          { status: 'discontinued', text: 'หลังเดือนเลิกขาย มีค่าเป็น 0' }
+        ],
+        sourceTitle: 'วิธีเติมยอด ระดับ SKU × หน่วยขาย',
         sourceRules: [
-          { source: 'locked', text: 'ยังไม่วางขาย ก่อนเดือนเริ่มขาย เลิกขายแล้ว หรือไม่ได้ Listing มีค่าเป็น 0 และแก้ไขไม่ได้' },
-          { source: 'manual', text: 'ยังไม่มียอดขายจริง (รวมถึง SKU ใหม่ทั้งปี) ทีมขายเป็นผู้กรอก' },
-          { source: 'system', text: 'มียอดขายจริงแล้ว ระบบคำนวณจาก Run-rate × Seasonality Index และแก้ไขได้ (Override)' },
+          { source: 'locked', text: 'Planned ก่อนเดือนเริ่มขาย Discontinued หรือไม่ได้ Listing มีค่าเป็น 0 และแก้ไขไม่ได้' },
+          { source: 'manual', text: 'ยังไม่มียอดขายปีก่อนในหน่วยขายนี้ (รวมถึง SKU ใหม่ทั้งปี) ทีมขายเป็นผู้กรอก' },
+          { source: 'system', text: 'มียอดขายปีก่อนในหน่วยขายนี้ ระบบคำนวณตามวิธีค่าตั้งต้นของหน่วยขาย (ยอดปีก่อน × การเติบโต หรือ Run-rate × Seasonality) และแก้ไขได้ (Override)' },
           { source: 'clearance', text: 'อยู่ในช่วง Clearance ระบบคำนวณจาก Stock ÷ จำนวนเดือน และแก้ไขได้ (Override)' }
         ]
       },
@@ -205,20 +278,21 @@
         lockReasons: {
           notListed: 'ไม่ได้ Listing',
           beforeStart: 'ก่อนเดือนเริ่มขาย',
-          upcoming: 'ยังไม่วางขาย (ก่อนวันเริ่มขายใน Product Master)',
-          ended: 'เลิกขายแล้ว'
-        }
+          planned: 'Planned (ก่อนวันเริ่มขายใน Product Master)',
+          discontinued: 'Discontinued (เลิกขายแล้ว)'
+        },
+        price: 'ราคาที่มีผล {price} บาท (RSP {rsp})',
+        // CR-11: ที่มาของช่องระบบเติม และยอดปีก่อนของช่อง
+        fill: {
+          lastYear: 'ยอดปีก่อน × การเติบโต ({ly} × {g})',
+          runRate: 'Run-rate × Seasonality ({rr} × {si})'
+        },
+        prior: 'ปีก่อน {ly} ชิ้น · {diff}',
+        priorNone: 'ไม่มียอดขายปีก่อนในหน่วยขายนี้',
+        anomaly: { up: 'สูงกว่าเดือนเดียวกันปีก่อนเกิน {pct}', down: 'ต่ำกว่าเดือนเดียวกันปีก่อนเกิน {pct}' },
+        gpPromo: 'GP ช่วง Promotion ถ่วงแล้ว {gp}'
       }
     },
-
-    // TODO(ร่าง): Claude ร่างไว้ ให้ทีมแก้ให้ตรงกับปัญหาจริงของไฟล์ Excel ปัจจุบัน
-    excelProblems: [
-      'ไฟล์ Excel แยกต่อ Sub-channel ต้องรวมด้วยมือเพื่อดูภาพรวมทั้งบริษัท',
-      'ราคา GP และ Listing ถูกคัดลอกไว้หลายไฟล์ ไม่ทราบว่าไฟล์ใดล่าสุดและใครเป็นเจ้าของ',
-      'แยกไม่ออกว่าช่องใดกรอกเองและช่องใดเป็นสูตร สูตรถูกพิมพ์ทับได้ง่าย',
-      'ไม่มีจุดแสดงว่าแบ่งเป้าครบแล้วหรือยัง และขาดหรือเกินเท่าใด',
-      'ไม่มี Baseline ที่ล็อกไว้ แผนที่อนุมัติแล้วปนกับ Forecast ที่แก้ไขระหว่างปี'
-    ],
 
     pages: {
 
@@ -228,60 +302,26 @@
         approve: ['ตัวอย่างกล่องสิ่งที่ต้องการให้อนุมัติ']
       },
 
-      home: {
-        title: 'ระบบตั้ง Sales Target แบบใหม่',
-        lead: [
-          'แทนไฟล์ Excel แยกต่อ Sub-channel ด้วยระบบเดียว ที่ทุกทีมใช้ข้อมูลชุดเดียวกัน',
-          'เป้าหมายจากผู้บริหาร (Top-down) และแผนจากทีมขาย (Bottom-up) มาเจอกันที่ยอดคงเหลือ'
-        ],
-        problemsTitle: 'ปัญหาของวิธีปัจจุบัน',
-        conceptTitle: 'แนวคิดหลัก: สองทางมาเจอกันที่ยอดคงเหลือ',
-        topDown: { title: 'Top-down', unit: 'Net Sales (บาท)', who: 'ผู้บริหาร / Sales Director', steps: ['Total Target', 'Channel', 'Account / เขตการขาย', 'รายเดือน'] },
-        bottomUp: { title: 'Bottom-up', unit: 'จำนวนชิ้น', who: 'ทีมขาย / KAM', steps: ['SKU × เดือน (ชิ้น)', '× ราคา = Sell-out Amount', '× (1 − GP) = Net Sales'] },
-        meet: { title: 'คงเหลือ', formula: 'เป้าหมาย − แผน', note: 'ดูได้ทุกชั้น ทุกเดือน' },
-        tourTitle: 'เนื้อหาใน Tour (10–15 นาที)',
-        startTour: 'เริ่ม Tour'
-      },
-
-      masterData: {
-        title: 'ใครดูแลข้อมูลอะไร',
-        lead: [
-          'ทุกทีมใช้ข้อมูลหลักชุดเดียวกัน และแต่ละข้อมูลมีเจ้าของเพียงทีมเดียว',
-          'ทีมขายไม่ต้องคัดลอกราคา GP หรือ Listing ไว้ในไฟล์ของตนเอง ระบบดึงข้อมูลให้'
-        ],
-        owners: { product: 'ทีม Product', supply: 'Supply Chain', kam: 'Sales/KAM + Finance', trade: 'Sales/Trade Marketing' },
-        rows: [
-          { key: 'status', item: 'Status สินค้า', owner: 'product', source: 'Product Master', usedIn: ['productMaster', 'skuPlanning'] },
-          { key: 'firstSale', item: 'วันเริ่มขาย', owner: 'product', source: 'Product Master', usedIn: ['productMaster', 'skuPlanning'] },
-          { key: 'listing', item: 'Listing ต่อ Account / เขตการขาย', owner: 'product', source: 'Product Master', usedIn: ['productMaster', 'skuPlanning'] },
-          { key: 'priceList', item: 'Price List', owner: 'product', source: 'Product Master', usedIn: ['skuPlanning'] },
-          { key: 'clearance', item: 'Clearance (Stock และช่วงเดือน)', owner: 'supply', source: 'แผน Clearance', usedIn: ['productMaster', 'skuPlanning'] },
-          { key: 'gp', item: 'GP ต่อ Account', owner: 'kam', source: 'Account Master', usedIn: ['accounts', 'skuPlanning'] },
-          { key: 'promotion', item: 'Promotion', owner: 'trade', source: 'ปฏิทิน Promotion', usedIn: ['skuPlanning'] }
-        ],
-        columns: { item: 'ข้อมูล', owner: 'เจ้าของ', source: 'เก็บที่', example: 'ตัวอย่างในเว็บนี้', usedIn: 'ใช้ในหน้า' },
-        flowTitle: 'ข้อมูลไหลไปที่แผนของทีมขาย',
-        planLabel: 'แผน SKU ของทีมขาย'
-      },
-
       // Workflow ทั้งหน้า: Sales Director จัดทำ → Management อนุมัติ
       topDown: {
-        title: 'แบ่งเป้า Top-down',
-        lead: ['กำหนดเป้าหมาย Net Sales ประจำปี และจัดสรรให้แต่ละ Channel และ Account / เขตการขาย'],
+        title: 'จัดสรรเป้าหมายประจำปี',
+        short: 'เป้าหมายประจำปี',
+        titleTip: 'การจัดสรรแบบ Top-down',
+        lead: ['กำหนดเป้าหมาย Net Sales ประจำปี และจัดสรรให้แต่ละ Channel และหน่วยขาย'],
         workflowTitle: 'แผน Top-down ปี {year}',
         totalLabel: 'Total Target',
         columns: {
           name: 'ชื่อ',
-          prior: 'ยอดขายปีก่อน (ล้านบาท)',
-          pct: 'สัดส่วน (%)',
-          pctTip: 'แถว Channel เทียบกับ Total Target · แถว Account/เขต เทียบกับ Channel',
+          pctTotal: '% ของ Total',
+          pctTotalTip: 'สัดส่วนเทียบกับ Total Target · แถว Channel กรอกที่คอลัมน์นี้ · แถวหน่วยขาย = % ใน Channel × % ของ Total ของ Channel',
+          pctChannel: '% ใน Channel',
+          pctChannelTip: 'สัดส่วนของหน่วยขายเทียบกับเป้าหมายของ Channel นั้น',
           amount: 'เป้าหมาย (บาท)',
           growth: 'การเติบโต',
-          compare: 'เทียบปีก่อน',
-          compareTip: 'ความยาวแท่ง = เป้าหมาย · ขีดตั้ง = ยอดขายปีก่อน · แถว Channel และแถว Account/เขต ใช้สเกลแยกกัน',
           manage: 'จัดการ'
         },
         remainingTotal: 'คงเหลือระดับ Total',
+        remainingIn: 'คงเหลือใน {channel}',
         usePriorShares: 'เติมตามสัดส่วนปีก่อน',
         usePriorSharesTitle: 'กำหนดสัดส่วนตามยอดขายปีก่อน (รายการที่ไม่มียอดขายปีก่อนได้ 0%)',
         normalize: 'กระจายตามสัดส่วนปัจจุบัน',
@@ -297,11 +337,21 @@
         removeChannelConfirm: 'นำ {name} และทุกรายการใน Channel นี้ออกจากแผนปี {year}',
         removeChannelLine: 'เป้าหมาย {amount} บาท · {count} รายการ จะถูกนำออกจากแผน',
         collapseTitle: 'ย่อหรือขยายรายการใน Channel นี้',
-        donutTitle: 'สัดส่วน Channel',
-        donutRings: 'วงนอก = ปีนี้ · วงใน = ปีก่อน',
-        donutCenter: 'จัดสรรแล้ว',
-        donutTip: '{name} · ปีนี้ {pct} ({amount} บาท) · ปีก่อน {prior}',
+        wfTitle: 'ที่มาของการเติบโต (ล้านบาท)',
+        wfStart: 'ยอดขายปี {year}',
+        wfEnd: 'Total Target {year}',
+        wfTip: '{name}: เป้าหมาย {target} · ยอดขายปี {year} {prior} ล้านบาท',
+        wfAxis: 'แกนเริ่มที่ {value} ล้านบาท · ตัวเลขท้ายแท่ง = ส่วนต่างเทียบปีก่อน',
+        shareTitle: 'สัดส่วน Channel ปี {prior} เทียบปี {year}',
+        shareTip: '{name} {pct}',
         unallocated: 'ยังไม่จัดสรร',
+        overAllocated: 'จัดสรรเกิน',
+        exportSpec: {
+          file: 'Top-down_{year}_{status}_{date}', sheet: 'Top-down',
+          cols: { channel: 'Channel', level: 'ระดับ', unitType: 'ประเภทหน่วย', unit: 'หน่วยขาย', owner: 'ผู้รับผิดชอบปัจจุบัน', prior: 'ยอดขายปี {year} (บาท)',
+            pctOfTotal: '% ของ Total', pctInChannel: '% ใน Channel', amount: 'เป้าหมาย (บาท)', growth: 'การเติบโต (%)', growthAmount: 'การเติบโต (บาท)' },
+          levels: { channel: 'Channel', unit: 'หน่วยขาย', total: 'Total', remaining: 'คงเหลือ' }
+        },
         summaryLines: {
           total: 'Total Target {amount} บาท',
           channel: '{name} {pct} = {amount} บาท · {count} รายการ'
@@ -310,14 +360,17 @@
 
       // Workflow ต่อ Account/เขต: ผู้รับผิดชอบจัดทำ → Sales Director อนุมัติ
       phasing: {
-        title: 'กระจายเป้ารายเดือน',
-        lead: ['จัดสรรเป้าหมายรายปีเป็นรายเดือน โดยใช้สัดส่วนยอดขายปีก่อนเป็นค่าตั้งต้น'],
+        title: 'จัดสรรเป้าหมายรายเดือน',
+        short: 'เป้าหมายรายเดือน',
+        titleTip: 'Phasing',
+        lead: ['กระจายเป้าหมายประจำปีของหน่วยขายเป็นรายเดือน โดยใช้สัดส่วนยอดขายปีก่อนเป็นค่าตั้งต้น'],
         workflowTitle: ' Phasing ของ {unit}',
         resetButton: 'คืนค่าตามสัดส่วนปีก่อน',
+        exportSpec: { file: 'Phasing_{year}_{unit}_{status}_{date}', sheet: 'Phasing', cols: { month: 'เดือน', growth: 'การเติบโตเทียบปีก่อน (%)' }, remaining: 'คงเหลือ' },
         noChannels: 'แผนของปีนี้ยังไม่มี Channel',
-        noUnitsInChannel: 'Channel {channel} ในแผนปี {year} ยังไม่มี Account / เขตการขาย',
-        goTopDown: 'ไปที่หน้า Top-down',
-        rows: { month: 'เดือน', owner: 'ผู้รับผิดชอบ', prior: 'ยอดขายปีก่อน (บาท)', pct: 'สัดส่วนรายเดือน (%)', amount: 'เป้าหมาย Net Sales (บาท)', growth: 'การเติบโตเทียบปีก่อน' },
+        noUnitsInChannel: 'Channel {channel} ในแผนปี {year} ยังไม่มี {unit}',
+        goTopDown: 'ไปที่หน้าจัดสรรเป้าหมายประจำปี',
+        rows: { month: 'เดือน', owner: 'ผู้รับผิดชอบ', prior: 'ยอดขายปี {year} (บาท)', pct: 'สัดส่วนรายเดือน (%)', amount: 'เป้าหมาย Net Sales (บาท)', growth: 'การเติบโตเทียบปีก่อน' },
         totalColumn: 'รวมทั้งปี',
         defaultTip: 'ค่าตั้งต้น {pct}',
         legendTarget: 'เป้าหมายปีนี้',
@@ -326,89 +379,317 @@
         summaryLines: { annual: 'เป้าหมายทั้งปี {amount} บาท', months: 'รวม 12 เดือน {pct} = {sum} บาท', remaining: 'คงเหลือ: {remaining}' }
       },
 
-      skuStatus: {
-        title: 'Status สินค้า กับ วิธีเติมยอด เป็นคนละเรื่อง',
-        lead: [
-          'Status บอกว่าสินค้าอยู่ช่วงใดของวงจรชีวิต ดูที่ระดับ SKU และเหมือนกันทุกช่องทาง',
-          'วิธีเติมยอดดูที่ระดับ SKU × Account / เขตการขาย เพราะ SKU เดียวกันเข้าแต่ละร้านไม่พร้อมกัน'
-        ],
-        statusTitle: 'Status ระดับ SKU',
-        statusRules: [
-          { status: 'npd', text: '3 เดือนแรกนับจากวันเริ่มขาย (เดือนที่เริ่มขายนับเป็นเดือนที่ 1)' },
-          { status: 'existing', text: 'พ้นช่วง NPD แล้ว' },
-          { status: 'clearance', text: 'ช่วงระบายสต็อกที่ Supply Chain กำหนด มาก่อน Status อื่นเสมอ' }
-        ],
-        sourceTitle: 'วิธีเติมยอด ระดับ SKU × Account / เขตการขาย',
-        sourceRules: [
-          { source: 'locked', text: 'ยังไม่ Listing หรือเลิกขายแล้ว มีค่าเป็น 0 และแก้ไขไม่ได้' },
-          { source: 'manual', text: 'ยังไม่มียอดขายจริง ทีมขายเป็นผู้กรอก' },
-          { source: 'system', text: 'มียอดขายจริงแล้ว คำนวณจาก Run-rate × Seasonality Index' },
-          { source: 'clearance', text: 'อยู่ในช่วง Clearance คำนวณจาก Stock ÷ จำนวนเดือน' }
-        ],
-        exampleTitle: 'ตัวอย่าง: SKU A สินค้าใหม่',
-        notListedOption: 'ไม่วางขาย',
-        exampleHint: 'เปลี่ยนเดือนเริ่มขายหรือเดือน Listing เพื่อดูการเปลี่ยนสี',
-        exampleSku: 'A',
-        exampleSubChannels: ['shopee', 'watsons', 'tt-north'],
-        firstSaleLabel: 'เริ่มขาย',
-        listingLabel: 'Listing',
-        statusRowLabel: 'Status ของ SKU',
-        clearanceTitle: 'ตัวอย่าง: SKU D Clearance มาก่อนเสมอ',
-        clearanceSku: 'D',
-        clearanceSubChannel: 'shopee',
-        conclusionTitle: 'ข้อสรุป: SKU ใหม่ต้องกรอกเองทั้งปีในแผนรายปี',
-        conclusion: 'ขณะจัดทำแผนรายปี SKU ใหม่ยังไม่มียอดขายจริงสำหรับคำนวณ Run-rate แม้พ้นช่วง NPD แล้วก็ยังเติมอัตโนมัติไม่ได้ เมื่อมียอดขายจริงแล้วจึงใช้ระบบเติมในรอบ Forecast'
+      // โหมดดู/แก้ไข (workflowBar แบบง่าย ไม่มีขั้นอนุมัติ)
+      // Product Master · รายการสินค้า (modules/products)
+      productList: {
+        title: 'รายการสินค้า',
+        lead: ['ข้อมูลหลักของสินค้า ราคา และสถานะความครบถ้วนของข้อมูล'],
+        kpi: { all: 'ทั้งหมด', active: 'Active', 'new': 'New', required: 'ขาดข้อมูลจำเป็น', recommended: 'ขาดข้อมูลที่ควรมี', unit: 'SKU', title: 'กดเพื่อกรองตาราง' },
+        searchPlaceholder: 'ค้นหา TR Code / รหัสชั่วคราว / Internal Code / Barcode / ชื่อ',
+        viewLabel: 'มุมมอง',
+        views: { list: 'รายการ', group: 'จัดกลุ่ม' },
+        filters: {
+          status: 'Status', statusAll: 'ทุก Status', category: 'หมวดสินค้า', categoryAll: 'ทุกหมวดสินค้า',
+          channel: 'Channel', channelAll: 'ทุก Channel', itemType: 'Item Type', itemTypeAll: 'ทุกประเภท',
+          completeness: 'ความครบถ้วน', completenessAll: 'ทุกระดับ',
+          completenessOptions: { ok: 'ครบ', required: 'ขาดข้อมูลจำเป็น', recommended: 'ขาดข้อมูลที่ควรมี' }
+        },
+        statusAsOf: 'Status ณ {month}',
+        columnsButton: 'เลือกคอลัมน์',
+        columnsTitle: 'คอลัมน์เพิ่มเติม',
+        exportCsv: 'ส่งออก CSV',
+        compareErp: 'เปรียบเทียบกับ ERP',
+        addSku: '+ เพิ่ม SKU',
+        filterSummary: 'ตัวกรองที่ใช้: {list}',
+        clearFilters: 'ล้างตัวกรอง',
+        resultCount: 'แสดง {n} จาก {total} SKU',
+        columns: {
+          image: 'รูป', code: 'TR Code', name: 'ชื่อสินค้า', status: 'Status', categoryGroup: 'หมวดสินค้า',
+          category: 'Category', subCategory: 'Sub Category', type: 'Type', series: 'Series', subSeries: 'Sub Series',
+          rsp: 'RSP (บาท)', completeness: 'ความครบถ้วน', manage: 'จัดการ',
+          internalCode: 'Internal Code', barcode: 'Barcode', itemType: 'Item Type', packSize: 'ขนาดบรรจุ', launchDate: 'วันเริ่มขาย',
+          listedCount: 'Listing (หน่วยขาย)', sellIn: 'ราคาขายเข้า {channel} (บาท)', updatedAt: 'แก้ไขล่าสุด'
+        },
+        groupHead: '{name} · {n} SKU',
+        noSeries: '(ไม่ระบุ Series)',
+        noSubSeries: '(ไม่ระบุ Sub Series)',
+        empty: 'ไม่พบสินค้าตามตัวกรอง',
+        viewDetail: 'ดูรายละเอียด',
+        removeTitle: 'ลบ SKU',
+        removeConfirm: 'ลบ {code} ออกจาก Product Master',
+        removeBlocked: 'ลบได้เฉพาะ SKU ที่ยังไม่มี Listing ราคา Promotion หรือแผน NPD · ปิดการขายด้วยเดือนเลิกขายแทน',
+        csvFile: 'Product-List_{date}',
+        tabs: { general: 'ข้อมูลทั่วไป', price: 'ราคา', listing: 'Listing และวงจรสินค้า', history: 'ประวัติการแก้ไข' },
+        edit: 'แก้ไข',
+        completenessPct: 'ความครบถ้วน {pct}',
+        general: {
+          codes: 'รหัส', names: 'ชื่อสินค้า', category: 'หมวดสินค้า', series: 'Series', other: 'ประเภทและขนาดบรรจุ', image: 'รูปสินค้า',
+          placeholder: 'เลือก', imageUpload: 'เลือกรูปจากเครื่อง', imageRemove: 'ลบรูป',
+          imageNote: 'ระบบย่อรูปให้ด้านยาวไม่เกิน {px}px ก่อนเก็บ (ไม่เก็บไฟล์ต้นฉบับ)', imageError: 'อ่านไฟล์รูปไม่ได้',
+          useTemp: 'ใช้รหัสชั่วคราว', tempNote: 'ระบบสร้างรหัสรูปแบบ NPD_{ปี}Q{ไตรมาส}_{ลำดับ} ตามวันเริ่มขาย',
+          tempHistory: 'รหัสชั่วคราวเดิม: {code}', note: 'หมายเหตุ'
+        },
+        bind: {
+          button: 'ผูกรหัสจริง', label: 'TR Code จริง', title: 'ผูกรหัส {temp} กับ TR Code {code}',
+          lines: ['ย้าย Listing ราคา Promotion แผน NPD และแผน SKU ทุกปีไปใช้ TR Code', 'เก็บรหัสชั่วคราวไว้เป็นประวัติ'],
+          errors: { empty: 'กรุณากรอก TR Code', duplicate: 'มี TR Code นี้แล้ว', notFound: 'ไม่พบรหัสชั่วคราวนี้' },
+          editingHint: 'บันทึกหรือยกเลิกการแก้ไขก่อนผูกรหัสจริง'
+        },
+        price: {
+          historyTitle: 'ประวัติราคา', noPrice: 'ยังไม่มีราคา',
+          columns: { type: 'ประเภท', channel: 'Channel', from: 'วันที่มีผล', to: 'ถึง', price: 'ราคา (บาท)', by: 'ผู้แก้ไข' },
+          types: { RSP: 'RSP', SELL_IN: 'ราคาขายเข้า' }, allChannels: 'ทุก Channel', accountOnly: 'เฉพาะ {unit}', open: 'ปัจจุบัน',
+          add: '+ ราคาใหม่', addTitle: 'เพิ่มราคาใหม่ (ราคาเดิมปิดช่วงให้อัตโนมัติ)', addSubmit: 'เพิ่มราคา',
+          errors: { price: 'ราคาต้องมากกว่า 0', date: 'วันที่มีผลต้องหลังราคาเดิมทุกรายการ' },
+          promosTitle: 'Promotion ที่เกี่ยวข้อง', promosEmpty: 'ยังไม่มี Promotion ของ SKU นี้', promoLink: 'เปิดหน้า Promotion Price',
+          promoLine: '{name} · {dates} · {value} · {status}'
+        },
+        listing: {
+          launch: 'วันเริ่มขาย', listedTitle: 'หน่วยขายที่ Listing ({n})', listedEmpty: 'ยังไม่ได้ Listing',
+          listingLink: 'แก้ไข Listing ที่หน้า Listing และวันเริ่มขาย', clearance: 'Clearance', clearanceNone: 'ไม่มี',
+          clearanceText: '{from} – {to} · Stock {stock} ชิ้น', discontinue: 'เดือนเลิกขาย', discontinueNone: 'ยังขายอยู่',
+          timelineTitle: 'Status ปี {year}', npdLink: 'แผน NPD: {stage} · {status}'
+        },
+        history: { columns: { at: 'วันเวลา', by: 'ผู้แก้ไข', field: 'ฟิลด์', change: 'ค่าเดิม → ค่าใหม่' }, empty: 'ยังไม่มีประวัติการแก้ไข', imageYes: 'มีรูป', imageNo: 'ไม่มีรูป' },
+        create: { title: 'เพิ่ม SKU ใหม่', submit: 'เพิ่ม SKU', codeRequired: 'กรุณากรอก TR Code หรือเลือกใช้รหัสชั่วคราว', duplicate: 'มีรหัสนี้แล้ว', nameRequired: 'กรุณากรอกชื่อสินค้า', rspLabel: 'RSP (บาท)', rspFrom: 'RSP มีผลตั้งแต่' },
+        erp: {
+          title: 'เปรียบเทียบกับ ERP', note: 'เทียบกับข้อมูลตัวอย่าง (data/erp-snapshot.js) เฉพาะสินค้าที่มี TR Code',
+          groups: { onlyErp: 'มีใน ERP แต่ไม่มีใน Master', onlyMaster: 'มีใน Master แต่ไม่มีใน ERP', mismatches: 'ฟิลด์ไม่ตรงกัน' },
+          fields: { name: 'ชื่อ', barcode: 'Barcode', rsp: 'RSP' }, master: 'Master', erpValue: 'ERP',
+          use: 'ใช้ค่าจาก ERP', useHint: 'ใช้ค่าจาก ERP ได้ในโหมดแก้ไข', none: 'ไม่มีรายการ', applied: 'ใช้ค่าจาก ERP แล้ว (ยังไม่บันทึก)'
+        }
       },
 
-      // โหมดดู/แก้ไข (workflowBar แบบง่าย ไม่มีขั้นอนุมัติ)
+      // Product Master · แผน NPD (modules/npd-plan)
+      npdPlan: {
+        title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)',
+        lead: ['กำหนดการเปิดตัวสินค้าใหม่ตาม Series และหน่วยขายที่วางแผนจำหน่าย'],
+        kpi: { inYear: 'NPD ในปี {year}', bySeries: 'ตาม Series', pending: 'ยังไม่อนุมัติ', missing: 'หน่วยขายที่วางแผนแล้วแต่ยังไม่อยู่ในแผน SKU' },
+        viewLabel: 'มุมมอง',
+        views: { timeline: 'Timeline', table: 'ตาราง' },
+        yearPrev: 'ปีก่อนหน้า', yearNext: 'ปีถัดไป', yearLabel: 'ปี {year}',
+        stages: { plan: 'วางแผน', concept: 'อนุมัติแนวคิด', production: 'เตรียมผลิต', ready: 'พร้อมขาย', launched: 'เปิดตัวแล้ว' },
+        stageAuto: 'ระบบตั้งให้เมื่อถึงวันเปิดตัว',
+        columns: { sku: 'SKU', series: 'Series', stage: 'ขั้น', launch: 'วันเปิดตัวตามแผน', accounts: 'หน่วยขายที่วางแผน', inPlan: 'อยู่ในแผน SKU แล้ว', approval: 'สถานะอนุมัติ' },
+        accountsCount: '{n} หน่วย',
+        inPlanText: '{x} / {y}',
+        pin: 'เปิดตัว {date}',
+        newBand: 'ช่วง New 3 เดือน',
+        empty: 'ไม่มีแผน NPD ที่เปิดตัวในปีนี้',
+        create: '+ สร้างแผน NPD',
+        createTitle: 'สร้างแผน NPD',
+        pickSku: 'SKU ที่ยังไม่มีแผน NPD',
+        pickPlaceholder: 'เลือก SKU',
+        orNew: 'หรือสร้าง SKU ใหม่ด้วยรหัสชั่วคราว',
+        newName: 'ชื่อสินค้าใหม่',
+        newSubmit: 'สร้าง SKU และแผน NPD',
+        createSubmit: 'สร้างแผน NPD',
+        nameRequired: 'กรุณาเลือก SKU หรือกรอกชื่อสินค้าใหม่',
+        drawerTitle: 'แผน NPD · {name}',
+        workflowTitle: 'แผน NPD ของ {name}',
+        fields: { product: 'SKU', series: 'Series', stage: 'ขั้น', launch: 'วันเปิดตัวตามแผน', accounts: 'หน่วยขายที่วางแผนและเดือนเริ่มขาย', note: 'หมายเหตุ' },
+        addAccount: '+ หน่วยขาย',
+        startMonth: 'เดือนเริ่มขาย',
+        removeAccount: 'นำหน่วยขายออกจากแผน NPD',
+        noAccounts: 'ยังไม่มีหน่วยขายที่วางแผน',
+        inSkuPlan: 'อยู่ในแผน SKU แล้ว',
+        notInSkuPlan: 'ยังไม่อยู่ในแผน SKU',
+        openSkuPlan: 'เปิดหน้าวางแผนยอดขายราย SKU ของ {unit}',
+        productLink: 'เปิดรายละเอียดสินค้า',
+        approvedEffect: 'อนุมัติแล้ว: ตั้งวันเริ่มขายและ Listing ให้อัตโนมัติ และเดือนเริ่มขายเป็นค่าตั้งต้นในหน้าวางแผนราย SKU',
+        launchMovedNote: 'เลื่อนวันเปิดตัวหลังอนุมัติ: แผนกลับเป็นฉบับร่าง และแผน SKU ที่อนุมัติแล้วของหน่วยขายที่วางแผนเป็น "ต้องตรวจสอบใหม่"',
+        summaryLines: { launch: 'วันเปิดตัว {date}', accounts: 'หน่วยขายที่วางแผน {n} หน่วย', stage: 'ขั้น {stage}' },
+        editHint: 'กดแก้ไขที่หัวหน้าเพื่อแก้แผน NPD'
+      },
+
+      // Product Master · Promotion Price (modules/promotions)
+      promotionPrice: {
+        title: 'Promotion Price',
+        lead: ['ราคาโปรโมชันราย SKU รายหน่วยขาย ตามช่วงเวลา'],
+        viewLabel: 'มุมมอง',
+        views: { calendar: 'ปฏิทินรายเดือน', list: 'รายการ' },
+        accountsLabel: 'หน่วยขาย',
+        accountsAll: 'ทุก {unit}',
+        accountsSelected: '{n} หน่วย',
+        search: 'ค้นหา SKU',
+        legend: { rsp: 'ไม่มี Promotion (RSP)', promo: 'มี Promotion', partial: 'Promotion บางวัน', draft: 'ฉบับร่าง (ไม่นับในแผน)', multi: 'หลายราคา' },
+        multiPrice: 'หลายราคา',
+        cellTip: { month: '{sku} · {month}', rsp: 'RSP {rsp} บาท', price: 'ราคาที่มีผลเฉลี่ย {price} บาท', promo: '{name} · {days} วัน · {price} บาท', draft: 'ฉบับร่าง: {name} · {days} วัน (ไม่นับ)', unit: '{unit}: {price} บาท' },
+        editHint: 'โหมดแก้ไข: คลิกช่องในปฏิทินเพื่อสร้าง Promotion ของเดือนนั้น',
+        columns: { name: 'ชื่อ Promotion', sku: 'SKU', accounts: 'หน่วยขาย', dates: 'ช่วงวันที่', value: 'ราคา / ส่วนลด', gp: 'GP ช่วง Promotion', status: 'สถานะ', manage: 'จัดการ' },
+        statuses: { DRAFT: 'ฉบับร่าง', CONFIRMED: 'ยืนยันแล้ว' },
+        modes: { PRICE: 'ราคาโปรโมชัน', DISCOUNT_PCT: 'ส่วนลด %' },
+        valueText: { PRICE: '{value} บาท', DISCOUNT_PCT: 'ลด {value}' },
+        gpDefault: 'GP ปกติ',
+        empty: 'ไม่มี Promotion ตามตัวกรอง',
+        noSkus: 'ไม่มี SKU ตามตัวกรอง',
+        add: '+ สร้าง Promotion',
+        editButton: 'แก้ไข',
+        baselineNote: 'ล็อก Baseline แล้ว: Promotion ที่เพิ่มหรือแก้ไขมีผลกับ Forecast เท่านั้น Target Baseline ไม่เปลี่ยน',
+        form: {
+          newTitle: 'สร้าง Promotion', editTitle: 'แก้ไข Promotion', name: 'ชื่อ Promotion', skus: 'SKU', skusAll: 'เลือก SKU',
+          skusSelected: '{n} SKU', accounts: 'หน่วยขาย', start: 'วันที่เริ่ม', end: 'วันที่สิ้นสุด', mode: 'รูปแบบ', value: 'ค่า',
+          valueSuffix: { PRICE: 'บาท', DISCOUNT_PCT: '%' }, gp: 'GP ช่วง Promotion (%)', gpNote: 'ไม่บังคับ (ว่าง = GP ปกติของหน่วยขาย)',
+          status: 'สถานะ', preview: 'ตัวอย่าง: {sku} ราคาหลังคำนวณ {price} บาท (RSP {rsp} · {pct})', previewNone: 'เลือก SKU และหน่วยขายเพื่อดูตัวอย่างราคา',
+          save: 'ใช้ค่านี้', selectSeries: 'ทั้ง Series {name}', previewMore: 'และอีก {n} SKU',
+          existingTitle: 'Promotion ที่มีอยู่ของ SKU นี้', copyApply: 'คัดลอก', remove: 'ลบ Promotion', copyNext: 'คัดลอกไปเดือนถัดไป', copyAccounts: 'คัดลอกไปหน่วยขายอื่น',
+          copyAccountsTitle: 'เลือกหน่วยขายที่ต้องการคัดลอก', copied: 'คัดลอกแล้ว {n} รายการ',
+          nameRequired: 'กรุณากรอกชื่อ Promotion', skusRequired: 'กรุณาเลือก SKU อย่างน้อย 1 รายการ',
+          errors: { dates: 'วันที่เริ่มต้องไม่หลังวันที่สิ้นสุด', accounts: 'กรุณาเลือกหน่วยขายอย่างน้อย 1 หน่วย', price: 'ราคาโปรโมชันต้องมากกว่า 0', overlap: '{sku} ซ้อนกับ Promotion: {names}' },
+          warnAboveRsp: 'ราคาโปรโมชันของ {sku} สูงกว่า RSP'
+        },
+        removeConfirm: 'ลบ Promotion {name} ({sku})'
+      },
+
+      // Product Master · Listing และวันเริ่มขาย (modules/product-master)
       productMaster: {
         title: 'Listing และวันเริ่มขาย',
-        lead: ['กำหนดวันเริ่มขายและ Account ที่จำหน่ายสินค้าได้'],
+        lead: ['กำหนดหน่วยขายที่จำหน่ายสินค้าได้ และช่วง Clearance'],
         searchPlaceholder: 'ค้นหา SKU ชื่อ หรือ Series',
         statusFilter: 'Status',
         statusAll: 'ทุก Status',
-        columns: { sku: 'SKU / ชื่อ / Series', launch: 'วันเริ่มขาย', status: 'Status ปีแผน', listing: 'Listing ต่อ{unitType}', clearance: 'Clearance', discontinue: 'เลิกขาย', manage: 'จัดการ' },
+        itemTypeFilter: 'Item Type',
+        itemTypeAll: 'ทุกประเภท',
+        columns: { sku: 'SKU / ชื่อ / Series', launch: 'วันเริ่มขาย', status: 'Status {year}', listing: 'Listing ต่อ {unit} · {channel}', clearance: 'Clearance', discontinue: 'เลิกขาย' },
         clearanceOwner: 'Supply Chain',
         clearanceFrom: 'ตั้งแต่',
         clearanceTo: 'ถึง',
         clearanceStock: 'Stock (ชิ้น)',
-        clearanceStockNote: 'Prototype แบ่ง Stock เท่ากันทุกรายการที่ Listing',
+        clearanceStockNote: 'Prototype แบ่ง Stock เท่ากันทุกหน่วยขายที่ Listing',
         clearanceNone: '–',
+        clearanceText: '{from}–{to} · {stock}',
+        clearanceEdit: 'แก้ไข Clearance',
+        clearanceTitle: 'Clearance · {sku}',
+        clearanceSave: 'ใช้ค่านี้',
+        clearanceClear: 'ไม่มี Clearance',
+        clearanceError: 'กรุณาระบุเดือนเริ่มและเดือนสิ้นสุด (เดือนสิ้นสุดต้องไม่ก่อนเดือนเริ่ม)',
         discontinueNone: 'ยังขายอยู่',
         listedMark: '✓',
+        selectRow: 'เลือกทั้งแถว',
+        selectColumn: 'เลือกทั้งคอลัมน์ {unit} (เฉพาะแถวที่แสดง)',
         noMatch: 'ไม่พบ SKU ตามเงื่อนไข',
-        noUnits: 'Channel นี้ยังไม่มีรายการใน Master',
-        listedCount: 'Listing {n} รายการ',
-        addSku: '+ เพิ่ม SKU',
-        addTitle: 'เพิ่ม SKU ใหม่',
-        addFields: { sku: 'รหัส SKU', name: 'ชื่อ', series: 'Series', launch: 'วันเริ่มขาย', price: 'ราคา (บาท)' },
-        addSubmit: 'เพิ่ม',
-        addCancel: 'ยกเลิก',
-        addErrorRequired: 'กรุณากรอกรหัส ชื่อ และวันเริ่มขาย',
-        addErrorDuplicate: 'มีรหัส SKU นี้แล้ว',
-        addedNote: 'SKU ใหม่ยังไม่มี Listing กรุณาเลือก Listing แล้วบันทึก เพื่อให้ทีมขายเห็นในหน้าวางแผน',
-        removeSku: 'ลบ SKU',
-        removeSkuConfirm: 'ลบ {sku} ออกจาก Product Master',
-        removeSkuBlocked: 'ลบได้เฉพาะ SKU ที่ยังไม่มี Listing'
+        noUnits: 'Channel นี้ยังไม่มีหน่วยขายใน Master',
+        listedCount: 'Listing {n} หน่วย',
+        roleHint: { product: 'ทีม Product: แก้ไข Listing', supply: 'Supply Chain: แก้ไข Clearance' },
+        launchHint: 'แก้ไขวันเริ่มขายได้ที่รายการสินค้าหรือแผน NPD'
+      },
+
+      // Product Master · หมวดสินค้าและ Series (modules/taxonomy)
+      taxonomy: {
+        title: 'หมวดสินค้าและ Series',
+        lead: ['รายการหมวดสินค้าและ Series ที่ใช้อ้างอิงในข้อมูลสินค้า'],
+        tabs: { category: 'หมวดสินค้า', series: 'Series' },
+        hint: 'ลำดับชั้น: {levels}',
+        levels: { CATEGORY: 'Category', SUB_CATEGORY: 'Sub Category', TYPE: 'Type', SERIES: 'Series', SUB_SERIES: 'Sub Series' },
+        columns: { name: 'ชื่อ', level: 'ระดับ', count: 'จำนวน SKU', active: 'การใช้งาน', order: 'ลำดับ', manage: 'จัดการ' },
+        addRoot: { category: '+ เพิ่ม Category', series: '+ เพิ่ม Series' },
+        addChild: '+ {level}',
+        addChildTitle: 'เพิ่ม {level} ภายใต้ {name}',
+        newName: '{level} ใหม่',
+        moveUp: 'เลื่อนขึ้น',
+        moveDown: 'เลื่อนลง',
+        removeTitle: 'ลบรายการ',
+        removeConfirm: 'ลบ {name} ออกจากรายการ',
+        cannotRemove: 'ลบ {name} ไม่ได้',
+        inUseLine: 'มี SKU ใช้อยู่ {n} รายการ',
+        hasChildrenLine: 'มีรายการย่อย {n} รายการ',
+        useInactive: 'ปิดใช้งานแทนการลบ: เลือกใหม่ในฟอร์มสินค้าไม่ได้ แต่สินค้าเดิมยังแสดงชื่อได้',
+        deactivate: 'ปิดใช้งาน',
+        activeYes: 'ใช้งาน',
+        activeNo: 'ปิดใช้งาน',
+        collapseTitle: 'ย่อหรือขยายรายการย่อย',
+        empty: 'ยังไม่มีรายการ'
       },
 
       // Workflow ต่อ Account/เขต: แผนครั้งแรก (sku) และ Re-forecast (forecast) แยกกัน
       skuPlanning: {
-        title: 'วางแผนราย SKU',
-        lead: ['วางแผนจำนวนขายราย SKU รายเดือน ระบบคำนวณเป็น Net Sales และเปรียบเทียบกับเป้าหมายรายเดือน'],
+        title: 'วางแผนยอดขายราย SKU',
+        short: 'แผนยอดขายราย SKU',
+        titleTip: 'การวางแผนแบบ Bottom-up',
+        lead: ['วางแผนจำนวนขายราย SKU รายเดือน และเปรียบเทียบกับเป้าหมายรายเดือน'],
         workflowTitle: { initial: 'แผน SKU ของ {unit}', reforecast: 'Re-forecast ของ {unit}' },
         noChannels: 'แผนของปีนี้ยังไม่มี Channel',
-        noUnitsInChannel: 'Channel {channel} ในแผนปี {year} ยังไม่มี Account / เขตการขาย',
-        goTopDown: 'ไปที่หน้า Top-down',
+        noUnitsInChannel: 'Channel {channel} ในแผนปี {year} ยังไม่มี {unit}',
+        goTopDown: 'ไปที่หน้าจัดสรรเป้าหมายประจำปี',
         viewLabel: 'มุมมอง',
         modeLabel: 'โหมด',
+        blockedReason: 'ขาดข้อมูลจำเป็น: {fields} · แก้ไขได้ที่รายการสินค้า',
+        productTip: {
+          category: 'หมวดสินค้า', series: 'Series', rsp: 'RSP', rspValue: '{price} บาท (ณ {date})', noRsp: 'ยังไม่มีราคา',
+          accountPrice: 'ราคาเฉพาะ {unit}', dealer: 'ราคา Dealer', status: 'Status ปี {year}'
+        },
+        // CR-11: แถบเครื่องมือตาราง (แถวที่ 2)
+        searchPlaceholder: 'ค้นหา SKU / ชื่อ',
+        searchLabel: 'ค้นหา SKU หรือชื่อสินค้า',
+        searchEmpty: 'ไม่พบ SKU ที่ตรงกับคำค้น',
+        groupLabel: 'จัดกลุ่ม',
+        groupBy: { series: 'Series', status: 'Status', none: 'ไม่จัดกลุ่ม' },
+        collapseAll: 'พับทั้งหมด',
+        expandAll: 'กางทั้งหมด',
+        sortLabel: 'เรียง',
+        sorts: { total: 'ยอดทั้งปีมากไปน้อย', code: 'TR Code', name: 'ชื่อ', growth: 'การเติบโต' },
+        showLastYear: 'แสดงยอดปีก่อน',
+        showLastYearTip: 'แสดงยอดเดือนเดียวกันปีก่อนใต้ตัวเลข และคอลัมน์ปีก่อน / การเติบโต',
+        lyColumn: 'ปีก่อน',
+        lyColumnTip: 'ยอดขายปี {year} ของ SKU ในแผน (ไม่รวม SKU ที่ไม่อยู่ในแผน)',
+        growthColumn: 'การเติบโต',
+        groupRows: { active: 'สินค้าที่วางขายแล้ว', 'new': 'สินค้าใหม่ (New) ปี {year}', clearance: 'Clearance', discontinued: 'เลิกขายระหว่างปี', all: 'ทุก SKU', noSeries: '(ไม่ระบุ Series)' },
+        groupSearchCount: '{n} จาก {total} รายการ',
+        groupToggle: 'พับหรือกางกลุ่ม {group}',
+        selectRow: 'เลือก {sku}',
+        selectGroup: 'เลือกทุก SKU ในกลุ่ม {group}',
+        // CR-11: เครื่องมือช่วยกรอก (โหมดแก้ไข)
+        method: {
+          button: 'ค่าตั้งต้น: {name} ▾',
+          title: 'วิธีเติมยอดของช่องระบบเติม',
+          names: { lastYear: 'ยอดปีก่อน × การเติบโต', runRate: 'Run-rate × Seasonality' },
+          confirmTitle: 'เปลี่ยนค่าตั้งต้นของ {unit} เป็น {name}',
+          confirmLine: 'ค่าในช่องที่ระบบเติมจะถูกคำนวณใหม่ ช่องที่แก้ไขเองจะไม่เปลี่ยน'
+        },
+        bulk: { selected: 'เลือก {n} รายการ', scale: 'ปรับ ±%', lastYear: 'ตั้งเท่ายอดปีก่อน', reset: 'คืนค่าตั้งต้น', clear: 'ล้างค่า', unselect: 'ยกเลิกการเลือก' },
+        rowMenu: { title: 'คำสั่งของ {sku}', reset: 'คืนค่าตั้งต้น', lastYear: 'ตั้งเท่ายอดปีก่อน', scale: 'ปรับเพิ่ม/ลด %', clear: 'ล้างค่า' },
+        scaleDialog: {
+          title: 'ปรับเพิ่ม/ลด % · {target}', label: 'ปรับ', hint: 'ค่าบวก = เพิ่ม ค่าลบ = ลด · ปรับเฉพาะเดือนที่แก้ไขได้ ผลลัพธ์ปัดเป็นจำนวนเต็ม',
+          invalid: 'กรุณากรอกตัวเลข', rows: '{n} รายการ'
+        },
+        annualTitle: 'กรอกยอดทั้งปี · ระบบกระจายไปเดือนที่แก้ไขได้ตามรูปแบบเดิมของแถว',
+        closeGap: {
+          button: 'ปิดส่วนต่าง',
+          monthButton: 'ปิดส่วนต่างเดือน {month}',
+          yearButton: 'ปิดส่วนต่างทั้งปี',
+          title: 'ปิดส่วนต่าง · {unit}',
+          months: 'เดือน',
+          skus: 'SKU ที่จะปรับ',
+          skusSelected: 'แถวที่เลือก ({n} รายการ)',
+          skusAll: 'ทุกแถวที่แก้ไขได้และมีค่ามากกว่า 0 ({n} รายการ)',
+          note: 'ระบบปรับจำนวนชิ้นตามสัดส่วน Net Sales ของแต่ละแถว ให้คงเหลือของเดือนที่เลือกเป็น 0 (ปัดเป็นจำนวนเต็ม)',
+          cols: { sku: 'SKU', before: 'ก่อน (ชิ้น)', after: 'หลัง (ชิ้น)', change: 'เปลี่ยน' },
+          more: 'และอีก {n} รายการ',
+          remBefore: 'คงเหลือก่อนปรับ: {text}',
+          remAfter: 'คงเหลือหลังปรับ: {text}',
+          confirm: 'ยืนยันปิดส่วนต่าง',
+          noRows: 'ไม่มี SKU ที่ปรับได้ในเดือนที่เลือก'
+        },
+        // CR-11: SKU ที่ไม่อยู่ในแผนแต่มียอดขายปีก่อน (ที่มาของส่วนต่าง)
+        notInPlan: {
+          discontinued: 'เลิกขายก่อนปี {year} {n} รายการ (ยอดขายปี {prior} {amount} บาท)',
+          incomplete: 'ขาดข้อมูลจำเป็น {n} รายการ (ยอดขายปี {prior} {amount} บาท · แก้ไขได้ที่รายการสินค้า)',
+          title: 'SKU ที่มียอดขายปี {prior} แต่ไม่อยู่ในแผน: {names}'
+        },
+        priceChanged: 'ราคาเปลี่ยนจาก Baseline {n} เดือน',
+        priceChangedTitle: 'ราคาหรือ Promotion ที่มีผลต่างจากตอนล็อก Baseline · Target Baseline และ Plan Baseline ใช้ราคาตอนล็อก แผนล่าสุดใช้ราคาปัจจุบัน',
+        exportSpec: {
+          file: 'SKU-Plan_{year}_{unit}_{status}_{date}', sheet: 'SKU Plan',
+          cols: { rowType: 'ประเภทแถว', sku: 'SKU', name: 'ชื่อสินค้า', series: 'Series', status: 'Status', start: 'เดือนเริ่มขาย', total: 'ทั้งปี' },
+          rowTypes: { sku: 'SKU', planUnits: 'รวมแผน (ชิ้น)', planMoney: 'รวมแผน {money} (บาท)', target: 'เป้าหมาย {money} (บาท)', remaining: 'คงเหลือ (ค่าบวก = ขาด ค่าลบ = เกิน)' }
+        },
         modes: { initial: 'สร้างแผนครั้งแรก', reforecast: 'ปรับแผน (Re-forecast)' },
         reforecastLocked: 'ใช้งานได้หลังจากล็อก Baseline',
         noGP: 'ไม่มี GP',
         currentMonthLabel: 'เดือนปัจจุบัน (จำลอง)',
         skuColumn: 'SKU',
         totalColumn: 'ทั้งปี',
-        groups: { selling: 'SKU ที่ขายอยู่', npd: 'NPD' },
+        groups: { selling: 'สินค้าที่วางขายแล้ว', npd: 'สินค้าใหม่ (New) ปี {year}' },
         groupCount: '{n} รายการ',
         rows: {
           owner: 'ผู้รับผิดชอบ',
@@ -424,16 +705,16 @@
           unitUnits: '{all} (ชิ้น)',
           unitMoney: '{all} {money} (บาท)',
           remaining: 'คงเหลือ',
-          remainingNote: 'เป้าหมาย − แผน เทียบกับเป้าหมายทั้ง Account / เขตการขายเสมอ (ค่าบวก = ขาด ค่าลบ = เกิน)'
+          remainingNote: 'เป้าหมาย − แผน เทียบกับเป้าหมายทั้งหน่วยขายเสมอ (ค่าบวก = ขาด ค่าลบ = เกิน)'
         },
         startMonthLabel: 'เริ่มขาย',
         startMonthInvalid: 'เลือกเดือนก่อนวันเริ่มขายใน Product Master ไม่ได้',
         addSku: '+ เพิ่ม SKU',
-        addNpd: '+ เพิ่ม NPD',
+        addNpd: '+ เพิ่มสินค้าใหม่',
         addSearch: 'ค้นหา SKU',
         addEmpty: 'ไม่มี SKU ที่ Listing แล้วแต่ยังไม่อยู่ในแผน',
-        npdEmpty: 'ยังไม่มี NPD ในแผน',
-        npdAvailable: 'มี NPD ที่ Listing แล้วแต่ยังไม่อยู่ในแผน {n} รายการ',
+        npdEmpty: 'ยังไม่มีสินค้าใหม่ในแผน',
+        npdAvailable: 'มีสินค้าใหม่ที่ Listing แล้วแต่ยังไม่อยู่ในแผน {n} รายการ',
         seriesMissing: 'SKU ใน Series ที่เลือกที่ Listing แล้วแต่ยังไม่อยู่ในแผน {n} รายการ',
         addSeries: 'เพิ่มทั้ง Series',
         seriesEmpty: 'ไม่มี SKU ของ Series ที่เลือกในแผนนี้',
@@ -446,55 +727,9 @@
         stopped: 'หยุดวางแผน',
         resetRowTitle: 'คืนค่าระบบเติมและ Clearance ของแถวนี้ (ล้าง Override)',
         cellReasons: { locked: 'ล็อก 0', actual: 'Actual', frozen: 'ล็อก (M+1 ถึง M+3)', open: 'ปรับได้' },
-        legend: { override: 'Override', actual: 'Actual', frozen: 'ล็อก M+1–M+3', promo: 'มี Promo บางวัน', dirty: 'ยังไม่บันทึก' },
+        legend: { override: 'Override', actual: 'Actual', frozen: 'ล็อก M+1–M+3', promo: 'มี Promo บางวัน', dirty: 'ยังไม่บันทึก', anomaly: 'ต่างจากเดือนเดียวกันปีก่อนเกิน ±{pct}' },
         sellOutNote: 'Sell-out Amount ก่อน VAT · เป้าหมาย = Net Sales ÷ (1 − GP)',
         summaryLines: { plan: 'แผนทั้งปี {plan} บาท', target: 'เป้าหมายทั้งปี {target} บาท', remaining: 'คงเหลือ: {remaining}', skus: '{n} SKU ในแผน' }
-      },
-
-      measureChain: {
-        title: 'จากจำนวนชิ้นถึง Net Sales',
-        lead: [
-          'ทุกตัวเลขในระบบใช้สูตรชุดเดียวกัน: จำนวนชิ้น × ราคา ได้ Sell-out Amount แล้วหัก GP ของร้านค้า ได้ Net Sales ของบริษัท',
-          'แสดงสูตรกลับด้าน จาก Net Sales หา Sell-out Amount'
-        ],
-        forwardTitle: 'จำนวนชิ้น → Net Sales',
-        reverseTitle: 'กลับด้าน: Net Sales → Sell-out Amount',
-        unitsLabel: 'จำนวนชิ้น',
-        priceLabel: 'ราคาต่อชิ้น (บาท)',
-        gpLabel: 'GP ของร้านค้า (%)',
-        netLabel: 'Net Sales ที่ต้องการ (บาท)',
-        vatToggle: 'ราคานี้รวม VAT แล้ว',
-        steps: { sellOutEx: 'Sell-out Amount ก่อน VAT', net: 'Net Sales', sellOutInc: 'Sell-out Amount รวม VAT (แสดงผล)' },
-        splitTitle: 'สัดส่วนเงินที่ลูกค้าจ่าย',
-        vatQuestion: 'คำถามที่ค้าง: ราคาใน Price List รวม VAT หรือไม่',
-        vatDiff: 'หากราคารวม VAT อยู่แล้วแต่คำนวณเหมือนไม่รวม Net Sales จะสูงกว่าความจริง',
-        vatCompare: { excl: 'Net Sales หากราคาไม่รวม VAT:', incl: 'Net Sales หากราคารวม VAT:' },
-        defaults: { units: 100, price: 50, gp: 0.45, net: 100 }
-      },
-
-      approval: {
-        title: 'อนุมัติ ล็อกเป้า และ Forecast',
-        lead: [
-          'แผนผ่านการอนุมัติครั้งเดียว แล้วล็อกเป็น Baseline ทั้งปี ใช้วัดผลงานได้ตลอดปี',
-          'ระหว่างปีปรับได้เฉพาะ Forecast โดยล็อก 3 เดือนข้างหน้าไว้เสมอ'
-        ],
-        timelineTitle: 'ขั้นตอนของแผน',
-        steps: [
-          { id: 'draft', title: 'Draft', who: 'ทีมขาย / KAM', desc: 'กรอกและแก้ไขแผน' },
-          { id: 'submitted', title: 'Submitted', who: 'ทีมขาย / KAM', desc: 'ส่งแผนแล้ว แก้ไขไม่ได้ระหว่างรออนุมัติ' },
-          { id: 'approved', title: 'Director อนุมัติ', who: 'Sales Director', desc: 'อนุมัติ หรือส่งกลับแก้ไข' },
-          { id: 'baseline', title: 'Baseline ล็อกทั้งปี', who: 'ระบบ', desc: 'เก็บ Snapshot ราคาและ GP ณ วันอนุมัติ' },
-          { id: 'forecast', title: 'Forecast รายเดือน', who: 'ทีมขาย / KAM', desc: 'ล็อก M+1 ถึง M+3 ปรับได้ตั้งแต่ M+4' }
-        ],
-        actions: { submit: 'ส่งแผน', approve: 'อนุมัติ', sendBack: 'ส่งกลับแก้ไข', lock: 'ล็อก Baseline', forecast: 'เริ่มรอบ Forecast', restart: 'เริ่มใหม่' },
-        windowTitle: 'Forecast: เดือนที่ปรับได้',
-        currentMonthLabel: 'เดือนปัจจุบัน (จำลอง)',
-        windowNotes: {
-          past: 'ใช้ยอดขายจริง',
-          current: 'กำลังขายอยู่ ล็อก',
-          locked: 'ล็อก M+1 ถึง M+3 ขอแก้ไขเป็น Exception ผ่าน Director',
-          open: 'ปรับ Forecast ได้'
-        }
       },
 
       // Account Master (workflowBar แบบง่าย)
@@ -502,7 +737,8 @@
         title: 'Account',
         lead: ['ข้อมูล Account และ GP ตามช่วงเวลาที่มีผล'],
         filterAll: 'ทุก Channel',
-        columns: { name: 'ชื่อ Account', channel: 'Channel', gp: 'GP (%)', gpFrom: 'มีผลตั้งแต่', active: 'การใช้งาน', owner: 'ผู้รับผิดชอบปัจจุบัน', inPlan: 'แผนปี {year}', manage: 'จัดการ' },
+        gpColumn: '{label} (%)',
+        columns: { name: 'ชื่อ Account', channel: 'Channel', gp: 'GP / ค่าธรรมเนียม (%)', gpFrom: 'มีผลตั้งแต่', active: 'การใช้งาน', owner: 'ผู้รับผิดชอบปัจจุบัน', inPlan: 'แผนปี {year}', manage: 'จัดการ' },
         noGP: 'Channel นี้ไม่มี GP',
         activeYes: 'ใช้งาน',
         activeNo: 'ปิดใช้งาน',
@@ -543,7 +779,7 @@
 
       salespeople: {
         title: 'ผู้รับผิดชอบ',
-        lead: ['ผู้รับผิดชอบ Account / เขตการขายรายเดือน และผลงานรายบุคคล'],
+        lead: ['ผู้รับผิดชอบของหน่วยขายรายเดือน และผลงานรายบุคคล'],
         currentMonthLabel: 'เดือนปัจจุบัน (จำลอง)',
         alertsTitle: 'รายการที่ต้องดำเนินการ',
         alertVacant: '{unit} ไม่มีผู้รับผิดชอบ {months}',
@@ -566,7 +802,7 @@
         removeBlocked: 'มีประวัติผู้รับผิดชอบ ให้บันทึกการลาออกแทนการลบ',
         timelineTitle: 'ผู้รับผิดชอบรายเดือน ปี {year}',
         timelineHint: 'โหมดแก้ไข: เลือกเดือนแรกและเดือนสุดท้ายของรายการเดียวกัน แล้วเลือกผู้รับผิดชอบ',
-        timelineUnit: 'Account / เขตการขาย',
+        timelineUnit: 'หน่วยขาย',
         pastTitle: 'เดือนที่ผ่านไปแล้วเป็นประวัติ แก้ไขไม่ได้',
         assignFor: '{unit} · {months}',
         assignPerson: 'ผู้รับผิดชอบ',
@@ -583,7 +819,8 @@
 
       // รายงานสรุปแผน (ผู้บริหารดูภาพรวมและล็อก Baseline)
       summary: {
-        title: 'รายงานสรุปแผน {year}',
+        title: 'รายงานสรุปแผน',
+        short: 'รายงานสรุปแผน',
         lead: ['สรุปเป้าหมาย แผนการขาย และสถานะการอนุมัติ'],
         channelFilter: 'Channel',
         channelAll: 'ทุก Channel',
@@ -614,23 +851,26 @@
           gap: 'ส่วนต่างจากเป้าหมาย',
           approval: 'ความคืบหน้าการอนุมัติ',
           approvalValue: '{done} / {total}',
-          approvalSub: 'Account / เขตการขายที่แผน SKU อนุมัติแล้ว'
+          approvalSub: 'หน่วยขายที่แผน SKU อนุมัติแล้ว'
         },
         monthlyTitle: 'เป้าหมายเทียบแผน รายเดือน (ล้านบาท)',
-        monthlyLegend: { bar: 'เป้าหมาย (Top-down Phasing)', line: 'แผน Bottom-up', dashed: 'ยอดขายปีก่อน' },
-        tableTitle: 'เป้าหมายและแผนราย Channel และ Account / เขตการขาย (ล้านบาท)',
-        tableColumns: { name: 'Channel / Account / เขตการขาย', prior: 'ยอดขายปีก่อน', target: 'เป้าหมาย', plan: 'แผน Bottom-up', gap: 'ส่วนต่าง', topDown: 'Top-down', phasing: 'Phasing', sku: 'SKU', owner: 'ผู้รับผิดชอบ' },
+        monthlyLegend: { bar: 'เป้าหมาย (Top-down Phasing)', line: 'แผน Bottom-up', dashed: 'ยอดขายปี {year}' },
+        tableTitle: 'เป้าหมายและแผนราย Channel และหน่วยขาย (ล้านบาท)',
+        tableColumns: { name: 'Channel / หน่วยขาย', prior: 'ยอดขายปีก่อน', target: 'เป้าหมาย', plan: 'แผน Bottom-up', gap: 'ส่วนต่าง', topDown: 'Top-down', phasing: 'Phasing', sku: 'SKU', owner: 'ผู้รับผิดชอบ' },
         approvalHead: 'สถานะอนุมัติ',
-        openPlan: 'เปิดหน้าวางแผนราย SKU ของ {name}',
+        openPlan: 'เปิดหน้าวางแผนยอดขายราย SKU ของ {name}',
         collapseTitle: 'ย่อหรือขยายรายการใน Channel นี้',
         mixTitle: 'สัดส่วนแผนตามกลุ่มสินค้า (ล้านบาท)',
         mixByStatus: 'ตาม Status',
         mixBySeries: 'ตาม Series',
+        mixGroupLabel: 'ตามกลุ่มสินค้า',
+        mixBy: { series: 'Series', category: 'Category' },
+        mixNoCategory: '(ไม่ระบุ Category)',
         mixText: '{value} · {pct}',
         mixOther: 'อื่นๆ',
         channelApproved: 'อนุมัติแล้ว {done}/{total}',
         peopleTitle: 'เป้าหมายรายผู้รับผิดชอบ (ล้านบาท)',
-        peopleColumns: { name: 'ผู้รับผิดชอบ', units: 'Account / เขตการขายที่ดูแล', target: 'เป้าหมาย', plan: 'แผน', gap: 'ส่วนต่าง' },
+        peopleColumns: { name: 'ผู้รับผิดชอบ', units: 'หน่วยขายที่ดูแล', target: 'เป้าหมาย', plan: 'แผน', gap: 'ส่วนต่าง' },
         peopleNote: 'คำนวณเฉพาะเดือนที่แต่ละคนรับผิดชอบ',
         vacantRow: 'ไม่มีผู้รับผิดชอบ',
         resignedTag: 'ลาออก {month}',
@@ -656,8 +896,8 @@
         tabs: { scope: 'ขอบเขต', decisions: 'Decision log', questions: 'คำถามที่ค้าง', next: 'ขั้นต่อไป' },
         scopeTitle: 'ขอบเขต',
         scope: [
-          'ตั้งเป้าหมาย Top-down เป็น Net Sales: Total → Channel → Account / เขตการขาย → รายเดือน',
-          'วางแผน Bottom-up เป็นจำนวนชิ้น ต่อ SKU × Account / เขตการขาย × เดือน',
+          'ตั้งเป้าหมาย Top-down เป็น Net Sales: Total → Channel → หน่วยขาย → รายเดือน',
+          'วางแผน Bottom-up เป็นจำนวนชิ้น ต่อ SKU × หน่วยขาย × เดือน',
           'อนุมัติทีละขั้น (Top-down, Phasing, แผน SKU) แล้วล็อก Baseline ทั้งปี และ Re-forecast รายเดือน',
           'ข้อมูลหลัก 3 ระบบ: Sales Planning, Product Master และ Account Master (Account, เขตการขาย, ผู้รับผิดชอบรายเดือน)',
           'ยอดคงเหลือและสถานะทุกชั้น ทุกเดือน และรายงานสรุปแผนสำหรับผู้บริหาร'
@@ -672,41 +912,55 @@
         decisionColumns: { topic: 'เรื่อง', decision: 'ข้อสรุป' },
         decisions: [
           { topic: 'หน่วยของเป้าหมาย', decision: 'ตั้งเป้าหมายเป็น Net Sales (บาท) / Bottom-up เป็นจำนวนชิ้น มาเจอกันที่ยอดคงเหลือ' },
-          { topic: 'การแบ่งเป้า', decision: 'แบ่ง 3 ชั้น: Total → Channel → Account / เขตการขาย เป็นสัดส่วนของชั้นบน แก้ไขได้ทั้ง % และบาท (เก็บเป็น %) ทุกกลุ่มมีแถวคงเหลือ' },
+          { topic: 'การแบ่งเป้า', decision: 'แบ่ง 3 ชั้น: Total → Channel → หน่วยขาย เป็นสัดส่วนของชั้นบน แก้ไขได้ทั้ง % และบาท (เก็บเป็น %) ทุกกลุ่มมีแถวคงเหลือ' },
           { topic: 'สถานะคงเหลือ', decision: 'จัดสรรครบ (±1 บาท) = เขียว / ขาด = แดง / เกิน = เหลือง / ยังไม่กำหนด = เทา ทุกสถานะมีข้อความกำกับ การกระจายยอดคงเหลือต้องกดเองเท่านั้น' },
           { topic: 'Channel แบบ Config', decision: 'Channel อยู่ใน Channel Master: หน่วยแบ่งเป้า (Account หรือเขต), วิธีนับ Sell-out, มี GP หรือไม่ และสี เพิ่ม Channel ใหม่ (เช่น Export) ได้โดยไม่แก้โค้ด' },
           { topic: 'TT ตามเขต', decision: 'TT แบ่งเป้าตามเขตการขาย เป้าหมายของเขต = Quota การแบ่งลงร้านค้าหรือสาขาเป็นงานของ Sales Person' },
-          { topic: 'เป้าหมายผูกกับ Account / เขต', decision: 'เป้าหมาย ยอดขาย และยอดขายปีก่อนผูกกับ Account หรือเขต ไม่ผูกกับบุคคล การเปลี่ยนผู้รับผิดชอบไม่เปลี่ยน Target และ Forecast' },
+          { topic: 'เป้าหมายผูกกับ หน่วยขาย', decision: 'เป้าหมาย ยอดขาย และยอดขายปีก่อนผูกกับ Account หรือเขต ไม่ผูกกับบุคคล การเปลี่ยนผู้รับผิดชอบไม่เปลี่ยน Target และ Forecast' },
           { topic: 'ผู้รับผิดชอบ', decision: 'เก็บเป็นช่วงเดือน 1 รายการ 1 เดือนมีได้ 1 คน ช่วงห้ามทับกัน แก้ไขเดือนที่ผ่านไปแล้วไม่ได้ ผู้ที่ลาออกแล้วนับเป็นไม่มีผู้รับผิดชอบ' },
           { topic: 'ผลงานรายบุคคล', decision: 'รวมเป้าหมายและยอดขายของทุกรายการ เฉพาะเดือนที่บุคคลนั้นรับผิดชอบ รวมถึงผู้ที่ลาออกแล้ว' },
           { topic: 'ปีแผน', decision: 'ข้อมูลแผนแยกตามปี ทุกแถวแสดงยอดขายปีก่อนและการเติบโต และเติมสัดส่วนตามยอดขายปีก่อนได้' },
-          { topic: 'Account / เขตในแผน', decision: 'เพิ่มหรือนำออกจากแผนได้จาก Account Master หรือ Territory Master เท่านั้น ไม่พิมพ์ชื่อเอง' },
+          { topic: 'หน่วยขายในแผน', decision: 'เพิ่มหรือนำออกจากแผนได้จาก Account Master หรือ Territory Master เท่านั้น ไม่พิมพ์ชื่อเอง' },
           { topic: 'Phasing', decision: 'ค่าตั้งต้นของเป้าหมายรายเดือน = เป้าหมายทั้งปี × สัดส่วนยอดขายรายเดือนของปีก่อน (ไม่มีข้อมูลใช้ Seasonality ของ Channel) ไม่ปรับเดือนอื่นอัตโนมัติ แต่ผลรวมต้องเท่าเป้าหมายทั้งปี' },
           { topic: 'อนุมัติต่อขั้น', decision: 'Top-down: Sales Director จัดทำ → Management อนุมัติ / Phasing และแผน SKU: ผู้รับผิดชอบจัดทำ → Sales Director อนุมัติ / ขั้นล่างจัดทำฉบับร่างได้ก่อน แต่ส่งได้เมื่อขั้นบนอนุมัติแล้ว / ขั้นบนอนุมัติใหม่และเป้าหมายเปลี่ยน → ขั้นล่างเป็น "ต้องตรวจสอบใหม่"' },
           { topic: 'แก้ไข / บันทึก / ยืนยัน', decision: 'ทุกหน้าเปิดเป็นโหมดดู ต้องกดแก้ไขก่อน แล้วบันทึกหรือยกเลิก / ส่งอนุมัติและอนุมัติมีกล่องยืนยันที่สรุปตัวเลข / ส่งไม่ได้หากยังจัดสรรไม่ครบ / ส่งกลับแก้ไขต้องระบุเหตุผล / บทบาทที่แก้ไขไม่ได้เห็นข้อความอ่านอย่างเดียว' },
           { topic: 'Baseline', decision: 'แผนผ่านการอนุมัติครั้งเดียว แล้ว Sales Director ล็อกเป็น Baseline ทั้งปีในรายงานสรุปแผนเมื่อแผน SKU ทุกรายการอนุมัติแล้ว พร้อม Snapshot ราคาและ GP' },
           { topic: 'Forecast', decision: 'หลังล็อก Baseline ปรับได้เฉพาะ Re-forecast (มี Workflow แยก) ล็อก M+1 ถึง M+3 ปรับได้ตั้งแต่ M+4 เดือนที่ผ่านแล้วใช้ Actual ขอแก้ไขเดือนที่ล็อกเป็น Exception ผ่าน Director' },
-          { topic: 'NPD', decision: '3 เดือนนับจากวันเริ่มขาย' },
+          { topic: 'Status สินค้า', decision: 'Planned / New (3 เดือนนับจากวันเริ่มขาย) / Active / Clearance (มาก่อนเสมอ) / Discontinued คำนวณจากวันที่เท่านั้น' },
           { topic: 'Clearance', decision: 'มาก่อน Status อื่นเสมอ แบ่ง Stock เท่ากันทุกเดือน ผลรวมเท่า Stock' },
-          { topic: 'วิธีเติมยอด', decision: 'ดูที่ SKU × Account / เขตการขาย มี 4 แบบ: ล็อก 0 / กรอกเอง / ระบบเติม / Clearance สีของช่องบอกที่มาของตัวเลข' },
+          { topic: 'วิธีเติมยอด', decision: 'ดูที่ SKU × หน่วยขาย มี 4 แบบ: ล็อก 0 / กรอกเอง / ระบบเติม / Clearance สีของช่องบอกที่มาของตัวเลข' },
           { topic: 'แผนราย SKU', decision: 'กรอกเป็นจำนวนชิ้น ระบบแปลงเป็น Sell-out Amount และ Net Sales แก้ไขช่องระบบเติมและ Clearance ได้ (Override) ยกเว้นช่องล็อก 0 / คงเหลือรายเดือน = เป้าหมาย − แผน' },
-          { topic: 'Series', decision: 'Filter Series เลือกได้หลายค่า แสดงรวม Series ที่เลือกคู่กับรวมทั้ง Account และคงเหลือเทียบกับเป้าหมายทั้ง Account เสมอ / "เพิ่มทั้ง Series" เพิ่มทุก SKU ของ Series ที่ Listing แล้ว' },
+          { topic: 'Series', decision: 'จัดกลุ่มตาม Series (หน่วยขายที่มีเกิน 20 SKU) หรือ Status พับได้ มีผลรวมของกลุ่มที่หัวกลุ่ม · Filter Series เลือกได้หลายค่า · คงเหลือเทียบกับเป้าหมายทั้ง Account เสมอ / "เพิ่มทั้ง Series" เพิ่มทุก SKU ของ Series ที่ Listing แล้ว' },
           { topic: 'Product Master', decision: 'ทีม Product กำหนดวันเริ่มขาย Listing และเดือนเลิกขาย / Supply Chain กำหนด Clearance / ทีมขายเห็นเฉพาะ SKU ที่ Listing แล้ว' },
+          { topic: 'ข้อมูลสินค้า', decision: 'Product Master เป็นแหล่งข้อมูลเดียว 5 หน้า: รายการสินค้า แผน NPD Promotion Price Listing และหมวดสินค้า/Series / สินค้าที่ขาดข้อมูลจำเป็นใช้ในแผน SKU ไม่ได้' },
+          { topic: 'รหัสสินค้า', decision: 'สินค้าใหม่ใช้รหัสชั่วคราวได้ เมื่อได้ TR Code จริงกดผูกรหัส ระบบย้าย Listing ราคา Promotion แผน NPD และแผน SKU ให้ทั้งหมด' },
+          { topic: 'แผน NPD', decision: 'ทีม Product ส่ง → Sales Director อนุมัติ / อนุมัติแล้วตั้งวันเริ่มขายและ Listing ให้ และเดือนเริ่มขายเป็นค่าตั้งต้นในแผน SKU' },
+          { topic: 'ราคาและ Promotion', decision: 'ราคามีวันที่มีผล / ราคาที่ใช้ในแผน = ราคาเฉลี่ยถ่วงตามจำนวนวันของ Promotion ที่ยืนยันแล้ว / แก้ราคาหลังล็อก Baseline ไม่เปลี่ยน Baseline แต่มีผลกับ Forecast' },
           { topic: 'โหมดแผน', decision: 'สร้างแผนครั้งแรกแก้ไขได้ทุกเดือน / ปรับแผนแก้ไขได้ตั้งแต่ M+4 เดือนที่ผ่านแล้วใช้ Actual และไม่เขียนทับ Baseline' },
           { topic: 'SKU ใหม่', decision: 'กรอกเองทั้งปีในแผนรายปี' },
-          { topic: 'ระบบเติม', decision: 'Run-rate × Seasonality Index ของเดือนนั้น' },
+          { topic: 'ระบบเติม', decision: 'ค่าตั้งต้น = ยอดขายเดือนเดียวกันปีก่อนของ SKU × การเติบโตของหน่วยขาย (เป้าหมายทั้งปี ÷ ยอดขายปีก่อน) คงรูปแบบรายเดือนและสัดส่วน SKU ของปีก่อน · เลือก Run-rate × Seasonality ได้ต่อหน่วยขาย · SKU ที่เลิกขายได้ 0 ส่วนต่างที่เหลือปิดด้วยสินค้าใหม่หรือการปรับเพิ่ม' },
+          { topic: 'ข้อมูลสินค้าจริง', decision: 'ใช้รายการสินค้าจริง 117 SKU จาก Excel · ยอดขายปี 2026 ราย SKU ของ 7-Eleven และ EVEANDBOY ปรับสัดส่วนให้ตรงกับยอดขายปีก่อนของ Prototype · หน่วยขายอื่นใช้รูปแบบของ EVEANDBOY · หมวดสินค้ากำหนดจากคำในชื่อสินค้า (ควรตรวจสอบ) · สินค้าใหม่ปี 2027 เป็นชื่อชั่วคราว' },
+          { topic: 'ราคาเฉพาะ Account', decision: 'ลำดับราคา: Promotion ที่ยืนยันแล้ว → ราคาเฉพาะ Account → ราคาทั่วไป (เช่น Juicy Pop Tint 02 และ 05 ที่ 7-Eleven 149 บาท) · TT ใช้ราคา Dealer และไม่หัก GP' },
+          { topic: 'เครื่องมือช่วยกรอก', decision: 'กรอกยอดทั้งปี · เลือกหลายแถวแล้วปรับ ±% · ตั้งเท่ายอดปีก่อน · ปิดส่วนต่างตามสัดส่วน Net Sales (แสดงก่อน/หลัง ต้องกดยืนยัน) · คัดลอก/วางกับ Excel และย้อนกลับ · ▲/▼ เมื่อต่างจากปีก่อนเกิน 50% · ทุกเครื่องมือไม่แก้ช่องที่ล็อก' },
           { topic: 'Promo บางวัน', decision: 'ใช้ราคาเฉลี่ยถ่วงตามจำนวนวัน' },
           { topic: 'สูตร Net Sales', decision: 'Net Sales = Sell-out Amount ก่อน VAT × (1 − GP) ดูสูตรและค่าที่ใช้ได้ที่ ⓘ และ Tooltip รายช่องในหน้าวางแผนราย SKU' },
           { topic: 'VAT', decision: 'ค่าตั้งต้น: ราคาใน Price List ไม่รวม VAT (รอยืนยัน)' },
-          { topic: 'เมนู', decision: 'เมนูข้าง 4 กลุ่ม: Sales Planning (Top-down → Phasing → วางแผนราย SKU → รายงานสรุปแผน) / Product Master / Account Master / ข้อมูลโครงการ' },
-          { topic: 'รายงานสรุปแผน', decision: 'สำหรับผู้บริหาร: KPI, เป้าหมายเทียบแผนรายเดือน, ตารางราย Channel และ Account / เขตการขาย, สัดส่วนแผนตามกลุ่มสินค้า, เป้าหมายรายผู้รับผิดชอบ และรายการที่ต้องดำเนินการ พิมพ์เป็น PDF ได้' }
+          { topic: 'เมนู', decision: 'เมนูข้าง 4 กลุ่ม: Sales Planning (จัดสรรเป้าหมายประจำปี → จัดสรรเป้าหมายรายเดือน → วางแผนยอดขายราย SKU → รายงานสรุปแผน) / Product Master / Account Master / ข้อมูลโครงการ' },
+          { topic: 'ชื่อขั้นตอน', decision: 'ชื่อหน้าเป็นภาษาไทยที่สื่อความหมาย: จัดสรรเป้าหมายประจำปี / จัดสรรเป้าหมายรายเดือน / วางแผนยอดขายราย SKU / รายงานสรุปแผน · คำว่า Top-down, Phasing, Bottom-up อยู่ใน Tooltip ของชื่อหน้า · เมนูและปุ่มก่อนหน้า/ถัดไปใช้ชื่อย่อ' },
+          { topic: 'ปีแผน', decision: 'เลือกปีแผนที่แถวหัวข้อของหน้าที่อิงปี (ต่อท้ายชื่อหน้า) ไม่อยู่ใน Header / เปลี่ยนในหน้าใดมีผลทุกหน้า / มีรายการที่ยังไม่บันทึกต้องยืนยันก่อนเปลี่ยนปี' },
+          { topic: 'สัดส่วนใน Top-down', decision: 'แยก 2 คอลัมน์ที่ฐานชัดเจน: % ของ Total (กรอกที่แถว Channel) และ % ใน Channel (กรอกที่แถวหน่วยขาย) / ค่าตั้งต้นตามสัดส่วนยอดขายปีก่อน' },
+          { topic: 'กราฟการเติบโต', decision: 'ที่มาของการเติบโต (Waterfall) และสัดส่วน Channel ปีก่อนเทียบปีนี้ อยู่ในรายงานสรุปแผน · หน้าจัดสรรเป้าหมายประจำปีไม่มีแผงกราฟ ตารางเต็มความกว้าง' },
+          { topic: 'เป้าหมายเทียบปีก่อน', decision: 'แท่งใช้สเกลจริงเดียวกันทั้งตาราง เริ่มที่ 0 ค่าสูงสุด = เป้าหมายหรือยอดขายปีก่อนที่มากที่สุดปัดเป็นเลขกลม · ความยาวแท่ง = เป้าหมาย ขีดตั้ง = ยอดขายปีก่อน · มีแกน 0 ถึงค่าสูงสุดที่หัวคอลัมน์ · ใช้ทั้งหน้าจัดสรรเป้าหมายประจำปีและรายงานสรุปแผน' },
+          { topic: 'ชื่อหน่วยขาย', decision: 'แต่ละ Channel เรียกหน่วยขายและ GP ตาม Channel Master: Account / เขตการขาย / Platform และ GP / ค่าธรรมเนียม Platform' },
+          { topic: 'ส่งออกข้อมูล', decision: 'ส่งออก Excel และ CSV ได้จากหน้าจัดสรรเป้าหมายประจำปี จัดสรรเป้าหมายรายเดือน และวางแผนยอดขายราย SKU ตัวเลขคำนวณต่อได้' },
+          { topic: 'รายงานสรุปแผน', decision: 'สำหรับผู้บริหาร: KPI, เป้าหมายเทียบแผนรายเดือน, ตารางราย Channel และ หน่วยขาย, สัดส่วนแผนตามกลุ่มสินค้า, เป้าหมายรายผู้รับผิดชอบ และรายการที่ต้องดำเนินการ พิมพ์เป็น PDF ได้' }
         ],
         openQuestions: [
           'ราคาใน Price List รวม VAT หรือไม่ (ไฟล์ Excel เดิมคำนวณแบบรวม VAT)',
           'TT มี GP หรือไม่ (Channel Master ตั้ง TT เป็นไม่มี GP ไว้ก่อน)',
           'Chayamiss เป็น Channel หรือ Account (Export ตั้งเป็น Channel ตัวอย่างแล้ว)',
           'ระบบจริงใช้งานหลายคนพร้อมกัน ต้องมี Backend',
-          'Stock Clearance ระดับ SKU แบ่งให้แต่ละ Account / เขตการขายอย่างไร (Prototype แบ่งเท่ากันทุกรายการที่ Listing)',
+          'Stock Clearance ระดับ SKU แบ่งให้แต่ละ หน่วยขายอย่างไร (Prototype แบ่งเท่ากันทุกรายการที่ Listing)',
           'แผน SKU ของ TT จัดทำที่ระดับเขตใช่หรือไม่',
           'CN% ของ TT กำหนดต่อเขตหรือทั้ง Channel',
           'การเปลี่ยนผู้รับผิดชอบต้องมีผู้อนุมัติหรือไม่'
@@ -715,7 +969,7 @@
           'ตอบคำถามที่ค้าง และยืนยันเจ้าของข้อมูลแต่ละรายการ',
           'กำหนดรูปแบบ Product Master, Account Master และแหล่งข้อมูลยอดขายย้อนหลัง',
           'ออกแบบระบบจริง: Backend สำหรับหลายผู้ใช้ สิทธิ์ผู้ใช้ตามบทบาท และการนำเข้าข้อมูลจาก Excel เดิม',
-          'ทดลองใช้กับ 1–2 Account / เขตการขาย ก่อนขยายทั้งบริษัท'
+          'ทดลองใช้กับ 1–2 หน่วยขาย ก่อนขยายทั้งบริษัท'
         ],
         approveTitle: 'สิ่งที่ขออนุมัติ',
         approve: [

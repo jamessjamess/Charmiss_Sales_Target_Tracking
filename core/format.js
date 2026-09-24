@@ -56,17 +56,19 @@
     return fraction > 0 && s.replace(/[^1-9]/g, '') !== '' ? '+' + s : s;
   }
 
+  // บาทมีเครื่องหมาย: 6,800,000 → '+6,800,000' / −300 → '−300' / null → '–' (ส่วนต่างการเติบโต)
+  function signedBaht(n) {
+    if (n == null || isNaN(n)) return '–';
+    var s = baht(n);
+    return n > 0 && Math.round(n) !== 0 ? '+' + s : s;
+  }
+
   // ค่าในช่องกรอก %: 0.35 → 35 / 0.0792 → 7.92
   // การเติบโต (calc.growth): เป้าหมาย 0 (NaN) → '–' / ไม่มียอดปีก่อน (null) → newLabel (เช่น 'ใหม่') / อื่นๆ ทศนิยม 1 ตำแหน่ง
   function growth(g, newLabel) {
     if (g == null) return newLabel;
     if (typeof g === 'number' && isNaN(g)) return '–';
     return signedPct(g, 1);
-  }
-
-  function pctInput(fraction) {
-    if (fraction == null || isNaN(fraction)) return '';
-    return String(Math.round(fraction * 10000) / 100);
   }
 
   function units(n) { return number(n == null ? n : Math.round(n), 0); }
@@ -110,8 +112,8 @@
     millionPlain: millionPlain,
     pct: pct,
     signedPct: signedPct,
+    signedBaht: signedBaht,
     growth: growth,
-    pctInput: pctInput,
     units: units,
     month: month,
     monthFull: monthFull,
