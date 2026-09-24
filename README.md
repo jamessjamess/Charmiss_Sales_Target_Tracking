@@ -55,10 +55,13 @@
   - `+ เพิ่ม SKU` ที่หัวคอลัมน์ SKU (สินค้าที่ขาดข้อมูลจำเป็นเลือกไม่ได้ พร้อมเหตุผล) และ `+ เพิ่มสินค้าใหม่` ในกลุ่มสินค้าใหม่ / ชี้ชื่อ SKU เพื่อดูชื่อเต็ม
     หมวดสินค้า Series RSP และราคาเฉพาะ Account (Juicy Pop Tint 02/05 ที่ 7-Eleven 149 บาท) / โหมดปรับแผนใช้ได้หลังล็อก Baseline
     (ถ้าราคาเปลี่ยนหลังล็อกจะมีป้าย `ราคาเปลี่ยนจาก Baseline n เดือน`)
-- **รายงานสรุปแผน**: KPI · เป้าหมายเทียบแผนรายเดือน + ที่มาของการเติบโต · ตาราง Channel → หน่วยขาย (กดชื่อเพื่อไปหน้าวางแผน) ·
-  สัดส่วนตาม Status และตาม Series หรือ Category ·
-  เป้าหมายรายผู้รับผิดชอบ · รายการที่ต้องดำเนินการ / Filter Channel / ปุ่ม **พิมพ์ / บันทึก PDF** (A4 แนวนอน) /
-  Sales Director ล็อก Baseline ได้เมื่อแผน SKU ทุกหน่วยขายอนุมัติแล้ว (เก็บราคาและ Promotion ตอนล็อกไว้เป็น Baseline)
+- **รายงานสรุปแผน** (ขั้นที่ 4 มี 2 แท็บ — CR-12):
+  - **ติดตามสถานะ** (ค่าเริ่มต้นก่อนล็อก Baseline ไม่ใช่เอกสารสำหรับพิมพ์): สถานะทั้งปี · ปุ่ม **ล็อก Baseline** (Sales Director เมื่อแผน SKU ทุกหน่วยขายอนุมัติแล้ว)
+    / **ปลดล็อก Baseline** (ต้องมีเหตุผล) · ตารางรายการที่ต้องดำเนินการ 1 แถวต่อหน่วยขาย เรียงตามความรุนแรง พร้อมลิงก์การดำเนินการถัดไป ·
+    ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง / ตัวเลขในเมนูข้างของขั้นที่ 4 = จำนวนรายการ
+  - **รายงานสรุปแผน** (ค่าเริ่มต้นหลังล็อก พิมพ์ / บันทึก PDF A4 แนวนอนได้ 4 หน้า): หัวรายงานพร้อมเลขฉบับ `2027-BL-01` (ฉบับร่าง = `2027-DRAFT` + ลายน้ำ) ·
+    KPI · เป้าหมายเทียบแผนรายเดือน : ที่มาของการเติบโต (60 : 40) · ตาราง Channel → หน่วยขาย (% ของ Total, สถานะอนุมัติ 2 ไอคอน) ·
+    สัดส่วนตาม Status และ Series / Category · เป้าหมายรายผู้รับผิดชอบ · การอนุมัติ · ช่องลงนาม / หลังล็อกตัวเลขทั้งหมดมาจาก Baseline ที่ล็อกไว้
 - **เกี่ยวกับ Prototype** (เมนูล่างสุดหรือลิงก์ที่ Header): ขอบเขต · Decision log · คำถามที่ค้าง · ขั้นต่อไป และสิ่งที่ขออนุมัติ
 - หน้า **ผู้รับผิดชอบ**: บันทึกการลาออก แล้วคลิกเดือนแรก–เดือนสุดท้ายใน Timeline เพื่อโอนหน่วยขายให้คนใหม่
   ตัวเลขเป้าไม่เปลี่ยน ตารางผลงานรายบุคคลแยกยอดตามเดือนที่แต่ละคนรับผิดชอบ
@@ -128,7 +131,8 @@
 
 ```
 index.html            พาไปหน้าแรกของ Sales Planning (ตามลำดับ Tour ใน core/registry.js)
-core/                 ส่วนกลาง: loader, registry, layout, store, calc, seed (นำเข้าข้อมูลจริง), workflow, format, components, charts, export, paths
+core/                 ส่วนกลาง: loader, registry, layout, store, calc, seed (นำเข้าข้อมูลจริง), workflow, format, components, charts, export,
+                      report (ข้อมูลขั้นที่ 4 ใช้ร่วมกับ Side Menu), paths
 data/                 ข้อมูลตัวอย่าง กฎนำเข้า และข้อความ (ไม่มี Logic)
 data/seed/            ข้อมูลจริงที่สร้างจาก Excel (ห้ามแก้ด้วยมือ)
 docs/                 SPEC.md · DECISIONS.md · CHANGELOG.md · change-requests/ (CR-10 เป็นต้นไป)
@@ -203,7 +207,8 @@ tests/                Test ของสูตร
 | `plan.<ปี>.phasing.<unitId>` | `{ monthPct: [12 สัดส่วน], edited }` | phasing |
 | `plan.<ปี>.sku.<unitId>` | `{ method, items: { <productKey>: { startMonth, qty, overrides, stopped } } }` แผนครั้งแรก (`method` = วิธีเติมยอด `lastYear` / `runRate`) | sku-planning, products (ผูกรหัสจริง) |
 | `plan.<ปี>.forecast.<unitId>` | โครงเดียวกัน แผนโหมดปรับแผน (ไม่เขียนทับแผนครั้งแรก) | sku-planning |
-| `plan.<ปี>.workflow.<step>.<unitId\|all>` | `{ status, history, snapshot }` สถานะอนุมัติ (topDown, phasing, sku, forecast, baseline — snapshot ของ baseline = GP + ราคา + Promotion ตอนล็อก) | workflowBar, summary (ล็อก Baseline), npd-plan (ต้องตรวจสอบใหม่) |
+| `plan.<ปี>.workflow.<step>.<unitId\|all>` | `{ status, history, snapshot }` สถานะอนุมัติ (topDown, phasing, sku, forecast, baseline — snapshot ของ baseline = GP + ราคา + Promotion + ตัวเลขทั้งหมดของรายงานตอนล็อก) | workflowBar, summary (ล็อก / ปลดล็อก Baseline), npd-plan (ต้องตรวจสอบใหม่) |
+| `plan.<ปี>.baselineVersions` | `[{ no, code, at, by }]` ประวัติเลขฉบับของรายงาน (`{ปี}-BL-{nn}`) | summary |
 | `master.products` / `master.listings` | สินค้าและ Listing (ไม่แยกปี) | products, product-master, npd-plan |
 | `master.taxonomy` | หมวดสินค้าและ Series | taxonomy |
 | `master.priceList` / `master.promotions` | ราคาตามวันที่มีผล / Promotion Price | products, promotions |
@@ -218,4 +223,5 @@ tests/                Test ของสูตร
 | `ui.seriesFilter` | Series / Sub Series ที่เลือก (หน้า SKU และ Product Master ใช้ร่วมกัน) | sku-planning, products, product-master, promotions |
 | `ui.productColumns` | คอลัมน์เพิ่มเติมของหน้ารายการสินค้า | products |
 | `ui.skuShowLastYear` | หน้าวางแผน SKU แสดงยอดปีก่อน (บรรทัดเล็กใต้ตัวเลข + คอลัมน์ปีก่อน / การเติบโต) | sku-planning |
+| `ui.summaryTab` | แท็บล่าสุดของขั้นที่ 4 `status` / `report` (ไม่มี = ตามสถานะ Baseline) | summary |
 | `ui.productMaster.channel` / `ui.masterChannel` | Channel ที่เลือกในหน้า Listing และ Promotion Price / Account | product-master, promotions, accounts |

@@ -1126,6 +1126,98 @@
         var rem = calc.sum(targets) - g2.yearTotal.net;
         return [res.before > 1000000, Math.abs(rem) <= 1000, res.writes.every(function (w) { return row(g, w.key).cells[w.m].state.editable; })];
       }
+    },
+    // ---------------- CR-12: รายงานสรุปแผน (docs/change-requests/CR-12_summary-report.md ข้อ 4) ----------------
+    {
+      name: 'cr12-1. axisStart([113.2M, 120M, 115.5M, 116.6M]) → 100,000,000 (ค่าต่ำสุด ≥ 50 ล้าน ปัดลงขั้นละ 50 ล้าน)',
+      expected: [100000000, 100000000],
+      actual: function () { var v = [113200000, 120000000, 115500000, 116600000]; return [SP.core.charts.axisStart(v), calc.axisStart(v)]; }
+    },
+    {
+      name: 'cr12-2. axisStart([245M, 260M]) → 200,000,000 (ค่าต่ำสุด ≥ 200 ล้าน ปัดลงขั้นละ 100 ล้าน)',
+      expected: 200000000,
+      actual: function () { return SP.core.charts.axisStart([245000000, 260000000]); }
+    },
+    {
+      name: 'cr12-3. axisStart([40M, 45M]) → 0 (ค่าต่ำสุดน้อยกว่า 50 ล้าน เริ่มที่ 0)',
+      expected: 0,
+      actual: function () { return SP.core.charts.axisStart([40000000, 45000000]); }
+    },
+    {
+      name: 'cr12-4. axisStart([100M, 120M]) → 100,000,000 (เลขกลมพอดีไม่ถูกปัดลงอีกขั้น)',
+      expected: 100000000,
+      actual: function () { return SP.core.charts.axisStart([100000000, 120000000]); }
+    },
+    {
+      name: 'cr12-5. niceScaleMax([12.9M, 12.7M, 11.9M], { headroom: 0.10 }) → 15,000,000 (ขั้นละ 2.5 ล้าน 6 เส้น) / ไม่ส่ง opts = กฎตาราง CR-10 เดิม',
+      expected: [15000000, 2500000, 7, 20000000],
+      actual: function () {
+        var v = [12900000, 12700000, 11900000];
+        var ax = calc.niceAxis(0, 12900000 * 1.1);
+        return [SP.core.charts.niceScaleMax(v, { headroom: 0.10 }), ax.step, ax.ticks.length, SP.core.charts.niceScaleMax([18000000, 12000000])];
+      }
+    },
+    {
+      name: 'cr12-6. Waterfall ข้อมูลตั้งต้น: แกนเริ่ม 100 ล้าน (สัญลักษณ์ตัดแกน + ข้อความ) · แท่งยอดปี 2026 และ Total Target เริ่มจุดเดียวกัน (ขอบซ้ายของแกน) · ปลายแกน 120 ล้าน',
+      expected: [100000000, 120000000, '0%', '0%', '66%', true, 'แกนเริ่มที่ 100 ล้านบาท'],
+      actual: function () {
+        var wf = calc.growthWaterfall(TREE);
+        var el = SP.core.charts.waterfall({
+          start: { label: 'LY', value: wf.start }, end: { label: 'Total', value: wf.end },
+          steps: wf.steps.map(function (s) { return { id: s.id, label: s.name, value: s.delta }; }),
+          format: String, signed: String,
+          axisNote: function (lo) { return SP.core.components.fill(SP.data.content.pages.summary.wfAxis, { value: F.number(lo / 1e6, 0) }); }
+        });
+        var bars = el.querySelectorAll('.wfc-row.is-total .wfc-bar');
+        return [el.info.start, el.info.end, bars[0].style.left, bars[1].style.left, bars[0].style.width, !!el.querySelector('.wfc-break'), el.querySelector('.wfc-axis').textContent];
+      }
+    },
+    {
+      name: 'cr12-7. เลขฉบับ: ล็อกครั้งแรก → 2027-BL-01 · ปลดล็อก (ต้องมีเหตุผล) แล้วล็อกใหม่ → 2027-BL-02 · ยังไม่ล็อก / ปลดล็อกอยู่ → 2027-DRAFT',
+      expected: ['2027-DRAFT', '2027-BL-01', 'noteRequired', '2027-DRAFT', '2027-BL-02', [1, 2]],
+      actual: function () {
+        var states = {}, versions = [];
+        var draft = W.baselineVersion(versions, 2027, W.isLocked(states)).code;
+        states = W.applyAction(states, { step: 'baseline', action: 'lock', by: 'Sales Director', at: '2026-11-15T07:30:00.000Z' }).states;
+        versions = W.addBaselineVersion(versions, 2027, { by: 'Sales Director', at: '2026-11-15T07:30:00.000Z' });
+        var first = W.baselineVersion(versions, 2027, W.isLocked(states)).code;
+        var noNote = W.applyAction(states, { step: 'baseline', action: 'unlock', by: 'Sales Director', at: 'x' }).error;
+        states = W.applyAction(states, { step: 'baseline', action: 'unlock', by: 'Sales Director', at: 'x', note: 'ปรับเป้า TT' }).states;
+        var reopened = W.baselineVersion(versions, 2027, W.isLocked(states)).code;
+        states = W.applyAction(states, { step: 'baseline', action: 'lock', by: 'Sales Director', at: 'y' }).states;
+        versions = W.addBaselineVersion(versions, 2027, { by: 'Sales Director', at: 'y' });
+        return [draft, first, noNote, reopened, W.baselineVersion(versions, 2027, W.isLocked(states)).code, versions.map(function (v) { return v.no; })];
+      }
+    },
+    {
+      name: 'cr12-8. รายการที่ต้องดำเนินการ: ไม่มีผู้รับผิดชอบอยู่แถวแรก → ส่งกลับแก้ไข → ส่วนต่างมากไปน้อย → ยังไม่ส่ง / จัดสรรครบและอนุมัติครบไม่แสดง / ข้อมูลตั้งต้น: TT เขต 3 แถวแรก ครบ 9 หน่วยขาย',
+      expected: [['c', 'd', 'e', 'b', 'f'], ['assignOwner', 'fixSku', 'closeGap', 'submitSku', 'waitDirector'], 'tt-central', 9],
+      actual: function () {
+        var list = calc.planActions([
+          { id: 'a', target: 1000, plan: 1000, phasing: 'approved', sku: 'approved', vacant: false },
+          { id: 'b', target: 1000, plan: 1000, phasing: 'approved', sku: 'draft', vacant: false },
+          { id: 'c', target: 1000, plan: 1000, phasing: 'approved', sku: 'approved', vacant: true },
+          { id: 'd', target: 1000, plan: 990, phasing: 'approved', sku: 'returned', vacant: false },
+          { id: 'e', target: 5000, plan: 2000, phasing: 'approved', sku: 'draft', vacant: false },
+          { id: 'f', target: 1000, plan: 1000, phasing: 'approved', sku: 'submitted', vacant: false }
+        ], { topDown: 'approved', locked: false });
+        var units = calc.planUnits(TREE).map(function (u) {
+          var g = calc.skuPlanGrid(D, MASTER, u.id, calc.defaultSkuPlan(MASTER, u.id, YEAR, true, D.planSeeds.years[YEAR][u.id]), GRID(u.id));
+          return { id: u.id, target: u.amount, plan: g.yearTotal.net, phasing: 'draft', sku: 'draft', vacant: !calc.ownerOf(D.assignments, D.salespeople, u.id, calc.monthKey(YEAR, D.settings.DEMO_FORECAST_MONTH)) };
+        });
+        var real = calc.planActions(units, { topDown: 'draft', locked: false });
+        return [list.map(function (r) { return r.id; }), list.map(function (r) { return r.next; }), real[0].id, real.length];
+      }
+    },
+    {
+      name: 'cr12-9. % ของ Total ของ 7-Eleven: 22,140,000 ÷ 120,000,000 → 18.45% (เท่ากับ % ใน Channel × % ของ Total ของ Channel)',
+      expected: ['18.45%', true],
+      actual: function () {
+        var seven = calc.planUnits(TREE).filter(function (u) { return u.id === 'seven'; })[0];
+        var pct = calc.pctFromAmount(TREE.amount, seven.amount);
+        var node = TREE.children[0].children.filter(function (u) { return u.id === 'seven'; })[0];
+        return [F.pct(pct, 2), Math.abs(pct - node.pctOfTotal) < 1e-12];
+      }
     }
   ];
 

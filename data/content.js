@@ -39,7 +39,8 @@
       roleGroupProduct: 'ทีมดูแลข้อมูลสินค้า',
       approveTitle: 'สิ่งที่ต้องการให้อนุมัติ',
       leaveConfirm: 'มีรายการที่ยังไม่บันทึก หากออกจากหน้านี้ รายการดังกล่าวจะหายไป',
-      discardConfirm: 'มีรายการที่ยังไม่บันทึก {n} รายการ ต้องการยกเลิกรายการดังกล่าวหรือไม่'
+      discardConfirm: 'มีรายการที่ยังไม่บันทึก {n} รายการ ต้องการยกเลิกรายการดังกล่าวหรือไม่',
+      actionCount: 'รายการที่ต้องดำเนินการ {n} รายการ'
     },
 
     labels: {
@@ -817,11 +818,19 @@
         perfEmpty: 'ยังไม่มีผู้รับผิดชอบในปีนี้'
       },
 
-      // รายงานสรุปแผน (ผู้บริหารดูภาพรวมและล็อก Baseline)
+      // ขั้นที่ 4 (CR-12): แท็บติดตามสถานะ (งานที่ต้องทำ ไม่พิมพ์) | รายงานสรุปแผน (ประกาศและหลักฐานข้อตกลง พิมพ์ได้)
       summary: {
         title: 'รายงานสรุปแผน',
         short: 'รายงานสรุปแผน',
-        lead: ['สรุปเป้าหมาย แผนการขาย และสถานะการอนุมัติ'],
+        lead: ['ติดตามสถานะการอนุมัติ และสรุปแผนสำหรับประกาศและเป็นหลักฐานข้อตกลง'],
+        tabLabel: 'มุมมองของขั้นที่ 4',
+        tabs: { status: 'ติดตามสถานะ', report: 'รายงานสรุปแผน' },
+        tabTips: {
+          status: 'รายการที่ต้องดำเนินการก่อนล็อก Baseline (ไม่ใช่เอกสารสำหรับพิมพ์)',
+          report: 'รายงานสำหรับประกาศและเป็นหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้'
+        },
+        tabCountTip: 'รายการที่ต้องดำเนินการ {n} รายการ',
+        statusNoPrint: 'แท็บติดตามสถานะไม่ใช่เอกสารสำหรับพิมพ์ · พิมพ์ได้จากแท็บรายงานสรุปแผน',
         channelFilter: 'Channel',
         channelAll: 'ทุก Channel',
         channelSelected: '{n} Channel',
@@ -830,19 +839,77 @@
         millionUnit: 'ล้านบาท',
         totalRow: 'Total',
         print: 'พิมพ์ / บันทึก PDF',
-        printHeader: 'รายงานสรุปแผน {year} · พิมพ์เมื่อ {at}',
+
+        // ---------- แท็บติดตามสถานะ ----------
+        yearTitle: 'สถานะทั้งปี',
+        yearLines: {
+          topDownPending: 'จัดสรรเป้าหมายประจำปียังไม่ได้รับอนุมัติ ({status})',
+          topDownApproved: 'จัดสรรเป้าหมายประจำปี: อนุมัติแล้ว {at} โดย {by}',
+          notLocked: 'ยังไม่ล็อก Baseline · แผน SKU อนุมัติแล้ว {done}/{total} หน่วยขาย',
+          locked: 'ล็อก Baseline แล้ว {at} โดย {by} · รายงานฉบับที่ {code}',
+          versions: 'รายงานที่เคยล็อก: {list}'
+        },
         lockButton: 'ล็อก Baseline {year}',
         lockConfirm: 'ล็อก Baseline ปี {year}',
         lockLines: [
           'แผน SKU ที่อนุมัติแล้วทุกรายการจะเป็น Baseline ทั้งปี ใช้วัดผลงานตลอดปี',
-          'หลังล็อก Top-down, Phasing และแผนครั้งแรกจะแก้ไขไม่ได้',
-          'ระหว่างปีปรับได้เฉพาะ Re-forecast (ล็อก M+1 ถึง M+3)'
+          'หลังล็อก จัดสรรเป้าหมายประจำปี จัดสรรเป้าหมายรายเดือน และแผนครั้งแรกจะแก้ไขไม่ได้',
+          'ระหว่างปีปรับได้เฉพาะ Re-forecast (ล็อก M+1 ถึง M+3)',
+          'รายงานสรุปแผนฉบับที่ {code} จะใช้ตัวเลข ณ เวลาที่ล็อก'
         ],
-        lockTotals: 'Total Target {target} บาท · แผนรวม {plan} บาท · {n} รายการ',
-        lockedAt: 'ล็อก Baseline แล้ว เมื่อ {at} โดย {by}',
-        lockPending: 'แผน SKU ยังไม่อนุมัติ {n} รายการ',
-        lockTopDownPending: 'Top-down ยังไม่ได้รับอนุมัติ',
+        lockTotals: 'Total Target {target} บาท · แผนรวม {plan} บาท · {n} หน่วยขาย',
+        lockPending: 'แผน SKU ยังไม่อนุมัติ {n} หน่วยขาย',
+        lockTopDownPending: 'จัดสรรเป้าหมายประจำปียังไม่ได้รับอนุมัติ',
         lockDirectorOnly: 'เฉพาะ Sales Director',
+        unlockButton: 'ปลดล็อก Baseline',
+        unlockConfirm: 'ปลดล็อก Baseline ปี {year}',
+        unlockLines: [
+          'รายงานฉบับที่ {code} ยังอยู่ในประวัติ',
+          'เปิดให้แก้ไขแผนได้อีกครั้ง เมื่อล็อกใหม่จะเป็นรายงานฉบับถัดไป'
+        ],
+        unlockNote: 'เหตุผลที่ปลดล็อก (จำเป็น)',
+        unlockNoteRequired: 'กรุณาระบุเหตุผลก่อนปลดล็อก',
+        actionsTitle: 'รายการที่ต้องดำเนินการ',
+        actionsCount: '{n} หน่วยขาย',
+        actionFilters: {
+          channel: 'Channel', channelAll: 'ทุก Channel',
+          owner: 'ผู้รับผิดชอบ', ownerAll: 'ทุกคน', ownerNone: 'ยังไม่มีผู้รับผิดชอบ',
+          gapOnly: 'เฉพาะที่มีส่วนต่าง'
+        },
+        actionColumns: { channel: 'Channel', unit: 'หน่วยขาย', owner: 'ผู้รับผิดชอบ', gap: 'ส่วนต่าง (ล้านบาท)', phasing: 'เป้าหมายรายเดือน', sku: 'แผน SKU', next: 'การดำเนินการถัดไป' },
+        statusShort: { draft: 'ยังไม่ส่ง', submitted: 'รออนุมัติ', approved: 'อนุมัติแล้ว', returned: 'ส่งกลับแก้ไข', review: 'ต้องตรวจสอบใหม่', locked: 'ล็อกแล้ว' },
+        next: {
+          assignOwner: 'กำหนดผู้รับผิดชอบ',
+          fixPhasing: 'แก้ไขแล้วส่งใหม่',
+          reviewPhasing: 'ตรวจสอบแล้วส่งใหม่',
+          waitTopDown: 'รออนุมัติเป้าหมายประจำปี',
+          submitPhasing: 'ส่งเป้าหมายรายเดือน',
+          waitDirector: 'รออนุมัติจาก Director',
+          fixSku: 'แก้ไขแผนแล้วส่งใหม่',
+          reviewSku: 'ตรวจสอบแผนแล้วส่งใหม่',
+          closeGap: 'ปิดส่วนต่าง',
+          submitSku: 'ส่งอนุมัติ',
+          checkOver: 'ตรวจสอบแผนที่เกิน'
+        },
+        nextTip: 'ไปที่หน้า{page} · {name}',
+        openPlan: 'เปิดหน้าวางแผนยอดขายราย SKU ของ {name}',
+        actionsNone: 'ไม่มีรายการที่ต้องดำเนินการ',
+        actionsNoneFiltered: 'ไม่มีรายการตามตัวกรองที่เลือก',
+
+        // ---------- แท็บรายงานสรุปแผน ----------
+        docTitle: 'รายงานสรุปแผน {year}',
+        version: 'ฉบับที่ {code}',
+        statusLocked: 'สถานะ: อนุมัติแล้ว · ล็อก Baseline {at} โดย {by}',
+        statusDraft: 'สถานะ: ฉบับร่าง · ยังไม่ได้รับอนุมัติ',
+        topDownLine: {
+          approved: 'จัดสรรเป้าหมายประจำปี: อนุมัติแล้ว {at} โดย {by}',
+          submitted: 'จัดสรรเป้าหมายประจำปี: รออนุมัติ · ส่งเมื่อ {at} โดย {by}',
+          other: 'จัดสรรเป้าหมายประจำปี: {status}'
+        },
+        printedAt: 'พิมพ์เมื่อ {at}',
+        snapshotNote: 'ตัวเลขในรายงานนี้มาจาก Baseline ที่ล็อกไว้',
+        draftNote: 'ฉบับร่าง: ตัวเลขเป็นข้อมูลล่าสุดที่ยังแก้ไขได้',
+        watermark: 'ฉบับร่าง · ยังไม่ได้รับอนุมัติ',
         kpi: {
           target: 'Total Target',
           targetSub: 'การเติบโตเทียบปีก่อน {growth}',
@@ -855,38 +922,36 @@
         },
         monthlyTitle: 'เป้าหมายเทียบแผน รายเดือน (ล้านบาท)',
         monthlyLegend: { bar: 'เป้าหมาย (Top-down Phasing)', line: 'แผน Bottom-up', dashed: 'ยอดขายปี {year}' },
+        monthlyEnd: { line: 'แผน', dashed: 'ปี {year}' },
+        monthlyTip: { target: 'เป้าหมาย', plan: 'แผน', gap: 'ส่วนต่าง', prior: 'ยอดขายปี {year}' },
+        wfAxis: 'แกนเริ่มที่ {value} ล้านบาท',
         tableTitle: 'เป้าหมายและแผนราย Channel และหน่วยขาย (ล้านบาท)',
-        tableColumns: { name: 'Channel / หน่วยขาย', prior: 'ยอดขายปีก่อน', target: 'เป้าหมาย', plan: 'แผน Bottom-up', gap: 'ส่วนต่าง', topDown: 'Top-down', phasing: 'Phasing', sku: 'SKU', owner: 'ผู้รับผิดชอบ' },
-        approvalHead: 'สถานะอนุมัติ',
-        openPlan: 'เปิดหน้าวางแผนยอดขายราย SKU ของ {name}',
+        tableColumns: { name: 'Channel / หน่วยขาย', target: 'เป้าหมาย', pctOfTotal: '% ของ Total', plan: 'แผน Bottom-up', gap: 'ส่วนต่าง', approval: 'สถานะอนุมัติ', owner: 'ผู้รับผิดชอบ' },
+        pctOfTotalTip: 'สัดส่วนเป้าหมายเทียบ Total Target',
+        approvalHeadTip: 'ไอคอนซ้าย = จัดสรรเป้าหมายรายเดือน (Phasing) · ไอคอนขวา = แผน SKU',
+        approvalTip: 'Phasing: {phasing} · แผน SKU: {sku}',
+        approvalIcons: { draft: '○', submitted: '◐', approved: '●', returned: '↩', review: '!' },
+        approvalLegend: 'สถานะอนุมัติ (Phasing · แผน SKU):',
+        channelApproved: 'อนุมัติแล้ว {done}/{total}',
         collapseTitle: 'ย่อหรือขยายรายการใน Channel นี้',
         mixTitle: 'สัดส่วนแผนตามกลุ่มสินค้า (ล้านบาท)',
         mixByStatus: 'ตาม Status',
-        mixBySeries: 'ตาม Series',
         mixGroupLabel: 'ตามกลุ่มสินค้า',
         mixBy: { series: 'Series', category: 'Category' },
         mixNoCategory: '(ไม่ระบุ Category)',
         mixText: '{value} · {pct}',
         mixOther: 'อื่นๆ',
-        channelApproved: 'อนุมัติแล้ว {done}/{total}',
         peopleTitle: 'เป้าหมายรายผู้รับผิดชอบ (ล้านบาท)',
         peopleColumns: { name: 'ผู้รับผิดชอบ', units: 'หน่วยขายที่ดูแล', target: 'เป้าหมาย', plan: 'แผน', gap: 'ส่วนต่าง' },
         peopleNote: 'คำนวณเฉพาะเดือนที่แต่ละคนรับผิดชอบ',
         vacantRow: 'ไม่มีผู้รับผิดชอบ',
         resignedTag: 'ลาออก {month}',
-        actionLine: '{unit}: {text}',
-        actionsTitle: 'รายการที่ต้องดำเนินการ',
-        actions: {
-          topDown: 'Top-down ยังไม่ได้รับอนุมัติ ({status})',
-          short: 'แผนต่ำกว่าเป้าหมาย ({amount})',
-          over: 'แผนสูงกว่าเป้าหมาย ({amount})',
-          draftPhasing: 'Phasing ยังไม่ส่งอนุมัติ',
-          draftSku: 'แผน SKU ยังไม่ส่งอนุมัติ',
-          returned: 'ส่งกลับแก้ไข',
-          review: 'ต้องตรวจสอบใหม่',
-          vacant: 'ยังไม่มีผู้รับผิดชอบ'
-        },
-        actionsNone: 'ไม่มีรายการที่ต้องดำเนินการ'
+        approvalsTitle: 'การอนุมัติ',
+        approvalsNote: 'จากประวัติการอนุมัติของแต่ละขั้นตอน · รายการที่ยังไม่อนุมัติแสดงสถานะแทนผู้อนุมัติ',
+        approvalsColumns: { step: 'ขั้นตอน', unit: 'หน่วยขาย', submittedBy: 'ผู้ส่ง', submittedAt: 'วันที่ส่ง', approvedBy: 'ผู้อนุมัติ', approvedAt: 'วันที่อนุมัติ' },
+        approvalsAll: 'ทุกหน่วยขาย',
+        signTitle: 'ลงนามรับทราบและอนุมัติ',
+        signFields: { name: 'ชื่อ', signature: 'ลายมือชื่อ', date: 'วันที่' }
       },
 
       // เกี่ยวกับ Prototype: ขอบเขต, Decision log, คำถามค้าง, ขั้นต่อไป (แยกออกจากรายงาน)
@@ -953,7 +1018,10 @@
           { topic: 'เป้าหมายเทียบปีก่อน', decision: 'แท่งใช้สเกลจริงเดียวกันทั้งตาราง เริ่มที่ 0 ค่าสูงสุด = เป้าหมายหรือยอดขายปีก่อนที่มากที่สุดปัดเป็นเลขกลม · ความยาวแท่ง = เป้าหมาย ขีดตั้ง = ยอดขายปีก่อน · มีแกน 0 ถึงค่าสูงสุดที่หัวคอลัมน์ · ใช้ทั้งหน้าจัดสรรเป้าหมายประจำปีและรายงานสรุปแผน' },
           { topic: 'ชื่อหน่วยขาย', decision: 'แต่ละ Channel เรียกหน่วยขายและ GP ตาม Channel Master: Account / เขตการขาย / Platform และ GP / ค่าธรรมเนียม Platform' },
           { topic: 'ส่งออกข้อมูล', decision: 'ส่งออก Excel และ CSV ได้จากหน้าจัดสรรเป้าหมายประจำปี จัดสรรเป้าหมายรายเดือน และวางแผนยอดขายราย SKU ตัวเลขคำนวณต่อได้' },
-          { topic: 'รายงานสรุปแผน', decision: 'สำหรับผู้บริหาร: KPI, เป้าหมายเทียบแผนรายเดือน, ตารางราย Channel และ หน่วยขาย, สัดส่วนแผนตามกลุ่มสินค้า, เป้าหมายรายผู้รับผิดชอบ และรายการที่ต้องดำเนินการ พิมพ์เป็น PDF ได้' }
+          { topic: 'รายงานสรุปแผน', decision: 'สำหรับผู้บริหาร: KPI, เป้าหมายเทียบแผนรายเดือน, ตารางราย Channel และ หน่วยขาย, สัดส่วนแผนตามกลุ่มสินค้า, เป้าหมายรายผู้รับผิดชอบ และการอนุมัติ พิมพ์เป็น PDF ได้' },
+          { topic: 'ติดตามสถานะแยกจากรายงาน', decision: 'ขั้นที่ 4 มี 2 แท็บ: ติดตามสถานะ (รายการที่ต้องดำเนินการ 1 แถวต่อหน่วยขาย เรียงตามความรุนแรง และปุ่มล็อก Baseline — ไม่พิมพ์) กับรายงานสรุปแผน (ประกาศและหลักฐานข้อตกลง — พิมพ์ได้)' },
+          { topic: 'แกนกราฟ', decision: 'กราฟรายเดือนเริ่มที่ 0 ค่าสูงสุดเผื่อ 10% แล้วปัดเป็นเลขกลม · แผน = เส้นทึบมีจุด ยอดปีก่อน = เส้นประ · Waterfall เริ่มแกนที่เลขกลม (เช่น 100 ล้านบาท) แท่งยอดปีก่อนและ Total Target เริ่มจุดเดียวกัน และมีสัญลักษณ์ตัดแกน' },
+          { topic: 'รายงานเป็นหลักฐาน', decision: 'ทุกครั้งที่ล็อก Baseline ได้รายงานฉบับใหม่ (2027-BL-01, 02 …) ตัวเลขทั้งหมดมาจาก Baseline ที่ล็อกไว้ พร้อมประวัติการอนุมัติและช่องลงนาม · ก่อนล็อกเป็นฉบับร่างมีลายน้ำทุกหน้า · ปลดล็อกได้โดย Sales Director พร้อมเหตุผล' }
         ],
         openQuestions: [
           'ราคาใน Price List รวม VAT หรือไม่ (ไฟล์ Excel เดิมคำนวณแบบรวม VAT)',

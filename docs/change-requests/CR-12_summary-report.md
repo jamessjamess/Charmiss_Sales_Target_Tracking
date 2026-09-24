@@ -1,8 +1,8 @@
 ---
 id: CR-12
 title: รายงานสรุปแผน — ปรับกราฟ ตาราง และแยกแท็บติดตามสถานะออกจากรายงาน
-status: Pending
-applied:
+status: Applied
+applied: 2026-09-24
 superseded_by:
 ---
 

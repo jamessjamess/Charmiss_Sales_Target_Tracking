@@ -1,16 +1,71 @@
-/* modules/summary/summary.css — รายงานสรุปแผน (หน้าเลื่อนแนวตั้งได้ / พิมพ์ A4 แนวนอน) */
+/* modules/summary/summary.css — ขั้นที่ 4: ติดตามสถานะ | รายงานสรุปแผน (หน้าเลื่อนแนวตั้งได้ / พิมพ์ A4 แนวนอนเฉพาะแท็บรายงาน) */
 
-.page-summary .module-body > * + * { margin-top: var(--sp-4); }
+.page-summary .module-body > * + *,
+.rp-report > * + * { margin-top: var(--sp-4); }
 .rp-section h2 { font-size: var(--fs-lg); margin: 0 0 var(--sp-3); }
 .rp-section h3 { font-size: var(--fs-sm); margin: 0 0 var(--sp-2); color: var(--c-text-muted); }
 .rp-note { font-size: var(--fs-xs); color: var(--c-text-muted); margin: 0 0 var(--sp-2); }
+.rp-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--c-border-strong); }
+.rp-link:hover { color: var(--c-primary-strong); border-bottom-color: var(--c-primary); }
+.rp-gap { font-weight: var(--fw-bold); font-size: var(--fs-xs); white-space: nowrap; }
+.rp-owner { font-size: var(--fs-xs); white-space: nowrap; cursor: help; }
+.rp-owner.is-vacant { color: var(--c-vacant-fg); font-weight: var(--fw-bold); }
 
-/* ---------- แถบบน ---------- */
-.rp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
-.rp-lock { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-left: auto; font-size: var(--fs-sm); }
+/* ---------- แท็บ ---------- */
+.rp-tabs .seg { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rp-tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: 999px;
+  font-size: 11px; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; background: var(--c-wf-returned-bg); color: var(--c-wf-returned-fg); }
+
+/* =====================================================================
+   แท็บติดตามสถานะ
+   ===================================================================== */
+.rp-year-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-2); }
+.rp-year-head h2 { margin: 0 !important; }
+.rp-year-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--fs-sm); }
+.rp-year-lines li { display: flex; align-items: baseline; gap: var(--sp-2); }
+.rp-dot { flex: 0 0 auto; width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 1px solid; align-self: center; }
+.rp-lock { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
 .rp-lock.is-locked { color: var(--c-text-muted); }
 
-/* ---------- 1. KPI ---------- */
+.rp-act-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); margin-bottom: var(--sp-3); }
+.rp-act-head h2 { margin: 0 !important; display: inline-flex; align-items: baseline; gap: var(--sp-2); }
+.rp-count { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--c-text-muted); }
+.rp-act-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); font-size: var(--fs-sm); }
+.rp-filter { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.rp-filter .field-label { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.rp-filter .select { font-size: var(--fs-sm); padding-top: 3px; padding-bottom: 3px; }
+.rp-check { cursor: pointer; }
+.rp-act-table { min-width: 860px; }
+.rp-act-table th, .rp-act-table td { padding: 6px var(--sp-2); vertical-align: middle; }
+.rp-act-table tbody th { font-weight: var(--fw-medium); white-space: nowrap; background: transparent; }
+.rp-act-ch { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-2) + 8px) !important; font-weight: var(--fw-bold); white-space: nowrap; }
+.rp-act-table .num { text-align: right; }
+.rp-next { font-size: var(--fs-xs); font-weight: var(--fw-bold); white-space: nowrap; color: var(--c-primary-strong); }
+.rp-empty { font-size: var(--fs-sm); margin: 0; }
+
+/* =====================================================================
+   แท็บรายงานสรุปแผน
+   ===================================================================== */
+.rp-report { position: relative; }
+/* ลายน้ำฉบับร่าง: บนจอซ้ำตามความยาวรายงาน (ตอนพิมพ์ 1 ชิ้นกลางทุกหน้า) */
+.rp-watermark { position: absolute; inset: 0; z-index: 4; overflow: hidden; pointer-events: none; }
+.rp-watermark span { position: absolute; left: 50%; transform: translate(-50%, -50%) rotate(-24deg); white-space: nowrap;
+  font-size: 64px; font-weight: var(--fw-bold); letter-spacing: 0.02em; color: var(--watermark-fg); }
+
+.card.rp-doc-head { display: grid; gap: 2px; padding: var(--sp-3) var(--sp-4); border-top: 4px solid var(--c-wf-approved-fg); }
+.card.rp-doc-head.is-draft { border-top-color: var(--c-wf-returned-fg); }
+.rp-doc-head > * { margin: 0 !important; }
+.rp-doc-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-1) var(--sp-4); }
+.rp-doc-title { font-size: var(--fs-xl); margin: 0; }
+.rp-doc-version { font-size: var(--fs-sm); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rp-doc-head.is-draft .rp-doc-version, .rp-doc-head.is-draft .rp-doc-status { color: var(--c-wf-returned-fg); }
+.rp-doc-status { font-weight: var(--fw-bold); font-size: var(--fs-sm); }
+.rp-doc-td, .rp-doc-printed { font-size: var(--fs-sm); }
+.rp-doc-note { font-size: var(--fs-xs); color: var(--c-text-muted); }
+
+.rp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+
+/* ---------- KPI ---------- */
 .rp-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
 .card.rp-kpi { display: flex; flex-direction: column; gap: 2px; padding: var(--sp-3) var(--sp-4); border-top: 4px solid var(--c-td); }
 .card.rp-kpi > * + * { margin-top: 0; }
@@ -28,51 +83,52 @@
 @media (max-width: 1100px) { .rp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .rp-kpis { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---------- 2. กราฟรายเดือน ---------- */
-.rp-monthly .barline { max-width: 1400px; }
-.rp-row2 { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); gap: var(--sp-3); align-items: stretch; }
-.rp-row2 > .card + .card { margin-top: 0; }
+/* ---------- กราฟ: รายเดือน : ที่มาของการเติบโต = 60 : 40 สูงเท่ากัน (จอแคบกว่า 1280px เรียงลง) ---------- */
+.rp-row2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--sp-3); align-items: stretch; }
+.rp-row2 > .card { margin-top: 0; display: flex; flex-direction: column; min-width: 0; }
+.rp-monthly .barline { flex: 1 1 auto; }
 .rp-growth-share { margin-top: var(--sp-4) !important; }
-.rp-mix-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
-.rp-mix-head h3 { margin: 0 !important; }
-@media (max-width: 1100px) { .rp-row2 { grid-template-columns: minmax(0, 1fr); } }
+@media screen and (max-width: 1279.98px) { .rp-row2 { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---------- 3. ตาราง Channel → Account/เขต ---------- */
-.rp-table { table-layout: fixed; min-width: 960px; }
-.rp-table col.rp-col-name { width: 18%; }
+/* ---------- ตาราง Channel → หน่วยขาย ---------- */
+.rp-table { table-layout: fixed; min-width: 980px; }
+.rp-table col.rp-col-name { width: 16%; }
 .rp-table col.rp-col-num { width: 8%; }
-.rp-table col.rp-col-vly { width: 14%; }
+.rp-table col.rp-col-pct { width: 7%; }
+.rp-table col.rp-col-vly { width: 18%; }
 .rp-table col.rp-col-gap { width: 11%; }
-.rp-table col.rp-col-wf { width: 8%; }
-.rp-table col.rp-col-owner { width: 9%; }
-/* แท่งเป้าหมายเทียบปีก่อน (charts.vsLastYearBar) สเกลจริงเดียวกันทั้งตาราง + แกนใต้หัวคอลัมน์ */
-.rp-table td.rp-vly, .rp-table th.rp-vly-head { padding-right: var(--sp-3); }
-.rp-table th.rp-vly-head { vertical-align: bottom; }
+.rp-table col.rp-col-ap { width: 9%; }
+.rp-table col.rp-col-owner { width: 15%; }
 .rp-table th, .rp-table td { padding: 4px var(--sp-2); vertical-align: middle; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rp-table .num { text-align: right; }
-.rp-table thead th { white-space: normal; line-height: 1.2; }
+.rp-table thead th, .rp-table thead th.num { font-size: var(--fs-xs); background: var(--c-surface-2); white-space: normal; line-height: 1.25; vertical-align: bottom; }
 .rp-table thead .prior-label { display: inline; }
-.rp-table thead th { font-size: var(--fs-xs); background: var(--c-surface-2); white-space: normal; line-height: 1.2; }
-.rp-table thead .rp-wf-head { text-align: center; border-bottom: 1px solid var(--c-border); }
+/* แท่งเป้าหมายเทียบปีก่อน (charts.vsLastYearBar) สเกลจริงเดียวกันทั้งตาราง + แกนใต้หัวคอลัมน์ */
+.rp-table td.rp-vly, .rp-table th.rp-vly-head { padding-right: var(--sp-3); }
+.rp-table .rp-pct { color: var(--c-text-muted); }
 .rp-total-row > * { font-weight: var(--fw-bold); background: var(--c-surface-2); border-bottom: 2px solid var(--c-border-strong); }
 .rp-ch-row > * { font-weight: var(--fw-bold); background: var(--c-surface-2); }
-.rp-ch-row > th { box-shadow: inset 5px 0 0 var(--c); white-space: normal; }
-.rp-unit-row > th { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-3) + 22px); font-weight: var(--fw-medium); white-space: normal; background: var(--c-surface); }
+.rp-ch-row > th { box-shadow: inset 5px 0 0 var(--c); overflow: hidden; text-overflow: clip; }
+.rp-unit-row > th { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-3) + 22px); font-weight: var(--fw-medium); background: var(--c-surface); }
 .rp-toggle { font: inherit; width: 22px; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--c-text-muted); }
-.rp-topdown { text-align: center; background: var(--c-surface); border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border); }
 .rp-approved { font-size: var(--fs-xs); color: var(--c-text-muted); }
-.rp-owner { font-size: var(--fs-xs); white-space: normal !important; cursor: help; }
-.rp-owner.is-vacant { color: var(--c-vacant-fg); font-weight: var(--fw-bold); }
-.rp-gap { font-weight: var(--fw-bold); font-size: var(--fs-xs); }
-.rp-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--c-border-strong); }
-.rp-link:hover { color: var(--c-primary-strong); border-bottom-color: var(--c-primary); }
+/* สถานะอนุมัติ 2 ไอคอน (Phasing · แผน SKU) */
+.rp-ap-cell { white-space: nowrap; }
+.rp-ap-cell .rp-link { border-bottom: 0; }
+.rp-ap-cell .rp-link + .rp-link { margin-left: var(--sp-2); }
+.rp-ap { display: inline-block; min-width: 1.1em; text-align: center; font-size: 16px; line-height: 1; }
+.rp-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-3); margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--c-text-muted); }
+.rp-legend-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.rp-legend .rp-ap { font-size: 14px; }
 
-/* ---------- 4. สัดส่วนตามกลุ่มสินค้า ---------- */
+/* ---------- สัดส่วนตามกลุ่มสินค้า ---------- */
 .rp-mix-grid { gap: var(--sp-6); }
+.rp-mix-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-bottom: var(--sp-2); }
+.rp-mix-head h3 { margin: 0 !important; }
 .rp-mix .hbar-row { grid-template-columns: minmax(0, 30%) minmax(0, 1fr) 9.5em; font-size: var(--fs-sm); }
 .rp-mix .hbar-label { white-space: normal; line-height: 1.2; }
 
-/* ---------- 5. รายผู้รับผิดชอบ ---------- */
+/* ---------- รายผู้รับผิดชอบ ---------- */
 .rp-people-table { min-width: 720px; }
 .rp-people-table th, .rp-people-table td { padding: 4px var(--sp-2); vertical-align: middle; font-variant-numeric: tabular-nums; }
 .rp-people-table .num { text-align: right; white-space: nowrap; }
@@ -81,24 +137,68 @@
 .rp-units { font-size: var(--fs-xs); color: var(--c-text-muted); }
 .rp-tag { margin-left: var(--sp-2); font-size: 11px; }
 
-/* ---------- 6. รายการที่ต้องดำเนินการ ---------- */
-.rp-action-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.rp-action-list > li { display: grid; grid-template-columns: 16em minmax(0, 1fr); gap: var(--sp-3); padding: 5px 0; border-bottom: 1px solid var(--c-border); font-size: var(--fs-sm); break-inside: avoid; }
-.rp-action-name { font-weight: var(--fw-bold); }
-.rp-action-items { display: flex; flex-wrap: wrap; gap: 2px var(--sp-4); }
-.rp-action { display: inline-flex; align-items: baseline; gap: var(--sp-1); }
-.rp-action-dot { flex: 0 0 auto; width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 1px solid; align-self: center; }
-@media (max-width: 720px) { .rp-action-list > li { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+/* ---------- การอนุมัติ ---------- */
+.rp-approvals-table { min-width: 760px; }
+.rp-approvals-table th, .rp-approvals-table td { padding: 4px var(--sp-2); vertical-align: middle; font-size: var(--fs-xs); }
+.rp-approvals-table tbody th { font-weight: var(--fw-medium); white-space: nowrap; background: transparent; }
+.rp-approvals-table tr.is-year > * { background: var(--c-surface-2); font-weight: var(--fw-bold); }
+.rp-when { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-/* ---------- พิมพ์ ---------- */
-.rp-print-head { font-size: 10pt; color: var(--c-text-muted); }
+/* ---------- ช่องลงนาม ---------- */
+.rp-sign { break-inside: avoid; }
+.rp-sign h2 { font-size: var(--fs-lg); margin: 0 0 var(--sp-3); }
+.rp-sign-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+.rp-sign-box { border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); display: grid; gap: var(--sp-4); background: var(--c-surface); }
+.rp-sign-role { font-size: var(--fs-sm); }
+.rp-sign-line { display: grid; grid-template-columns: 6em minmax(0, 1fr); align-items: end; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-muted); }
+.rp-sign-blank { display: block; height: 1.6em; border-bottom: 1px solid var(--c-border-strong); }
+@media (max-width: 720px) { .rp-sign-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- พิมพ์ (เฉพาะแท็บรายงาน — แท็บติดตามสถานะพิมพ์ได้เพียงข้อความแจ้ง) ---------- */
+.rp-noprint-note { font-size: 12pt; }
+/* หน้าที่ 1 = หัวรายงาน · KPI · กราฟ / 2 = ตาราง / 3 = กลุ่มสินค้า · รายผู้รับผิดชอบ / 4 = การอนุมัติ · ช่องลงนาม */
 @media print {
-  .page-summary .module-body > * + * { margin-top: 6mm; }
+  .page-summary .page-intro { display: none !important; }
+  .page-summary .module-body > * + *, .rp-report > * + * { margin-top: 4mm; }
+  .page-summary .card { padding: 3mm 4mm; }
+  .rp-section h2 { font-size: 12pt; margin: 0 0 2mm; }
+  .rp-section h3 { font-size: 9pt; margin: 0 0 1mm; }
+  .rp-note { font-size: 8pt; margin-bottom: 1mm; }
+  .rp-doc-head p, .rp-doc-td, .rp-doc-printed, .rp-doc-status { font-size: 9pt; }
+  .card.rp-kpi { padding: 2.5mm 3.5mm; }
+  .rp-kpi-label { font-size: 9pt; }
+  .rp-kpi-sub { font-size: 8pt; }
+  .rp-growth-share { margin-top: 3mm !important; }
+  .wfc { gap: 2px var(--sp-2); font-size: 9pt; }
+  .wfc-track { height: 16px; }
+  .ssc-bar { height: 20px; }
+  .barline-legend, .ssc-legend { font-size: 8pt; }
+  .rp-mix .hbar-row { font-size: 9pt; }
+  .rp-mix .hbars { gap: 2px; }
+  .rp-people-table th, .rp-people-table td, .rp-approvals-table th, .rp-approvals-table td { padding: 1px 4px; font-size: 8pt; line-height: 1.3; }
+  .rp-sign { margin-top: 4mm; }
+  .rp-sign h2 { font-size: 12pt; margin-bottom: 2mm; }
+  .rp-sign-box { padding: 2.5mm 4mm; gap: 1mm; }
+  .rp-sign-line { font-size: 9pt; }
+  .rp-unit-row > th { padding-left: 14px !important; }
+  .rp-ch-row > th { padding-left: 8px !important; }
+  .rp-legend { font-size: 8pt; margin-top: 1mm; }
+  .rp-watermark { position: fixed; inset: 0; z-index: 50; overflow: visible; }
+  .rp-watermark span { display: none; top: 50% !important; font-size: 60pt; }
+  .rp-watermark span:first-child { display: block; }
+  .card.rp-doc-head { padding: 3mm 4mm; }
+  .rp-doc-title { font-size: 16pt; }
   .rp-break { break-before: page; }
   .rp-unit-row[hidden] { display: table-row !important; }
-  .rp-table, .rp-people-table { min-width: 0; font-size: 9pt; }
   .rp-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; }
   .rp-kpi-value { font-size: 16pt; }
+  .rp-row2 { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 3mm; break-inside: avoid; }
+  .rp-row2 .barline-body { min-height: 170px; }
+  .rp-table, .rp-people-table, .rp-approvals-table, .rp-act-table { min-width: 0; width: 100%; font-size: 8.5pt; }
+  .rp-table { table-layout: fixed; }
+  .rp-table th, .rp-table td { padding: 2px 4px; }
+  .rp-table thead th { font-size: 8pt; white-space: normal; }
   .rp-link { border-bottom: 0; }
   .table-scroll { overflow: visible !important; }
+  .rp-sign-blank { height: 9mm; }
 }

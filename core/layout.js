@@ -8,6 +8,7 @@
  *      ปีแผนไม่อยู่ใน Header (CR-10): อยู่ต่อท้ายชื่อหน้า (components.planYearPicker) เฉพาะหน้าที่ registry ตั้ง year: true
  *   3. Side Menu ซ้าย 4 กลุ่มจาก registry (group) พับเหลือไอคอนได้ (ui.sidebarCollapsed)
  *      หน้าวางแผน SKU พับให้เองเมื่อจอกว้างน้อยกว่า 2200px (รวมจอ 1920px — CR-11) / ไอคอนสถานะ Workflow ข้างหน้าใน Sales Planning
+ *      (ขั้นที่ 4 = จำนวนรายการที่ต้องดำเนินการจาก core/report.js คำนวณหลังหน้าแสดงแล้ว — CR-12)
  *   4. หัวข้อ (+ Tooltip pages.<id>.titleTip) ปีแผน และคำอธิบาย (จาก content.js) — แถวหัวข้อส่งให้ Module ใส่ workflowBar ได้ (ctx.intro)
  *      ชื่อในเมนูของ Sales Planning = ชื่อเต็ม ถ้ายาวเกินบรรทัดเดียวใช้ชื่อย่อ (pages.<id>.short) / ปุ่มก่อนหน้า/ถัดไปใช้ชื่อย่อ
  *      กล่องสิ่งที่ต้องการให้อนุมัติ (เฉพาะหน้าที่มี approve ใน content.js ตอนนี้คือหน้าเกี่ยวกับ Prototype)

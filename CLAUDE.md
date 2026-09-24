@@ -16,6 +16,8 @@ Top-down/Phasing/SKU ใหม่, รายงานสรุปแผน, ห�
 `CR-10_top-down-layout.md` (ชื่อขั้นตอนใหม่, ปีแผนในแถวหัวข้อ, ตัดแผงกราฟหน้าขั้นที่ 1, แท่งเป้าหมายเทียบปีก่อนสเกลจริงเดียวกันทั้งตาราง
 — ข้อ 3.4 และ Test แก้ไข 2026-09-24 แทนฉบับแรก) → `CR-11_sku-planning-ux.md` (สินค้าจริงจาก `data/seed/`, ค่าตั้งต้นยอดปีก่อน × การเติบโต,
 ราคาเฉพาะ Account, หน้าวางแผน SKU: ชื่อ 2 บรรทัด ค้นหา/จัดกลุ่ม/เรียง/ยอดปีก่อน, เครื่องมือช่วยกรอก, คีย์บอร์ดและ Excel)
+→ `CR-12_summary-report.md` (ขั้นที่ 4 แยกแท็บติดตามสถานะ | รายงานสรุปแผน, กราฟรายเดือนแยกชุดชัด + แกนเลขกลม, Waterfall แกนเริ่มเลขกลม,
+ตาราง % ของ Total + สถานะอนุมัติ 2 ไอคอน, รายการที่ต้องดำเนินการเป็นตาราง, รายงานเป็นหลักฐาน: เลขฉบับ ลายน้ำ Snapshot การอนุมัติ ช่องลงนาม)
 — `docs/SPEC.md` (สเปกฉบับย่อสำหรับ CR อ้างหัวข้อ: 6 ข้อมูลหลัก · 7 หน้าวางแผน SKU · 10 Business Rules) / `docs/DECISIONS.md` / `docs/CHANGELOG.md`
 สร้างใน CR-11 (2026-09-24) — รายละเอียดเต็มยังอยู่ในไฟล์นี้ Decision log บนหน้าเว็บอยู่ใน `pages.aboutPrototype.decisions`
 วิธีเปิด/Deploy/เพิ่ม Module อยู่ที่ `README.md`
@@ -71,6 +73,11 @@ Top-down/Phasing/SKU ใหม่, รายงานสรุปแผน, ห�
      `pasteCells`, `fillCells`, `cleanQty` แล้วใส่ลงแผนด้วย `applyWrites` (ช่องระบบเติม → Override / ข้ามช่องที่แก้ไม่ได้) · `resetRows`
      — คีย์บอร์ด การเลือกช่วง คัดลอก/วาง ย้อนกลับ อยู่ใน `components.gridKeys` + `undoStack` ห้ามเขียนใน Module
    - นำเข้าข้อมูลจริง → `core/seed.js` (`SP.core.seed.build(SP.data)`) เท่านั้น
+   - ข้อมูลขั้นที่ 4 (CR-12) → `core/report.js` (`build` ตัวเลขทั้งหมดของรายงานเป็น JSON · `current` ล็อกแล้ว = Snapshot · `actions` · `actionCount`)
+     ใช้ร่วมกันระหว่างหน้ารายงานกับ Side Menu / กฎเรียงรายการ `calc.planActions` / รวมกลุ่มสินค้า `calc.mergeMix` /
+     เลขฉบับ `W.baselineVersion`, `W.addBaselineVersion` / ส่วนการอนุมัติ `W.approvalRows` / `W.lastOf(state, action)`
+   - แกนกราฟ (CR-12) → `calc.niceAxis(start, max)` (4–6 เส้น ขั้นละ 1 / 2 / 2.5 / 5 × 10^n) · `calc.niceScaleMax(values, { headroom })` ·
+     `calc.axisStart(values)` (+ `charts.axisStart`) ค่าคงที่ใน `settings.CHART_*`, `AXIS_START_RULES`
    - ชื่อหน้า / ชื่อขั้นตอน → `content.js` (`pages.<id>.title`, `short` = ชื่อย่อในเมนูและปุ่มก่อนหน้า/ถัดไป, `titleTip` = Tooltip ของชื่อหน้า)
      + ค่าสำรองใน registry ห้ามเขียนชื่อหน้าใน Module / ปีแผนต่อท้ายชื่อหน้า = `components.planYearPicker` (layout ใส่ให้หน้าที่ registry ตั้ง `year: true`)
    - แท่งเป้าหมายเทียบปีก่อน = `calc.niceScaleMax` / `calc.scaleTicks` / `calc.vsLastYear` + `charts.niceScaleMax`, `charts.vsLastYearBar`,
@@ -103,7 +110,7 @@ Top-down/Phasing/SKU ใหม่, รายงานสรุปแผน, ห�
 
 paths → format → data/* (settings, channels, accounts, territories, salespeople, assignments, taxonomy, **seed/seed-charmiss**, products, listings,
 pricing, promotions, npd, targets, history, actuals, plan-seeds, erp-snapshot, content) → calc → **seed** (นำเข้าข้อมูลจริง) → workflow → registry →
-store → components → charts → export → layout → JS ของ Module → `layout.boot()`
+store → components → charts → export → **report** (ข้อมูลขั้นที่ 4) → layout → JS ของ Module → `layout.boot()`
 `boot()` หา entry จาก registry ด้วย Path ของหน้า, สร้าง Header + Side Menu + หัวข้อ แล้วเรียก
 `SP.modules[entry.id].render(bodyEl, ctx)` — `ctx = { entry, page, content, year, intro (แถวหัวข้อ ใส่ workflowBar), refreshMenu() }`
 หลัง render ถ้ามี `page.approve` layout ต่อกล่อง "สิ่งที่ขออนุมัติ" (`page.approveTitle`) ท้ายหน้า (ตอนนี้คือหน้าเกี่ยวกับ Prototype)
@@ -122,8 +129,10 @@ store → components → charts → export → layout → JS ของ Module �
   - `plan.<ปี>.forecast.<unitId>` = โครงเดียวกัน ใช้ในโหมดปรับแผน default = สำเนาของ Baseline ห้ามเขียนทับ Baseline
   - `plan.<ปี>.workflow.<step>.<unitId|all>` = `{ status, history: [{ action, by, at, note }], snapshot, prevSnapshot }`
     step = `topDown` (all) | `phasing` | `sku` | `forecast` | `baseline` (all) ไม่มี Key = ฉบับร่าง
-    `baseline.all.snapshot` = `{ gp: { <unitId>: GP }, priceList, promotions (ยืนยันแล้ว) }` ตอนล็อก → แผนครั้งแรก / Plan Baseline / รายงาน
-    คำนวณด้วย snapshot (`gridOpts.snapshot`) ราคาและ Promotion ที่แก้หลังล็อกมีผลกับ Forecast เท่านั้น
+    `baseline.all.snapshot` = `{ gp: { <unitId>: GP }, priceList, promotions (ยืนยันแล้ว), report }` ตอนล็อก → แผนครั้งแรก / Plan Baseline
+    คำนวณด้วย snapshot (`gridOpts.snapshot`) ราคาและ Promotion ที่แก้หลังล็อกมีผลกับ Forecast เท่านั้น /
+    `report` (CR-12) = ผลของ `core/report.js build()` ตอนล็อก — รายงานที่ล็อกแล้วอ่านตัวเลขทั้งหมดจากที่นี่ (ชื่อ เป้าหมาย แผน ผู้รับผิดชอบ การอนุมัติ)
+  - `plan.<ปี>.baselineVersions` = `[{ no, code, at, by }]` (CR-12) ต่อท้ายทุกครั้งที่ล็อก Baseline → เลขฉบับรายงาน `{ปี}-BL-{nn}` / ไม่ล็อก = `{ปี}-DRAFT`
     Workflow ของแผน NPD ไม่อยู่ที่นี่ (อยู่ใน `master.npdPlans[].workflow`)
     อ่าน/เขียนทั้งปีด้วย `store.workflowStates()` / `store.saveWorkflowStates(map)` (map Key = `'<step>.<unitId|all>'`)
 - Master (ไม่แยกปี) default จากไฟล์ใน `data/`: `master.products`, `master.listings`, `master.taxonomy`, `master.priceList`, `master.promotions`,
@@ -136,8 +145,10 @@ store → components → charts → export → layout → JS ของ Module �
   `ui.role` = `{ type, personId }` (`store.role()` ปุ่มสลับมุมมองใน workflowBar ตั้งค่านี้แล้ว reload) / `ui.sidebarCollapsed` /
   `ui.seriesFilter` = [seriesId หรือ subSeriesId] (SKU, รายการสินค้า, Listing, Promotion ใช้ร่วมกัน เลือก Series = รวม Sub Series) /
   `ui.productMaster.channel` (Listing และ Promotion Price) / `ui.productColumns` (คอลัมน์เพิ่มเติมของรายการสินค้า) / `ui.masterChannel` (หน้า Account) /
-  `ui.skuShowLastYear` (หน้าวางแผน SKU แสดงยอดปีก่อน)
-  Filter Channel ของรายงาน แท็บของหน้าเกี่ยวกับ Prototype และ ค้นหา / จัดกลุ่ม / เรียง / กลุ่มที่พับ / แถวที่เลือก ของหน้าวางแผน SKU เป็นตัวแปรใน Module (ไม่เก็บ)
+  `ui.skuShowLastYear` (หน้าวางแผน SKU แสดงยอดปีก่อน) / `ui.summaryTab` = `'status' | 'report' | null` (CR-12 แท็บล่าสุดของขั้นที่ 4
+  null = ยังไม่ล็อก → ติดตามสถานะ / ล็อกแล้ว → รายงาน / ล็อกเสร็จตั้ง report · ปลดล็อกตั้ง status)
+  Filter Channel ของรายงาน ตัวกรองของแท็บติดตามสถานะ แท็บของหน้าเกี่ยวกับ Prototype และ ค้นหา / จัดกลุ่ม / เรียง / กลุ่มที่พับ / แถวที่เลือก
+  ของหน้าวางแผน SKU เป็นตัวแปรใน Module (ไม่เก็บ)
 - `DATA_VERSION` = 7 (CR-11 สินค้าจริง): ค่าที่บันทึกจากรุ่นก่อนถูกล้างครั้งเดียวตอนโหลด (คงปีแผนและเมนูพับ) / `store.reset()` เขียนรุ่นข้อมูลกลับทันที
   (ไม่อย่างนั้นค่าที่ตั้งหลังรีเซ็ต เช่น มุมมองผู้ใช้ จะถูกล้างอีกครั้งตอนเปิดหน้าถัดไป) / `store.today()` = วันที่ของเดือนปัจจุบันจำลอง
 - store แปลงค่าจากรุ่นก่อนให้เองตอนโหลด: phasing แบบ Array, `ui.phasing.selection` → `ui.selection`, `{ account }` → `{ unit }`,
@@ -257,7 +268,8 @@ store → components → charts → export → layout → JS ของ Module �
 
 ### Workflow (core/workflow.js + components.workflowBar)
 
-- สถานะ: ฉบับร่าง → รออนุมัติ → อนุมัติแล้ว / ส่งกลับแก้ไข (ต้องมีเหตุผล) / ต้องตรวจสอบใหม่ / baseline: ล็อกแล้ว
+- สถานะ: ฉบับร่าง → รออนุมัติ → อนุมัติแล้ว / ส่งกลับแก้ไข (ต้องมีเหตุผล) / ต้องตรวจสอบใหม่ / baseline: ล็อกแล้ว → ปลดล็อก (`unlock` CR-12
+  Sales Director ต้องมีเหตุผล → ฉบับร่าง แผนแก้ไขได้ตามปกติ ล็อกใหม่ = รายงานฉบับถัดไป)
   แก้ไขได้เมื่อ ฉบับร่าง, ส่งกลับแก้ไข, ต้องตรวจสอบใหม่ / อนุมัติแล้ว → ผู้อนุมัติกด เปิดให้แก้ไข → ฉบับร่าง
 - ผู้จัดทำ/ผู้อนุมัติ (`submitterRole`, `approverRole`): Top-down = Sales Director → Management / Phasing, SKU, Forecast ต่อหน่วย =
   ผู้รับผิดชอบปัจจุบันของหน่วย (`ownerOf` ณ เดือนปัจจุบันจำลอง; หน่วยว่าง → Sales Director ส่งแทน) → Sales Director /
@@ -270,7 +282,7 @@ store → components → charts → export → layout → JS ของ Module �
   หมวดสินค้าและ Series = ทีม Product, Account / เขต / ผู้รับผิดชอบ = ทุกบทบาท)
 - `allowedActions(state, role, { step, ownerId, editing, locked })`, `viewState`, `transition(state, action, payload)`,
   `canSubmit(step, unitId, year, { states, remaining, baselineLocked })`, `changedUnits`, `invalidateDownstream`, `applyAction`,
-  `canLock`, `isLocked`, `lastEvent`
+  `canLock`, `isLocked`, `lastEvent`, `lastOf`, `baselineVersion`, `addBaselineVersion`, `approvalRows`
 - ส่งอนุมัติได้เมื่อ: Top-down และ Phasing คงเหลือครบ (±1 บาท) / SKU ไม่ขาดเป้า (เกินเป้าส่งได้) / Phasing รอ Top-down อนุมัติ /
   SKU รอ Phasing ของหน่วยนั้น / Forecast ต้องล็อก Baseline แล้ว (ไม่บังคับคงเหลือ)
 - อนุมัติเก็บ `snapshot` (เป้าต่อหน่วย: Top-down = ทั้งปี, Phasing = 12 เดือน) อนุมัติใหม่แล้วหน่วยที่ต่างเกิน 1 บาท → ขั้นล่างที่อนุมัติแล้ว
@@ -326,9 +338,10 @@ store → components → charts → export → layout → JS ของ Module �
 
 ### กราฟ (core/charts.js — SVG/CSS เขียนเอง)
 
-- `waterfall({ start: { label, value }, steps: [{ id, label, value (ส่วนต่าง), tag }], end, format, signed, axisNote, onHover })` ที่มาของการเติบโต
-  แนวนอน (เพิ่ม = `--wfc-up` เขียว, ลด = `--wfc-down` แดง, ยอดรวม `--wfc-total`) แกนไม่เริ่มที่ 0 จึงบอกจุดเริ่มแกนใต้กราฟ → `.update(o)`, `.highlight(id)`
-  (หน้า Top-down และรายงาน) / Channel ไม่มียอดปีก่อน = แท่งเพิ่มทั้งหมด + ป้าย "ใหม่" / คงเหลือระดับ Total ≠ 0 = แท่ง "ยังไม่จัดสรร" / "จัดสรรเกิน"
+- `waterfall({ start: { label, value }, steps: [{ id, label, value (ส่วนต่าง), tag }], end, format, signed, tick, axisNote, onHover })` ที่มาของการเติบโต
+  แนวนอน (เพิ่ม = `--wfc-up` เขียว, ลด = `--wfc-down` แดง, ยอดรวม `--wfc-total`) → `.info = { start, end, step, ticks }`, `.update(o)`, `.highlight(id)` (รายงาน)
+  แกน (CR-12) เริ่มที่เลขกลม `calc.axisStart` (ค่าต่ำสุด ≥ 200 ล้าน ขั้นละ 100 ล้าน · ≥ 50 ล้าน ขั้นละ 50 ล้าน · ต่ำกว่านั้น 0) ปลายแกน `niceAxis` /
+  แท่งยอดปีก่อนและ Total เริ่มจุดเดียวกัน (แถวใช้ subgrid คอลัมน์ร่วมกัน) / เส้นแบ่งแกน + ตัวเลขใต้แกน / แกนไม่เริ่มที่ 0 = สัญลักษณ์ตัดแกน + `แกนเริ่มที่ 100 ล้านบาท` / Channel ไม่มียอดปีก่อน = แท่งเพิ่มทั้งหมด + ป้าย "ใหม่" / คงเหลือระดับ Total ≠ 0 = แท่ง "ยังไม่จัดสรร" / "จัดสรรเกิน"
 - `stackedShare({ rows: [{ label, parts: [{ id, value (0–1), colorToken, title }] }], legend, minLabel (0.06), onHover })` แท่ง 100% 2 ปี
   → `.update(rows, legend)`, `.highlight(id)`
 - แท่งเป้าหมายเทียบปีก่อน (CR-10 ข้อ 3.4 ฉบับแก้ไข) = **สเกลจริงเดียวกันทั้งตาราง เริ่มที่ 0** (ห้ามสเกลต่อแถว หรือแยกสเกล Channel / หน่วยขาย):
@@ -339,7 +352,11 @@ store → components → charts → export → layout → JS ของ Module �
     เส้นแกนจางที่ 1/3 และ 2/3 ทุกแถว / สีตาม Channel / Tooltip `เป้าหมาย {x} บาท · ยอดขายปี {ปีก่อน} {y} บาท · {±z}%` / `.info` = ผลจาก calc
   - `vsLastYearAxis(scaleMax)` แกนใต้ชื่อคอลัมน์ `0 · 20 · 40 · 60 ล้าน` (แบ่ง 3 ช่วง ตำแหน่งตรงกับเส้นแกน) / ใช้ทั้งหน้าจัดสรรเป้าหมายประจำปีและรายงาน
   — แทน `miniBar` เดิม (ลบแล้ว) / ข้อความจาก `labels.vsLastYear`
-- `barLine({ bars, line, dashed, months, labels, format, height })` แท่ง 12 เดือน + เส้นทึบ + เส้นประ (รายงาน)
+- `barLine({ bars, line, dashed, months, labels: { bar, line, dashed, lineEnd, dashedEnd }, tick, endText, tip })` (CR-12) แท่งเป้าหมาย
+  `--chart-target` (สีหลักอ่อน ~40%) · แผน = เส้นทึบ 3px + จุดทุกเดือน `--chart-plan` · ยอดปีก่อน = เส้นประ 1.5px ไม่มีจุด `--chart-lastyear` /
+  แกน Y เริ่ม 0 ค่าสูงสุด = `niceScaleMax(ทุกชุด, { headroom: CHART_HEADROOM })` เส้นแบ่ง 4–6 เส้น (`calc.niceAxis`) / ป้ายท้ายเส้นเดือน ธ.ค.
+  (`แผน 12.70` · `ปี 2026 11.90` ชนกันแยกขึ้น/ลง) / Legend ใช้สัญลักษณ์เดียวกับที่วาด / Hover เดือน = Tooltip เป้าหมาย · แผน · ส่วนต่าง · ยอดปีก่อน /
+  วาดด้วย HTML + SVG เฉพาะเส้น (`vector-effect: non-scaling-stroke`) จึงยืดตามความสูงการ์ดได้ → `.info = { top, step, ticks }`
 - `hbars({ items: [{ label, value, text, colorToken, title }] })` แท่งแนวนอน (รายงาน: สัดส่วนตามกลุ่มสินค้า)
 - `splitBar(calc.moneySplit(...), labels, opts)` แถบ Net Sales / GP / VAT (ⓘ วิธีคำนวณ) / ไม่มี donut และ barList แล้ว (ลบพร้อมหน้าที่ซ่อน)
 
@@ -421,21 +438,33 @@ store → components → charts → export → layout → JS ของ Module �
 - จอกว้างน้อยกว่า 2200px Side Menu พับเอง (CR-11 เดิม 1920px) / 12 เดือน + รวม ไม่เลื่อนแนวนอน (ยอดปีก่อนที่จอ < 1600px เลื่อนแนวนอนภายในกล่องได้)
   / ≥ 1024px หน้าไม่ยืด ตารางเลื่อนเอง / จอเตี้ยกว่า 700px แถว SKU 40px
 
-### หน้ารายงานสรุปแผน (v5 ข้อ 5, `modules/summary`)
+### ขั้นที่ 4: ติดตามสถานะ | รายงานสรุปแผน (v5 ข้อ 5 + CR-12, `modules/summary`)
 
-- แถบบน: Filter Channel (multiSelect) · `พิมพ์ / บันทึก PDF` · ล็อก Baseline (Director + `W.canLock`, กล่องยืนยัน → เวลาที่ล็อก
-  snapshot = GP ต่อหน่วย + priceList + Promotion ที่ยืนยันแล้ว) / หลังล็อก แผนในรายงานคำนวณด้วย snapshot
-- 1 KPI 4 ใบ (บาทเต็ม): Total Target + การเติบโต / แผน Bottom-up รวม + % ของเป้าหมาย / ส่วนต่าง (สีสถานะ) / ความคืบหน้าอนุมัติแผน SKU x / y
-  2 `charts.barLine` เป้าหมาย (Phasing) · แผน · ยอดขายปีก่อน 12 เดือน + (ขวา) `charts.waterfall` และ `charts.stackedShare` ชุดเดียวกับหน้า Top-down
-  (ตาม Filter Channel) / 3 ตาราง Total → Channel (พับได้) → หน่วยขาย: ยอดขายปี {ปีก่อน} ⓘ ·
-  เป้าหมาย · เป้าหมายเทียบปีก่อน (`vsLastYearBar` สเกลจริงเดียวกันทั้งตาราง ตาม Filter · แถว Total ไม่มีแท่ง) · แผน · ส่วนต่าง (สี + ข้อความ) ·
-  Top-down (ช่องเดียว rowspan) · Phasing · SKU · ผู้รับผิดชอบ — กดชื่อ → หน้าวางแผน SKU,
-  กดสถานะ → หน้านั้น (ตั้ง `ui.selection`) / 4 `calc.planMix` ตาม Status (Planned / New / Active / Clearance / Discontinued) และตาม Series
-  หรือ Category (Segmented, Top 8 + อื่นๆ) `charts.hbars` /
-  5 เป้าหมายรายผู้รับผิดชอบ (`performanceByPerson` เป้าหมายและแผน เฉพาะเดือนที่รับผิดชอบ + แถวไม่มีผู้รับผิดชอบ, ป้ายลาออก) /
-  6 รายการที่ต้องดำเนินการ จัดกลุ่มตาม Account/เขต (ขาด/เกิน, ยังไม่ส่ง, ส่งกลับแก้ไข, ต้องตรวจสอบใหม่, ไม่มีผู้รับผิดชอบ) แต่ละเรื่องเป็นลิงก์
-- ตัวเลขข้อ 2–6 เป็นล้านบาท 2 ตำแหน่ง / Print: A4 แนวนอน (`styles/print.css` `@page`) ซ่อนเมนูและปุ่ม ขึ้นหน้าใหม่ก่อนข้อ 3 และ 5
-  (`.rp-break`) หัวกระดาษ `.rp-print-head.print-only` `รายงานสรุปแผน {ปี} · พิมพ์เมื่อ {วันเวลา}` (อัปเดตตอน beforeprint)
+- เมนูยังเป็นหน้าเดียว (4 ขั้น) มีแท็บใต้หัวข้อ (`C.segmented`) จำที่ `ui.summaryTab` / ค่าเริ่มต้น: ยังไม่ล็อก = ติดตามสถานะ · ล็อกแล้ว = รายงาน /
+  แท็บติดตามสถานะมีตัวเลขจำนวนรายการ / Side Menu ขั้นที่ 4 แสดงจำนวนรายการที่ต้องดำเนินการ (`.side-count` จาก `report.actionCount()`
+  คำนวณหลังหน้าแสดงแล้ว ไม่มีรายการ + ล็อกแล้ว = ไอคอนล็อก) — ข้อมูลตั้งต้น = `9`
+- **ติดตามสถานะ** (พิมพ์ไม่ได้: ตอนพิมพ์เหลือข้อความ `statusNoPrint`): การ์ดสถานะทั้งปี (จัดสรรเป้าหมายประจำปียังไม่ได้รับอนุมัติ ({สถานะ}) /
+  อนุมัติแล้ว · ยังไม่ล็อก Baseline · แผน SKU อนุมัติแล้ว x/y / ล็อกแล้ว · รายงานที่เคยล็อก) + ปุ่ม `ล็อก Baseline {ปี}` (Director + `W.canLock`
+  กล่องยืนยันบอกเลขฉบับที่จะได้) / ล็อกแล้ว = `ปลดล็อก Baseline` (Director ต้องมีเหตุผล) /
+  ตาราง 1 แถวต่อหน่วยขายที่มีประเด็น (`calc.planActions`): Channel (แถบสี) · หน่วยขาย (ลิงก์หน้าวางแผน SKU) · ผู้รับผิดชอบ (`ยังไม่มีผู้รับผิดชอบ` สีแดง) ·
+  ส่วนต่าง (ล้านบาท) · เป้าหมายรายเดือน · แผน SKU (ข้อความสั้น `ยังไม่ส่ง` / `รออนุมัติ` …) · การดำเนินการถัดไป (ลิงก์ไปหน้าที่ต้องทำ ≤ 4 คำ) /
+  เรียง: ไม่มีผู้รับผิดชอบ → ส่งกลับแก้ไข / ต้องตรวจสอบใหม่ → ส่วนต่างมากไปน้อย → ยังไม่ส่ง → รออนุมัติ / ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง /
+  ไม่มีประเด็น = `ไม่มีรายการที่ต้องดำเนินการ` / ล็อกแล้วเหลือเฉพาะเรื่องผู้รับผิดชอบ (แผนครั้งแรกแก้ไม่ได้แล้ว)
+- **รายงานสรุปแผน** (พิมพ์ได้เฉพาะแท็บนี้ ปุ่ม `พิมพ์ / บันทึก PDF` อยู่ในแท็บนี้): หัวรายงาน `รายงานสรุปแผน {ปี}` + `ฉบับที่ {ปี}-BL-{nn}` /
+  `{ปี}-DRAFT` · `สถานะ: อนุมัติแล้ว · ล็อก Baseline {เวลา} โดย …` หรือ `สถานะ: ฉบับร่าง · ยังไม่ได้รับอนุมัติ` · `จัดสรรเป้าหมายประจำปี: …` ·
+  `พิมพ์เมื่อ` (print-only อัปเดตตอน beforeprint) · หมายเหตุ `ตัวเลขในรายงานนี้มาจาก Baseline ที่ล็อกไว้` / ฉบับร่าง = ลายน้ำเฉียง
+  `ฉบับร่าง · ยังไม่ได้รับอนุมัติ` (`--watermark-fg` บนจอซ้ำตามความยาว ตอนพิมพ์ `position: fixed` ทุกหน้า) /
+  ล็อกแล้ว = ตัวเลข ชื่อ ผู้รับผิดชอบ และการอนุมัติทั้งหมดจาก `snapshot.report` (`report.current`) ไม่อ่านข้อมูลที่ยังแก้ได้
+- เนื้อหา: Filter Channel · KPI 4 ใบ (บาทเต็ม) · `charts.barLine` : `charts.waterfall` + `stackedShare` = **60 : 40 สูงเท่ากัน** (จอ < 1280px เรียงลง) ·
+  ตาราง Total → Channel (พับได้) → หน่วยขาย: `Channel / หน่วยขาย · ยอดขายปี {ปีก่อน} ⓘ · เป้าหมาย · % ของ Total · เป้าหมายเทียบปีก่อน
+  (vsLastYearBar) · แผน Bottom-up · ส่วนต่าง · สถานะอนุมัติ · ผู้รับผิดชอบ` (ไม่มีคอลัมน์ Top-down — ย้ายไปหัวรายงาน) / สถานะอนุมัติ = 2 ไอคอน
+  Phasing · แผน SKU (`○` ฉบับร่าง · `◐` รออนุมัติ · `●` อนุมัติแล้ว · `↩` ส่งกลับแก้ไข · `!` ต้องตรวจสอบใหม่ จาก `pages.summary.approvalIcons`
+  เฉพาะรายงาน) + Tooltip + คำอธิบายบรรทัดเดียวใต้ตาราง / แถว Channel และ Total = `อนุมัติแล้ว x/y` (Phasing และ SKU อนุมัติครบ) / ผู้รับผิดชอบบรรทัดเดียว ·
+  สัดส่วนแผนตาม Status และ Series / Category (`calc.mergeMix` Top 8) · เป้าหมายรายผู้รับผิดชอบ · **การอนุมัติ** (ขั้นตอน · หน่วยขาย · ผู้ส่ง · วันที่ส่ง ·
+  ผู้อนุมัติ · วันที่อนุมัติ จาก `W.approvalRows` ยังไม่อนุมัติ = แสดงสถานะ) · ช่องลงนาม Sales Director / Management (ชื่อ · ลายมือชื่อ · วันที่) เมื่อล็อกแล้ว
+- ตัวเลขกราฟ ตาราง กลุ่มสินค้า รายผู้รับผิดชอบเป็นล้านบาท 2 ตำแหน่ง / พิมพ์ A4 แนวนอน 4 หน้า (ข้อมูลตั้งต้น): 1 หัวรายงาน · KPI · กราฟ /
+  2 ตาราง / 3 กลุ่มสินค้า · รายผู้รับผิดชอบ / 4 การอนุมัติ · ช่องลงนาม (`.rp-break`) / ซ่อนหัวข้อของ layout ปุ่ม และ ⓘ (`.info-dot` ทุกหน้า) /
+  `thead { display: table-header-group }` · `tr { break-inside: avoid }` (print.css) / ตาราง `table-layout: fixed` หัวคอลัมน์ตัดบรรทัดในช่อง ไม่ซ้อน
 - หน้านี้เลื่อนแนวตั้งได้ (หน้าเดียวที่ไม่ต้องพอดีจอ)
 
 ### หน้าเกี่ยวกับ Prototype (`modules/about-prototype`, id `aboutPrototype`, กลุ่ม project-info)
@@ -588,6 +617,17 @@ CR-11: ห้ามเก็บสินค้าตัวอย่างเด�
   ปิดส่วนต่างทั้งปีปรับทีละเดือนให้คงเหลือของแต่ละเดือนเป็น 0 / ยอดปีก่อนในมุมมองเงินใช้ราคาและ GP ปีก่อน (Price List ณ ปีก่อน) / ▲▼ แสดงเฉพาะโหมดแก้ไข /
   เรียงตามการเติบโต = ทั้งปีเทียบยอดปีก่อนของ SKU / Tab ที่ช่องสุดท้ายขึ้นแถวถัดไป / ช่อง `ทั้งปี` ไม่รับการวางหรือเติมจาก Excel (กรอกทีละแถว) /
   คอลัมน์ `ปีก่อน` ของแถวรวมแผน = ยอดปีก่อนของ SKU ในแผน (ไม่ใช่ยอดขายปีก่อนของหน่วย ซึ่งอยู่ในแถบบริบท)
+- CR-12 Workflow: CR ต้องการ "เปิดให้แก้ไขแล้วล็อกใหม่ → BL-02" แต่เดิมล็อกแล้วปลดไม่ได้ → เพิ่ม `ปลดล็อก Baseline` (Sales Director ต้องมีเหตุผล
+  อยู่ในแท็บติดตามสถานะ) / ล็อกเสร็จพาไปแท็บรายงาน ปลดล็อกพาไปแท็บติดตามสถานะ / แท็บที่จำไว้มีผลก่อนค่าเริ่มต้นตามสถานะ
+- CR-12 ติดตามสถานะ: หน่วยที่แผนเกินเป้าก็แสดง (ส่วนต่างเป็นประเด็น การดำเนินการ `ตรวจสอบแผนที่เกิน`) · รออนุมัติอยู่ท้ายสุด (`รออนุมัติจาก Director`) ·
+  ล็อกแล้วเหลือเฉพาะเรื่องผู้รับผิดชอบ · ตัวเลขในเมนูนับเฉพาะหน่วยขาย (บรรทัดสถานะทั้งปีไม่นับ) · เพิ่มบรรทัด `รายงานที่เคยล็อก`
+- CR-12 รายงาน: ไอคอน `○ ◐ ● ↩ !` ใช้เฉพาะคอลัมน์สถานะอนุมัติของรายงาน (ไอคอน Workflow ที่อื่นคงเดิม `◔ ✓`) / `% ของ Total` เทียบ Total Target
+  ทั้งปีเสมอ (เลือก Filter Channel แล้วแถว Total แสดงสัดส่วนของ Channel ที่เลือก) / ส่วนการอนุมัติแสดงทุกฉบับ (ยังไม่อนุมัติแสดงสถานะแทนผู้อนุมัติ)
+  ช่องลงนามแสดงเมื่อล็อกแล้วเท่านั้น / ฉบับร่างมีหมายเหตุ `ฉบับร่าง: ตัวเลขเป็นข้อมูลล่าสุดที่ยังแก้ไขได้` / Snapshot ของรายงานเก็บชื่อหน่วยขาย ผู้รับผิดชอบ
+  ผู้รับผิดชอบรายเดือน และประวัติการอนุมัติ ณ เวลาที่ล็อก / Baseline ที่ล็อกก่อน CR-12 (ไม่มี `snapshot.report`) คำนวณจากข้อมูลปัจจุบันด้วยราคาตอนล็อก
+  และนับเป็นฉบับที่ 1
+- CR-12 กราฟ: "เส้นแบ่งแกน 4–6 เส้น" นับไม่รวมเส้น 0 / ข้อมูลตั้งต้นค่าสูงสุดของกราฟรายเดือน 11.99 ล้าน × 1.10 = 13.19 → แกน 0–15 ล้าน ขั้นละ 2.5 (ขั้น 2 ล้านได้ 7 เส้น เกินกฎ)
+  (ส่วนที่เกิน headroom จากการปัดเป็นเลขกลม 12% ของแกน) / ป้ายแกนทศนิยมตามขั้น (2.5 → 1 ตำแหน่ง) / Waterfall ใช้เฉพาะในรายงาน (หน้าขั้นที่ 1 ไม่มีกราฟตั้งแต่ CR-10)
 
 ### คำถามที่ค้าง (อยู่ใน `content.js` → pages.aboutPrototype.openQuestions)
 
@@ -604,7 +644,8 @@ CR-11: ห้ามเก็บสินค้าตัวอย่างเด�
 
 - เปิด `tests/calc.test.html` ต้องขึ้น "ผ่านทั้งหมด" ทุกครั้งที่แก้ `calc.js` หรือ `workflow.js` และเพิ่ม Test เมื่อเพิ่มสูตร
   (Test Workflow wf-1..6, ผู้รับผิดชอบ as-1..6, คำอธิบายการคำนวณ cx-1..3, Series, v5-1..5 + ข้อมูลตั้งต้น + ลบ Master, v6-1..12 + 6b,
-  v7-1..7, cr10-1..6, cr11-1..9 + เครื่องมือช่วยกรอก 3) ตอนนี้ 120 Test — cr10 ใช้ `SP.core.charts` (สร้าง DOM) จึงต้องรันในเบราว์เซอร์ (`tests/calc.test.html`)
+  v7-1..7, cr10-1..6, cr11-1..9 + เครื่องมือช่วยกรอก 3, cr12-1..9) ตอนนี้ 129 Test — cr10 / cr12 ใช้ `SP.core.charts` (สร้าง DOM) จึงต้องรันในเบราว์เซอร์
+  (`tests/calc.test.html`)
   / Test อ้างสินค้าจริง (12130, 33390, 33400, 12040, 25011, NPD_2027Q2_01..03) กฎที่ข้อมูลจริงไม่มี (Clearance, Sub Series) ใช้สินค้าสมมติในแต่ละ Test
 - หลังแก้ ให้เปิด `index.html` ผ่าน `file://` ใน Chrome แล้วตรวจ: ไม่มี "โหลดไฟล์ไม่ได้", Side Menu 4 กลุ่ม, ค่าที่แก้ส่งต่อข้ามหน้า,
   ไม่มี Scroll แนวนอนที่ 375px (ตารางกว้างให้อยู่ใน `.table-scroll`), ไม่มีคำต้องห้ามตามตารางคำศัพท์ในข้อความทุกหน้า
@@ -613,7 +654,10 @@ CR-11: ห้ามเก็บสินค้าตัวอย่างเด�
   "ต้องตรวจสอบใหม่"
 - ทดสอบเพิ่ม Channel Export แล้วเห็นใน Tree, Waterfall, แท่งสัดส่วน, Filter ของ Phasing / SKU / Listing / Promotion Price
 - ทดสอบลาออก + โอนเขตที่หน้าผู้รับผิดชอบ แล้วหน้า Phasing แสดงแถบผู้รับผิดชอบ 2 คน ตัวเลขเป้าไม่เปลี่ยน
-- รายงาน: พิมพ์ด้วย `Page.printToPDF({ preferCSSPageSize: true })` ได้ A4 แนวนอน (842×595 pt)
+- รายงาน: พิมพ์ด้วย `Page.printToPDF({ preferCSSPageSize: true })` ได้ A4 แนวนอน (842×595 pt) 4 หน้า / ดูหน้า PDF ได้ด้วยการเปิดไฟล์ PDF
+  ใน headless Chrome (PDF viewer ทำงาน) แล้วจับภาพ / จำลองการพิมพ์ `Emulation.setEmulatedMedia({ media: 'print' })` ที่กว้าง 1032px (พื้นที่พิมพ์ A4)
+- CR-12: ขั้นที่ 4 ค่าเริ่มต้นแท็บติดตามสถานะ (9 รายการ TT เขต 3 แถวแรก) · ตัวกรอง · พิมพ์แท็บติดตามสถานะได้แค่ข้อความ · รายงานฉบับร่างมีลายน้ำ ·
+  ล็อก → 2027-BL-01 + ช่องลงนาม · แก้ราคา/ชื่อหลังล็อกแล้วตัวเลขในรายงานไม่เปลี่ยน · ปลดล็อก (ต้องมีเหตุผล) → DRAFT → ล็อกใหม่ → 2027-BL-02
 - ใน headless ต้องตอบ dialog ผ่าน `Page.javascriptDialogOpening` → `Page.handleJavaScriptDialog` (confirm และ beforeunload)
   ปุ่มในกล่องยืนยัน (`<dialog>`) กด `.dlg-confirm` / beforeunload แสดงเฉพาะเมื่อมี user activation จริง (ใช้ Input.dispatchMouseEvent)
 - Browser pane ของ Claude desktop แสดง `file://` เป็นภาพนิ่ง ให้ทดสอบด้วย Chrome headless ผ่าน DevTools Protocol

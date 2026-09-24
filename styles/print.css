@@ -31,6 +31,10 @@ body.fit-screen { height: auto !important; }
 .card { box-shadow: none; }
 
 .table-scroll { overflow: visible !important; }
+/* ตาราง: หัวตารางแสดงซ้ำทุกหน้า ไม่ตัดแถวกลางหน้า / ไม่พิมพ์ ⓘ (CR-12) */
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+.info-dot { display: none !important; }
 .bar-chart { min-width: 0; }
 
 input.num, .select {
