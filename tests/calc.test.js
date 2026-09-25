@@ -1218,6 +1218,45 @@
         var node = TREE.children[0].children.filter(function (u) { return u.id === 'seven'; })[0];
         return [F.pct(pct, 2), Math.abs(pct - node.pctOfTotal) < 1e-12];
       }
+    },
+    // ---------------- CR-13: การอนุมัติในแท็บติดตามสถานะ + มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน (docs/change-requests/CR-13_approval-tab-phasing-total.md ข้อ 4) ----------------
+    {
+      name: 'cr13-4. aggregatePhasing([7-Eleven, Watsons, EVEANDBOY]): ม.ค. = ผลรวมเป้าหมาย ม.ค. ของ 3 หน่วย · ทั้งปี = 54,000,000 · สัดส่วนรายเดือนรวม 100%',
+      expected: [true, 54000000, 54000000, 1, 3, []],
+      actual: function () {
+        var ids = ['seven', 'watsons', 'eveandboy'];
+        var a = calc.aggregatePhasing(D, TREE, {}, ids, YEAR);
+        var jan = calc.sum(ids.map(function (id) { return calc.phasingTotals(target(id), calc.defaultPhasing(D, YEAR, id)).amounts[0]; }));
+        return [Math.abs(a.amounts[0] - jan) < 1e-6, Math.round(a.total), Math.round(a.target), round2(calc.sum(a.monthPct)), a.units.length, a.incomplete];
+      }
+    },
+    {
+      name: 'cr13-4b. aggregatePhasing: ยอดขายปีก่อนรวม = ผลรวมของหน่วย · หน่วยที่แก้เป็นไม่ครบ 100% อยู่ใน incomplete · ทุก Channel = 120,000,000',
+      expected: [true, ['watsons'], 120000000],
+      actual: function () {
+        var ids = ['seven', 'watsons', 'eveandboy'];
+        var pct = calc.defaultPhasing(D, YEAR, 'watsons').slice();
+        pct[0] += 0.01;
+        var a = calc.aggregatePhasing(D, TREE, { watsons: { monthPct: pct } }, ids, YEAR);
+        var prior = calc.sum(ids.map(function (id) { return calc.sum(calc.priorMonthly(D.history, YEAR, id)); }));
+        var allIds = calc.planUnits(TREE).map(function (u) { return u.id; });
+        return [Math.abs(a.priorTotal - prior) < 1e-6, a.incomplete, Math.round(calc.aggregatePhasing(D, TREE, {}, allIds, YEAR).total)];
+      }
+    },
+    {
+      name: 'cr13-2. ตารางติดตามสถานะ (planActions all): 9 แถว 1 ต่อหน่วยขาย · หน่วยที่ไม่มีประเด็นอยู่ท้าย (issue false, next null) · จำนวนที่มีประเด็นเท่าเดิม',
+      expected: [3, ['c', 'b', 'a'], [true, true, false], [null], 2, 9],
+      actual: function () {
+        var units = [
+          { id: 'a', target: 1000, plan: 1000, phasing: 'approved', sku: 'approved', vacant: false },
+          { id: 'b', target: 1000, plan: 500, phasing: 'approved', sku: 'draft', vacant: false },
+          { id: 'c', target: 1000, plan: 1000, phasing: 'approved', sku: 'approved', vacant: true }
+        ];
+        var all = calc.planActions(units, { topDown: 'approved', locked: false, all: true });
+        var real = calc.planUnits(TREE).map(function (u) { return { id: u.id, target: u.amount, plan: u.amount, phasing: 'draft', sku: 'draft', vacant: false }; });
+        return [all.length, all.map(function (r) { return r.id; }), all.map(function (r) { return r.issue; }), all.filter(function (r) { return !r.issue; }).map(function (r) { return r.next; }),
+          calc.planActions(units, { topDown: 'approved', locked: false }).length, calc.planActions(real, { topDown: 'draft', all: true }).length];
+      }
     }
   ];
 

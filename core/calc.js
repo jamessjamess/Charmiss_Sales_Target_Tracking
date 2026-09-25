@@ -2027,9 +2027,10 @@
   // รายการที่ต้องดำเนินการ 1 แถวต่อหน่วยขายที่มีประเด็น เรียงตามความรุนแรง:
   //   0 ยังไม่มีผู้รับผิดชอบ → 1 ส่งกลับแก้ไข / ต้องตรวจสอบใหม่ → 2 มีส่วนต่าง (มากไปน้อย) → 3 ยังไม่ส่ง → 4 รออนุมัติ
   //   (ลำดับเดียวกันเรียงตามส่วนต่างมากไปน้อย แล้วตามลำดับเดิม) หน่วยที่จัดสรรครบ มีผู้รับผิดชอบ และอนุมัติครบ ไม่แสดง
-  // units = [{ id, target, plan, phasing, sku (สถานะ Workflow), vacant }] / ctx = { topDown (สถานะ Top-down), locked }
+  // units = [{ id, target, plan, phasing, sku (สถานะ Workflow), vacant }] / ctx = { topDown (สถานะ Top-down), locked, all }
   //   ล็อก Baseline แล้ว = แผนครั้งแรกแก้ไม่ได้ → เหลือเฉพาะเรื่องผู้รับผิดชอบ
-  // → [{ id, unit, rem, rank, gap (|ส่วนต่าง|), next, entry }]
+  //   ctx.all (CR-13 ตารางติดตามสถานะ) = แสดงทุกหน่วยขาย หน่วยที่ไม่มีประเด็นอยู่ท้ายตาราง (rank 5 · issue false · next null)
+  // → [{ id, unit, rem, rank, issue, gap (|ส่วนต่าง|), next, entry }]
   //   next = การดำเนินการถัดไป (Key ของข้อความ) / entry = id ของหน้าที่ต้องไป
   function planActions(units, ctx) {
     ctx = ctx || {};
@@ -2045,7 +2046,10 @@
         : gapIssue ? 2
         : st.indexOf('draft') >= 0 ? 3
         : st.indexOf('submitted') >= 0 ? 4 : -1;
-      if (rank < 0) return;
+      if (rank < 0) {
+        if (ctx.all) rows.push({ id: u.id, unit: u, rem: rem, rank: 5, issue: false, gap: Math.abs(rem.amount), next: null, entry: null, order: i });
+        return;
+      }
       var next, entry;
       if (u.vacant) { next = 'assignOwner'; entry = 'salespeople'; }
       else if (u.phasing === 'returned') { next = 'fixPhasing'; entry = 'phasing'; }
@@ -2058,9 +2062,53 @@
       else if (u.sku === 'draft') { next = 'submitSku'; entry = 'skuPlanning'; }
       else if (u.sku === 'submitted') { next = 'waitDirector'; entry = 'skuPlanning'; }
       else { next = 'checkOver'; entry = 'skuPlanning'; }
-      rows.push({ id: u.id, unit: u, rem: rem, rank: rank, gap: Math.abs(rem.amount), next: next, entry: entry, order: i });
+      rows.push({ id: u.id, unit: u, rem: rem, rank: rank, issue: true, gap: Math.abs(rem.amount), next: next, entry: entry, order: i });
     });
-    return rows.sort(function (a, b) { return a.rank - b.rank || b.gap - a.gap || a.order - b.order; });
+    return rows.sort(function (a, b) { return a.rank - b.rank || (a.issue ? b.gap - a.gap : 0) || a.order - b.order; });
+  }
+
+  // =====================================================================
+  // 22) CR-13: มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน (อ่านอย่างเดียว ไม่เก็บผลรวมลง store)
+  // =====================================================================
+
+  // รวมเป้าหมายรายเดือนและยอดขายปีก่อนของหลายหน่วยขาย
+  //   tree = calc.topDown(...) (เป้าหมายทั้งปีของหน่วย) / phasing = { <unitId>: { monthPct } } (ไม่มี = ค่าตั้งต้น defaultPhasing)
+  //   unitIds = หน่วยขายที่รวม (ตามลำดับที่ส่ง) / year = ปีแผน (ยอดปีก่อน = year − 1)
+  // → { units: [{ id, name, channelId, color, target, amounts[12], prior[12] | null, priorTotal, remaining }],
+  //     amounts[12], prior[12], total, priorTotal, monthPct[12] (สัดส่วนของผลรวม), growth[12], growthTotal, incomplete: [unitId] }
+  //   incomplete = หน่วยที่ผลรวม 12 เดือนยังไม่เท่าเป้าหมายทั้งปี (คงเหลือ ≠ จัดสรรครบ) — คงเหลือคิดต่อหน่วยขายเท่านั้น
+  function aggregatePhasing(data, tree, phasing, unitIds, year) {
+    var all = planUnits(tree);
+    var units = (unitIds || []).map(function (id) {
+      var u = findById(all, id);
+      if (!u) return null;
+      var p = phasing && phasing[id] && phasing[id].monthPct ? phasing[id].monthPct : defaultPhasing(data, year, id);
+      var t = phasingTotals(u.amount, p);
+      var prior = priorMonthly(data.history, year, id);
+      return {
+        id: id, name: u.name, channelId: u.channel.id, color: u.channel.color, target: u.amount, amounts: t.amounts,
+        prior: prior, priorTotal: prior ? sum(prior) : null, remaining: t.remaining
+      };
+    }).filter(Boolean);
+    var amounts = zeros(12), prior = zeros(12), hasPrior = false;
+    units.forEach(function (u) {
+      u.amounts.forEach(function (v, m) { amounts[m] += v; });
+      if (u.prior) { hasPrior = true; u.prior.forEach(function (v, m) { prior[m] += v || 0; }); }
+    });
+    var total = sum(amounts);
+    var priorTotal = hasPrior ? sum(prior) : null;
+    return {
+      units: units,
+      amounts: amounts,
+      prior: hasPrior ? prior : null,
+      total: total,
+      target: sum(units.map(function (u) { return u.target; })),
+      priorTotal: priorTotal,
+      monthPct: amounts.map(function (v) { return total ? v / total : 0; }),
+      growth: amounts.map(function (v, m) { return hasPrior ? growth(v, prior[m]) : null; }),
+      growthTotal: hasPrior ? growth(total, priorTotal) : null,
+      incomplete: units.filter(function (u) { return u.remaining.status !== 'ok'; }).map(function (u) { return u.id; })
+    };
   }
 
   SP.core.calc = {
@@ -2247,6 +2295,8 @@
     actualNetByUnit: actualNetByUnit,
     // รายงานสรุปแผน (CR-12)
     mergeMix: mergeMix,
-    planActions: planActions
+    planActions: planActions,
+    // มุมมองรวมของ Phasing (CR-13)
+    aggregatePhasing: aggregatePhasing
   };
 })(window.SP);

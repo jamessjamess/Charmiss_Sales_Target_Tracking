@@ -97,6 +97,44 @@
   .page-phasing { --fs-table: 12px; --ph-cols: 132px repeat(12, minmax(0, 1fr)) 100px; --ph-in-fs: 11px; --ph-in-pad: 1px 2px; }
   .ph-table .num-input.ph-cell { padding: 0 1px; }
 }
+/* ---------- มุมมองรวม (CR-13): อ่านอย่างเดียว ---------- */
+/* ตัวเลือกรวมใน Dropdown หน่วยขาย (subChannelPicker allowAggregate) คั่นจากรายการหน่วยขายด้วยเส้น */
+.sc-picker.has-aggregate .ss-list > .ss-option:first-child:not(:only-child) { border-bottom: 1px solid var(--c-border-strong); margin-bottom: 2px; font-weight: var(--fw-bold); }
+.ph-agg-bar { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.ph-agg-note { font-size: var(--fs-xs); white-space: nowrap; }
+.ph-agg .ph-chart-head { justify-content: space-between; }
+.ph-agg-title { font-weight: var(--fw-bold); font-size: var(--fs-sm); }
+.ph-agg-toggle { grid-column: 1 / -1; background: var(--c-surface); }
+.ph-agg-toggle-btn { font: inherit; font-weight: var(--fw-bold); color: var(--c-text-muted); background: transparent; border: 0; padding: 0; cursor: pointer; }
+.ph-agg-toggle-btn:hover { color: var(--c-primary-strong); }
+.ph-agg-unit { box-shadow: inset 4px 0 0 var(--c); padding-left: calc(var(--sp-1) + 6px); }
+.ph-agg-sub { color: var(--c-text-muted); font-size: 0.95em; }
+.ph-agg-link { font: inherit; color: inherit; background: transparent; border: 0; padding: 0; cursor: pointer; text-align: left; border-bottom: 1px dotted var(--c-border-strong); }
+.ph-agg-link:hover { color: var(--c-primary-strong); border-bottom-color: var(--c-primary); }
+.ph-agg-status { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3); margin: 0; font-size: var(--fs-sm); color: var(--c-text-muted); }
+.ph-agg-status.has-issues { color: var(--c-text); font-weight: var(--fw-medium); }
+.ph-agg-issue { font-weight: var(--fw-medium); }
+
+/* กราฟแท่งซ้อน (charts.stackedBars) คอลัมน์เดียวกับตาราง: ช่องป้าย = แกน Y (ล้านบาท) */
+.sbc { padding-top: 8px; }
+.page-phasing .sbc-grid { display: grid; grid-template-columns: var(--ph-cols); grid-template-rows: calc(var(--bar-height) - 8px); position: relative; }
+.sbc-axis { position: relative; border-right: 1px solid var(--c-border-strong); margin-right: 0; }
+.sbc-tick { position: absolute; right: 6px; transform: translateY(50%); font-size: 11px; line-height: 1; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.sbc-lines { position: relative; pointer-events: none; }
+.sbc-gridline { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--c-border); }
+.sbc-gridline.is-base { border-top-color: var(--c-border-strong); }
+.sbc-col { position: relative; z-index: 1; }
+.sbc-col:hover, .sbc-col:focus-visible { background: var(--c-surface-2); outline: none; }
+.sbc-stack { position: absolute; left: 22%; right: 22%; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; }
+.sbc-seg { display: block; min-height: 1px; flex-basis: 0; background: color-mix(in srgb, var(--c) var(--shade), var(--c-surface)); border-top: 1px solid var(--c-surface); }
+.sbc-seg.is-total { border-top: 0; }
+.sbc-line-layer { position: relative; z-index: 2; pointer-events: none; }
+.sbc-line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+.sbc-legend { font-size: var(--fs-xs); gap: var(--sp-1) var(--sp-4); margin-top: var(--sp-1); padding-left: var(--sp-2); }
+.sbc-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; background: color-mix(in srgb, var(--c) var(--shade), var(--c-surface)); border: 1px solid var(--c-border); }
+.sbc-legend-btn { font: inherit; color: inherit; background: transparent; border: 0; padding: 0; cursor: pointer; border-bottom: 1px dotted var(--c-border-strong); }
+.sbc-legend-btn:hover { color: var(--c-primary-strong); }
+
 /* จอแคบ: ตารางกับกราฟเลื่อนแนวนอนด้วยกันภายในการ์ด (หน้าไม่เลื่อนแนวนอน) */
 @media (max-width: 1023px) {
   .ph-grid { min-width: 1240px; }

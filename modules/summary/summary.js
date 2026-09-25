@@ -1,17 +1,19 @@
 /*
  * modules/summary/summary.js — ขั้นที่ 4: ติดตามสถานะ | รายงานสรุปแผน {ปี} (CR-12)
  *
- * หน้าที่:  แท็บใต้หัวข้อ (จำที่ ui.summaryTab / ยังไม่เลือก: ยังไม่ล็อก Baseline = ติดตามสถานะ · ล็อกแล้ว = รายงานสรุปแผน)
+ * หน้าที่:  แท็บใต้หัวข้อ รายงานสรุปแผน | ติดตามสถานะ (n) — ค่าเริ่มต้น = รายงานสรุปแผนเสมอ จำแท็บล่าสุดที่ ui.summaryTab (CR-13)
  *   ติดตามสถานะ (งานที่ต้องทำ พิมพ์ไม่ได้):
- *     บรรทัดสรุปสถานะทั้งปี (จัดสรรเป้าหมายประจำปี · Baseline · รายงานที่เคยล็อก) + ล็อก / ปลดล็อก Baseline (Sales Director)
- *     ตารางรายการที่ต้องดำเนินการ 1 แถวต่อหน่วยขายที่มีประเด็น (calc.planActions เรียงตามความรุนแรง)
- *     + ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง
+ *     บรรทัดสรุป (จัดสรรเป้าหมายประจำปี · Baseline · รายงานที่เคยล็อก) + ล็อก / ปลดล็อก Baseline (Sales Director)
+ *     ตารางเดียว 1 แถวต่อหน่วยขาย (ทุกหน่วย calc.planActions all เรียงตามความรุนแรง ไม่มีประเด็นอยู่ท้าย): ส่วนต่าง ·
+ *     เป้าหมายรายเดือน / แผน SKU (สถานะ · ผู้อนุมัติ · วันที่อนุมัติ กดสถานะ = Popover ประวัติ) · การดำเนินการถัดไป
+ *     + ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง · แสดงเฉพาะที่มีประเด็น
  *   รายงานสรุปแผน (ประกาศและหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้เฉพาะแท็บนี้):
  *     หัวรายงาน: เลขฉบับ {ปี}-BL-{nn} | {ปี}-DRAFT · สถานะ · จัดสรรเป้าหมายประจำปี · พิมพ์เมื่อ · หมายเหตุที่มาของตัวเลข
  *     ยังไม่ล็อก = ลายน้ำ "ฉบับร่าง · ยังไม่ได้รับอนุมัติ" ทุกหน้า (บนจอและตอนพิมพ์) / ล็อกแล้ว = ตัวเลขทั้งหมดจาก Snapshot ของ Baseline
  *     Filter Channel · KPI 4 ใบ · กราฟรายเดือน (charts.barLine) : ที่มาของการเติบโต (charts.waterfall + stackedShare) = 60 : 40
  *     ตาราง Channel → หน่วยขาย (ยอดขายปีก่อน · เป้าหมาย · % ของ Total · เป้าหมายเทียบปีก่อน · แผน · ส่วนต่าง · สถานะอนุมัติ 2 ไอคอน · ผู้รับผิดชอบ)
- *     สัดส่วนแผนตามกลุ่มสินค้า · เป้าหมายรายผู้รับผิดชอบ · การอนุมัติ (ประวัติ Workflow) · ช่องลงนาม (เมื่อล็อกแล้ว)
+ *     สัดส่วนแผนตามกลุ่มสินค้า · เป้าหมายรายผู้รับผิดชอบ / การอนุมัติ: ยังไม่ล็อก = บรรทัด "อนุมัติครบแล้ว x/y หน่วยขาย" ใต้หัวรายงาน ·
+ *     ล็อกแล้ว = ตารางย่อ 1 แถวต่อหน่วยขาย (ผู้อนุมัติ · วันที่ ของเป้าหมายรายเดือนและแผน SKU) + ช่องลงนาม
  *     ตัวเลขเป็นล้านบาท 2 ตำแหน่ง (KPI บาทเต็ม) / พิมพ์ A4 แนวนอน
  * อ่านจาก data/:  settings, content (pages.summary, pages.<ขั้น>.title, labels) — ตัวเลขทั้งหมดของรายงานมาจาก core/report.js
  * store อ่าน:     app.planYear, plan.<ปี>.workflow.*, plan.<ปี>.baselineVersions, ui.role, ui.summaryTab (+ Key ที่ core/report.js อ่าน)
@@ -34,19 +36,14 @@
   var channelFilter = [];   // รายงาน: Channel ที่เลือก ([] = ทุก Channel)
   var collapsed = {};       // รายงาน: <channelId>: true = พับแถวหน่วยขาย
   var mixBy = 'series';     // รายงาน: กราฟกลุ่มสินค้าที่ 2 'series' | 'category'
-  var act = { channel: '', owner: '', gapOnly: false };   // ติดตามสถานะ: ตัวกรอง (owner '_none' = ยังไม่มีผู้รับผิดชอบ)
+  var act = { channel: '', owner: '', gapOnly: false, issuesOnly: false };   // ติดตามสถานะ: ตัวกรอง (owner '_none' = ยังไม่มีผู้รับผิดชอบ)
   // สีแท่งตาม Status ของ SKU (ชื่อ Token)
   var STATUS_TOKENS = { planned: '--c-st-planned-fg', 'new': '--c-st-new-fg', active: '--c-st-active-fg', clearance: '--c-st-clearance-fg', discontinued: '--c-st-discontinued-fg' };
   var AP_STATES = ['draft', 'submitted', 'approved', 'returned', 'review'];
 
   function mb(v) { return F.millionPlain(v, 2); }
-  // ป้ายแกนเป็นล้านบาท: ขั้นเต็มล้าน = ไม่มีทศนิยม / ขั้น 2.5 ล้าน = ทศนิยม 1 ตำแหน่ง / 0 = "0"
-  function axisText(v, step) {
-    if (!v) return '0';
-    var s = step / 1e6;
-    var d = Math.abs(s - Math.round(s)) < 1e-9 ? 0 : Math.abs(s * 10 - Math.round(s * 10)) < 1e-9 ? 1 : 2;
-    return F.number(v / 1e6, d);
-  }
+  // ป้ายแกนเป็นล้านบาท (charts.millionTick)
+  function axisText(v, step) { return SP.core.charts.millionTick(v, step); }
 
   function render(root, ctx) {
     var page = ctx.page;
@@ -78,7 +75,7 @@
       var live = R.build();
       var acts = R.actions(live);
       var tab = store.get('ui.summaryTab');
-      if (tab !== 'status' && tab !== 'report') tab = locked ? 'report' : 'status';
+      if (tab !== 'status' && tab !== 'report') tab = 'report';
       document.body.classList.toggle('rp-on-status', tab === 'status');
       root.appendChild(tabs(tab, acts.length));
       (tab === 'status' ? statusTab(live, acts, states, locked) : reportTab(live, states, locked)).forEach(function (n) { root.appendChild(n); });
@@ -90,8 +87,8 @@
       return h('div', { class: 'rp-tabs no-print' }, C.segmented({
         label: page.tabLabel, value: tab,
         options: [
-          { value: 'status', title: page.tabTips.status, label: [T.status, n ? h('span', { class: 'rp-tab-count', title: fill(page.tabCountTip, { n: n }) }, String(n)) : null] },
-          { value: 'report', title: page.tabTips.report, label: T.report }
+          { value: 'report', title: page.tabTips.report, label: T.report },
+          { value: 'status', title: page.tabTips.status + (n ? ' · ' + fill(page.tabCountTip, { n: n }) : ''), label: n ? fill(T.statusCount, { n: n }) : T.status }
         ],
         onChange: function (v) { store.set('ui.summaryTab', v); draw(); window.scrollTo(0, 0); }
       }));
@@ -110,13 +107,13 @@
         var ap = W.lastOf(td, 'approve');
         lines.push({ tag: 'tag-ok', text: fill(Y.topDownApproved, { at: F.dateTime(ap && ap.at), by: ap ? ap.by : '' }) });
       } else {
-        lines.push({ tag: 'tag-warn', text: fill(Y.topDownPending, { status: WL.status[td.status] }), entry: 'topDown' });
+        lines.push({ tag: 'tag-warn', text: fill(Y.topDown, { status: WL.status[td.status] }), entry: 'topDown' });
       }
       if (locked) {
         var lk = W.lastOf(W.stateOf(states, 'baseline'), 'lock');
-        lines.push({ tag: 'tag-ok', text: fill(Y.locked, { at: F.dateTime(lk && lk.at), by: lk ? lk.by : '', code: ver.code }) });
+        lines.push({ tag: 'tag-ok', text: fill(Y.locked, { at: F.dateTime(lk && lk.at), code: ver.code }) });
       } else {
-        lines.push({ tag: 'tag-warn', text: fill(Y.notLocked, { done: live.units.filter(function (u) { return u.sku === 'approved'; }).length, total: live.units.length }) });
+        lines.push({ tag: 'tag-warn', text: Y.notLocked });
       }
       if (versions.length) {
         lines.push({ tag: 'tag-muted', text: fill(Y.versions, { list: versions.map(function (v) { return v.code + ' (' + F.dateTime(v.at) + ')'; }).join(' · ') }) });
@@ -126,7 +123,7 @@
         h('ul', { class: 'rp-year-lines' }, lines.map(function (l) {
           return h('li', null, h('span', { class: 'rp-dot badge ' + l.tag, 'aria-hidden': 'true' }), l.entry ? link(l.entry, l.text) : h('span', null, l.text));
         })));
-      return [year1, actionTable(live, acts), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)];
+      return [year1, statusTable(live, acts, states, locked), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)];
     }
 
     function lockBox(live, states, locked, ver, versions) {
@@ -192,22 +189,29 @@
       });
     }
 
-    // ตารางรายการที่ต้องดำเนินการ (1 แถวต่อหน่วยขาย เรียงตามความรุนแรงจาก calc.planActions)
-    function actionTable(live, acts) {
+    // ตารางสถานะและการอนุมัติ 1 แถวต่อหน่วยขาย (CR-13: ทุกหน่วยขาย เรียงตามความรุนแรงจาก calc.planActions หน่วยที่ไม่มีประเด็นอยู่ท้าย)
+    //   acts = รายการที่มีประเด็น (ตัวเลขเดียวกับเมนูข้าง) / ผู้อนุมัติและวันที่จาก W.approvalRows (report.build) / กดสถานะ = Popover ประวัติของขั้นนั้น
+    function statusTable(live, acts, states, locked) {
       var A = page.actionFilters;
       var AC = page.actionColumns;
       var chById = {};
       live.channels.forEach(function (c) { chById[c.id] = c; });
+      var all = calc.planActions(live.units.map(function (u) {
+        return { id: u.id, name: u.name, channelId: u.channelId, target: u.target, plan: u.plan, phasing: u.phasing, sku: u.sku, vacant: u.owner.vacant, owner: u.owner };
+      }), { topDown: live.topDown, locked: locked, all: true });
+      var approvalOf = {};
+      live.approvals.forEach(function (a) { approvalOf[a.step + '.' + a.unitId] = a; });
       var owners = [];
-      acts.forEach(function (r) {
+      all.forEach(function (r) {
         var o = r.unit.owner;
         if (!o.vacant && !owners.some(function (x) { return x.id === o.id; })) owners.push({ id: o.id, name: o.name });
       });
-      var rows = acts.filter(function (r) {
+      var rows = all.filter(function (r) {
         var o = r.unit.owner;
         return (!act.channel || r.unit.channelId === act.channel)
           && (!act.owner || (act.owner === '_none' ? o.vacant : !o.vacant && o.id === act.owner))
-          && (!act.gapOnly || r.rem.status === 'short' || r.rem.status === 'over');
+          && (!act.gapOnly || r.rem.status === 'short' || r.rem.status === 'over')
+          && (!act.issuesOnly || r.issue);
       });
       var filters = h('div', { class: 'rp-act-filters' },
         h('label', { class: 'rp-filter' }, h('span', { class: 'field-label' }, A.channel), C.select({
@@ -220,28 +224,56 @@
           options: [{ value: '', label: A.ownerAll }].concat(owners.map(function (o) { return { value: o.id, label: o.name }; }), [{ value: '_none', label: A.ownerNone }]),
           onChange: function (v) { act.owner = v; draw(); }
         })),
-        h('label', { class: 'rp-filter rp-check' }, h('input', { type: 'checkbox', checked: act.gapOnly, onChange: function (e) { act.gapOnly = e.target.checked; draw(); } }), A.gapOnly));
-      function status(entry, st, ch, u) {
-        return link(entry, h('span', { class: 'wf-text wf-' + st }, page.statusShort[st] || WL.status[st]), ch.id, u.id, pageTitle(entry) + ' · ' + u.name + ' · ' + WL.status[st]);
+        h('label', { class: 'rp-filter rp-check' }, h('input', { type: 'checkbox', checked: act.gapOnly, onChange: function (e) { act.gapOnly = e.target.checked; draw(); } }), A.gapOnly),
+        h('label', { class: 'rp-filter rp-check rp-switch' }, h('input', { type: 'checkbox', role: 'switch', checked: act.issuesOnly, onChange: function (e) { act.issuesOnly = e.target.checked; draw(); } }), A.issuesOnly));
+      // สถานะ = ปุ่มเปิด Popover ประวัติ Workflow ของขั้นนั้น (ผู้ส่ง · วันที่ส่ง · ส่งกลับแก้ไข · ผู้อนุมัติ) + ลิงก์ไปหน้านั้น
+      function statusCell(step, st, ch, u) {
+        var entry = stepEntry(step);
+        var btn = h('button', { type: 'button', class: 'rp-status-btn', title: page.historyOpen, dataset: { step: step } },
+          h('span', { class: 'wf-text wf-' + st }, page.statusShort[st] || WL.status[st]));
+        C.popover(btn, function (close) {
+          var hist = W.stateOf(states, step, u.id).history || [];
+          return h('div', { class: 'rp-hist' },
+            h('strong', { class: 'rp-hist-title' }, fill(page.historyTitle, { step: pageTitle(entry), unit: u.name })),
+            hist.length ? h('ol', { class: 'rp-hist-list' }, hist.map(function (ev) {
+              return h('li', { class: 'rp-hist-item is-' + ev.action },
+                h('span', { class: 'rp-hist-event' }, (WL.events[ev.action] || ev.action) + ' ' + (ev.by || '')),
+                h('span', { class: 'rp-hist-at' }, F.dateTime(ev.at)),
+                ev.note ? h('span', { class: 'rp-hist-note' }, ev.note) : null);
+            })) : h('p', { class: 'rp-note' }, WL.historyEmpty),
+            link(entry, fill(page.historyGo, { page: pageTitle(entry) }), ch.id, u.id, null, 'rp-hist-go'));
+        }, { className: 'rp-hist-popover', label: page.historyOpen });
+        return btn;
+      }
+      function approvalCells(step, u) {
+        var a = approvalOf[step + '.' + u.id] || {};
+        var done = a.status === 'approved' && a.approvedBy;
+        return [h('td', { class: 'rp-appr' }, done ? a.approvedBy : page.noIssue), h('td', { class: 'rp-when' }, done ? F.dateTime(a.approvedAt) : page.noIssue)];
       }
       var body = rows.length ? h('div', { class: 'table-scroll' }, h('table', { class: 'data-table rp-act-table' },
-        h('thead', null, h('tr', null, [AC.channel, AC.unit, AC.owner, AC.gap, AC.phasing, AC.sku, AC.next].map(function (t, i) {
-          return h('th', { scope: 'col', class: i === 3 ? 'num' : null }, t);
-        }))),
+        h('thead', null,
+          h('tr', null,
+            h('th', { scope: 'col', rowspan: '2' }, AC.channel), h('th', { scope: 'col', rowspan: '2' }, AC.unit), h('th', { scope: 'col', rowspan: '2' }, AC.owner),
+            h('th', { scope: 'col', rowspan: '2', class: 'num' }, AC.gap),
+            h('th', { scope: 'colgroup', colspan: '3', class: 'rp-group-head' }, AC.phasing), h('th', { scope: 'colgroup', colspan: '3', class: 'rp-group-head' }, AC.sku),
+            h('th', { scope: 'col', rowspan: '2' }, AC.next)),
+          h('tr', null, [AC.status, AC.approvedBy, AC.approvedAt, AC.status, AC.approvedBy, AC.approvedAt].map(function (t, i) {
+            return h('th', { scope: 'col', class: 'rp-sub-head' + (i % 3 === 0 ? ' is-first' : '') }, t);
+          }))),
         h('tbody', null, rows.map(function (r) {
           var u = r.unit, ch = chById[u.channelId];
-          return h('tr', { class: 'rp-act-row', style: { '--c': C.tokenVar(ch.color) }, dataset: { unit: u.id } },
+          return h('tr', { class: 'rp-act-row' + (r.issue ? ' has-issue' : ' no-issue'), style: { '--c': C.tokenVar(ch.color) }, dataset: { unit: u.id } },
             h('td', { class: 'rp-act-ch', title: ch.fullName }, ch.name),
             h('th', { scope: 'row' }, link('skuPlanning', u.name, ch.id, u.id, fill(page.openPlan, { name: u.name }))),
             h('td', { class: 'rp-owner' + (u.owner.vacant ? ' is-vacant' : ''), title: u.owner.title }, u.owner.vacant ? A.ownerNone : u.owner.name),
             h('td', { class: 'num' }, gapText(r.rem)),
-            h('td', null, status('phasing', u.phasing, ch, u)),
-            h('td', null, status('skuPlanning', u.sku, ch, u)),
-            h('td', null, link(r.entry, page.next[r.next], ch.id, u.id, fill(page.nextTip, { page: pageTitle(r.entry), name: u.name }), 'rp-next')));
+            h('td', { class: 'rp-status is-first' }, statusCell('phasing', u.phasing, ch, u)), approvalCells('phasing', u),
+            h('td', { class: 'rp-status is-first' }, statusCell('sku', u.sku, ch, u)), approvalCells('sku', u),
+            h('td', null, r.next ? link(r.entry, page.next[r.next], ch.id, u.id, fill(page.nextTip, { page: pageTitle(r.entry), name: u.name }), 'rp-next') : page.noIssue));
         }))))
-        : h('p', { class: 'rp-note rp-empty' }, acts.length ? page.actionsNoneFiltered : page.actionsNone);
+        : h('p', { class: 'rp-note rp-empty' }, act.issuesOnly && !acts.length ? page.actionsNone : page.actionsNoneFiltered);
       return h('section', { class: 'card rp-section rp-actions no-print' },
-        h('div', { class: 'rp-act-head' }, h('h2', null, page.actionsTitle, acts.length ? h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: acts.length })) : null), filters),
+        h('div', { class: 'rp-act-head' }, h('h2', null, page.actionsTitle, h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: acts.length, total: all.length }))), filters),
         body);
     }
 
@@ -254,15 +286,17 @@
       var ver = W.baselineVersion(store.get(store.planKey('baselineVersions')), year, locked);
       var wrap = h('div', { class: 'rp-report' + (ver.draft ? ' is-draft' : '') });
       if (ver.draft) wrap.appendChild(watermark());
-      wrap.appendChild(docHead(M.rep, states, locked, ver, cur.fromSnapshot));
+      wrap.appendChild(docHead(M, states, locked, ver, cur.fromSnapshot));
       wrap.appendChild(toolbar(M.rep));
       wrap.appendChild(kpis(M, locked));
       wrap.appendChild(h('div', { class: 'rp-row2' }, monthly(M), growth(M)));
       wrap.appendChild(unitTable(M));
       wrap.appendChild(mix(M));
       wrap.appendChild(people(M));
-      wrap.appendChild(approvals(M));
-      if (!ver.draft) wrap.appendChild(signatures());
+      if (!ver.draft) {
+        wrap.appendChild(approvals(M));
+        wrap.appendChild(signatures());
+      }
       return [wrap];
     }
 
@@ -288,7 +322,8 @@
       return w;
     }
 
-    function docHead(rep, states, locked, ver, fromSnapshot) {
+    function docHead(M, states, locked, ver, fromSnapshot) {
+      var rep = M.rep;
       var TL = page.topDownLine;
       var lk = W.lastOf(W.stateOf(states, 'baseline'), 'lock');
       var td = rep.approvals.filter(function (a) { return a.step === 'topDown'; })[0] || { status: rep.topDown };
@@ -303,6 +338,10 @@
           h('span', { class: 'rp-doc-version' }, fill(page.version, { code: ver.code }))),
         h('p', { class: 'rp-doc-status' }, locked ? fill(page.statusLocked, { at: F.dateTime(lk && lk.at), by: lk ? lk.by : '' }) : page.statusDraft),
         h('p', { class: 'rp-doc-td' }, tdLine),
+        // ยังไม่ล็อก: การอนุมัติเป็นบรรทัดเดียว (ตารางการอนุมัติแสดงเมื่อล็อก Baseline แล้ว)
+        ver.draft ? h('p', { class: 'rp-doc-approval' }, fill(page.approvalLine, {
+          done: M.units.filter(function (u) { return u.phasing === 'approved' && u.sku === 'approved'; }).length, total: M.units.length
+        })) : null,
         printedAt,
         note ? h('p', { class: 'rp-doc-note' }, note) : null);
     }
@@ -516,23 +555,26 @@
     }
 
     // ---------- การอนุมัติ (จากประวัติ Workflow ของ Top-down และ Phasing / แผน SKU ทุกหน่วยขาย) ----------
+    // ---------- การอนุมัติ (ล็อก Baseline แล้วเท่านั้น — CR-13): บรรทัดจัดสรรเป้าหมายประจำปี + ตารางย่อ 1 แถวต่อหน่วยขาย ----------
     function approvals(M) {
       var A = page.approvalsColumns;
-      var ids = M.units.map(function (u) { return u.id; });
-      var names = {};
-      M.rep.units.forEach(function (u) { names[u.id] = u.name; });
-      var rows = M.rep.approvals.filter(function (a) { return !a.unitId || ids.indexOf(a.unitId) >= 0; });
-      function when(at) { return at ? F.dateTime(at) : '–'; }
+      var byKey = {};
+      M.rep.approvals.forEach(function (a) { byKey[a.step + '.' + (a.unitId || 'all')] = a; });
+      var td = byKey['topDown.all'] || {};
+      function who(a) { return a && a.status === 'approved' && a.approvedBy ? a.approvedBy : page.noIssue; }
+      function when(a) { return a && a.status === 'approved' && a.approvedAt ? F.dateTime(a.approvedAt) : page.noIssue; }
       return h('section', { class: 'card rp-section rp-break rp-approvals' }, h('h2', null, page.approvalsTitle),
-        h('p', { class: 'rp-note' }, page.approvalsNote),
+        h('p', { class: 'rp-approvals-td' }, fill(page.approvalsTopDown, { by: who(td), at: when(td) })),
         h('div', { class: 'table-scroll' }, h('table', { class: 'data-table rp-approvals-table' },
-          h('thead', null, h('tr', null, [A.step, A.unit, A.submittedBy, A.submittedAt, A.approvedBy, A.approvedAt].map(function (t) { return h('th', { scope: 'col' }, t); }))),
-          h('tbody', null, rows.map(function (a) {
-            return h('tr', { class: a.step === 'topDown' ? 'is-year' : null },
-              h('td', null, pageTitle(stepEntry(a.step))),
-              h('th', { scope: 'row' }, a.unitId ? names[a.unitId] : page.approvalsAll),
-              h('td', null, a.submittedBy || '–'), h('td', { class: 'rp-when' }, when(a.submittedAt)),
-              h('td', null, a.approvedBy || h('span', { class: 'wf-text wf-' + a.status }, WL.status[a.status])), h('td', { class: 'rp-when' }, when(a.approvedAt)));
+          h('thead', null,
+            h('tr', null, h('th', { scope: 'col', rowspan: '2' }, A.unit),
+              h('th', { scope: 'colgroup', colspan: '2', class: 'rp-group-head' }, A.phasing), h('th', { scope: 'colgroup', colspan: '2', class: 'rp-group-head' }, A.sku)),
+            h('tr', null, [A.approvedBy, A.approvedAt, A.approvedBy, A.approvedAt].map(function (t, i) { return h('th', { scope: 'col', class: 'rp-sub-head' + (i % 2 === 0 ? ' is-first' : '') }, t); }))),
+          h('tbody', null, M.units.map(function (u) {
+            var ph = byKey['phasing.' + u.id], sk = byKey['sku.' + u.id];
+            return h('tr', null, h('th', { scope: 'row' }, u.name),
+              h('td', { class: 'is-first' }, who(ph)), h('td', { class: 'rp-when' }, when(ph)),
+              h('td', { class: 'is-first' }, who(sk)), h('td', { class: 'rp-when' }, when(sk)));
           })))));
     }
 

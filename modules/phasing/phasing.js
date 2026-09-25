@@ -9,10 +9,16 @@
  *                 เดือนที่ต่างจากค่าตั้งต้นมีจุดมุมช่อง + Tooltip ค่าตั้งต้น
  *                 เปิดมาเป็นโหมดดู / แก้ไข → แก้ % หรือบาทรายเดือน (เก็บ %) → บันทึก/ยกเลิก ส่วนต่างไปอยู่ที่คงเหลือ
  *                 Workflow ต่อ Account/เขต (workflowBar): ผู้รับผิดชอบจัดทำ → Sales Director อนุมัติ (ส่งได้เมื่อ Top-down อนุมัติแล้ว)
+ *                 มุมมองรวม (CR-13, subChannelPicker allowAggregate): "รวมทั้ง {Channel}" / "รวมทุก Channel" — อ่านอย่างเดียว (ไม่มี workflowBar
+ *                 แสดง "มุมมองรวม · เลือกหน่วยขายเพื่อแก้ไข") / แถบบริบท = เป้าหมายทั้งปี · ยอดขายปีก่อน · การเติบโตของผลรวม /
+ *                 กราฟแท่งซ้อนตามหน่วยขาย (ทุก Channel = ตาม Channel) หรือแท่งรวม + เส้นประยอดปีก่อน (charts.stackedBars) Legend กดไปมุมมองนั้น /
+ *                 ตาราง ยอดขายปีก่อน · สัดส่วนรายเดือน · เป้าหมาย · การเติบโต ของผลรวม + แถวย่อยต่อหน่วยขาย (พับได้) · บรรทัดหน่วยที่ยังจัดสรรไม่ครบ /
+ *                 ส่งออกผลรวม + แถวต่อหน่วยขาย — ตัวเลขจาก calc.aggregatePhasing (คำนวณทุกครั้ง ไม่เก็บลง store)
  * อ่านจาก data/:  channels, history, content (pages.phasing, labels) + Master ผ่าน store.data()
  * store อ่าน:     app.planYear, plan.<ปี>.topDown, plan.<ปี>.phasing.<unitId>, plan.<ปี>.workflow.*, ui.selection,
  *                 master.* (ผู้รับผิดชอบ, GP), ui.role, ui.currentMonth
- * store เขียน:    plan.<ปี>.phasing.<unitId> = { monthPct, edited } (ตอนกด บันทึก), ui.selection (Key เดียวกับหน้าวางแผน SKU)
+ * store เขียน:    plan.<ปี>.phasing.<unitId> = { monthPct, edited } (ตอนกด บันทึก), ui.selection (Key เดียวกับหน้าวางแผน SKU
+ *                 มุมมองรวม = { channel, unit (หน่วยขายล่าสุด), aggregate: 'channel' | 'all' } หน้าวางแผน SKU ใช้ channel/unit ตามเดิม)
  *                 plan.<ปี>.workflow.phasing.<unitId> (ผ่าน workflowBar)
  *
  * ตัวเลขทุกตัว (บาท ↔ %, ผลรวม, คงเหลือ, การเติบโต, Seasonality) มาจาก SP.core.calc / กฎ Workflow มาจาก SP.core.workflow
@@ -39,6 +45,8 @@
     var draftPct = null;
     var savedPct = null;
     var bar = null;
+    var chartMode = 'stack';   // มุมมองรวม: 'stack' แยกตามหน่วยขาย (หรือ Channel) | 'total' แท่งรวม
+    var unitsOpen = false;     // มุมมองรวม: แถวย่อยต่อหน่วยขายกางอยู่หรือไม่
 
     function phasingOf(unitId) { return store.get(store.planKey('phasing.' + unitId)); }
     function dirty() {
@@ -59,7 +67,12 @@
         tree: tree,
         selection: store.get('ui.selection'),
         guard: guard,
-        onSelect: function (channelId, unitId) { store.set('ui.selection', { channel: channelId, unit: unitId }); draw(); ctx.refreshMenu(); },
+        allowAggregate: true,
+        onSelect: function (channelId, unitId, aggregate) {
+          store.set('ui.selection', aggregate ? { channel: channelId, unit: unitId, aggregate: aggregate } : { channel: channelId, unit: unitId });
+          draw();
+          ctx.refreshMenu();
+        },
         // รายการใน Dropdown: สถานะคงเหลือของ Phasing + สถานะ Workflow (ข้อความ)
         remainingOf: function (id) { return calc.phasingTotals(calc.unitTarget(tree, id), phasingOf(id).monthPct).remaining; },
         workflowOf: function (id) { return W.stateOf(states, 'phasing', id).status; },
@@ -69,6 +82,7 @@
       var unit = picker.unit;
       var toolbar = h('div', { class: 'ctx-bar' }, picker);
       root.appendChild(toolbar);
+      if (picker.aggregate) { drawAggregate(tree, picker, toolbar); return; }
 
       if (!ch || !unit) {
         root.appendChild(h('div', { class: 'callout callout-info' },
@@ -292,6 +306,144 @@
       }
 
       update();
+    }
+
+    // ---------------------------------------------------------------------
+    // มุมมองรวม (CR-13): อ่านอย่างเดียว / ตัวเลขทั้งหมดจาก calc.aggregatePhasing / คงเหลือคิดต่อหน่วยขาย (ไม่มีแถวคงเหลือรายเดือน)
+    // ---------------------------------------------------------------------
+    function drawAggregate(tree, picker, toolbar) {
+      var A = page.aggregate;
+      var P = L.picker;
+      var all = picker.aggregate === 'all';
+      var channels = all ? tree.children : [picker.channel];
+      var ids = [];
+      channels.forEach(function (c) { c.children.forEach(function (u) { ids.push(u.id); }); });
+      var map = {};
+      ids.forEach(function (id) { map[id] = phasingOf(id); });
+      var agg = calc.aggregatePhasing(data, tree, map, ids, year);
+      var title = all ? P.allTotal : fill(P.channelTotal, { channel: picker.channel.name, n: ids.length });
+      function channelName(id) { var c = calc.findById(tree.children, id); return c ? c.name : ''; }
+      function openUnit(unitId) {
+        var u = calc.findById(agg.units, unitId);
+        store.set('ui.selection', { channel: u.channelId, unit: u.id });
+        draw();
+        ctx.refreshMenu();
+      }
+      function openChannel(channelId) {
+        var c = calc.findById(tree.children, channelId);
+        store.set('ui.selection', { channel: channelId, unit: c && c.children[0] ? c.children[0].id : null, aggregate: 'channel' });
+        draw();
+      }
+
+      C.contextStats([
+        { label: L.context.annual, value: F.baht(agg.target) + ' ' + L.baht },
+        { label: C.priorLabel(tree.priorYear), value: F.baht(agg.priorTotal) + ' ' + L.baht, title: fill(A.priorTip, { year: tree.priorYear, n: agg.units.length }) },
+        { label: L.context.growth, value: C.growthText(calc.growth(agg.target, agg.priorTotal)) }
+      ]).forEach(function (el) { toolbar.appendChild(el); });
+
+      // ---------- ส่งออก ▾: ผลรวม (เป้าหมาย + ยอดขายปีก่อน) + แถวต่อหน่วยขาย ----------
+      var X = A.exportSpec;
+      var exportBtn = C.exportButton({
+        unsaved: function () { return 0; },
+        build: function () {
+          var columns = [{ key: 'kind', label: X.cols.kind }, { key: 'unit', label: X.cols.unit }, { key: 'channel', label: X.cols.channel }]
+            .concat(F.MONTHS.map(function (m, i) { return { key: 'm' + i, label: F.monthYear(i, year), type: 'money' }; }))
+            .concat([{ key: 'total', label: X.cols.total, type: 'money' },
+              { key: 'growth', label: X.cols.growth, type: 'pct', value: function (r) { return r.growth == null || isNaN(r.growth) ? null : r.growth; } }]);
+          function row(kind, unit, channel, values, prior) {
+            var r = { kind: kind, unit: unit, channel: channel };
+            values.forEach(function (v, i) { r['m' + i] = v; });
+            r.total = calc.sum(values);
+            r.growth = prior != null ? calc.growth(r.total, prior) : null;
+            return r;
+          }
+          var chLabel = all ? '' : picker.channel.name;
+          var rows = [row(X.kinds.target, title, chLabel, agg.amounts, agg.priorTotal)];
+          if (agg.prior) rows.push(row(fill(X.kinds.prior, { year: tree.priorYear }), title, chLabel, agg.prior, null));
+          agg.units.forEach(function (u) { rows.push(row(X.kinds.target, u.name, channelName(u.channelId), u.amounts, u.priorTotal)); });
+          var stamp = C.exportStamp('draft');
+          return {
+            filename: fill(X.file, { year: year, unit: C.fileSafe(title), date: stamp.date }),
+            sheets: [{ name: X.sheet, header: C.exportHeader(year, A.exportStatus, [[L.exporting.headerUnit, title], [L.context.annual, agg.target]]), columns: columns, rows: rows }]
+          };
+        }
+      });
+      // หัวหน้า: ไม่มีปุ่มแก้ไข / ส่งอนุมัติ (มุมมองรวมอ่านอย่างเดียว)
+      bar = h('div', { class: 'ph-agg-bar' }, h('span', { class: 'badge tag-muted ph-agg-note' }, A.readOnly), exportBtn);
+      if (ctx.intro) ctx.intro.appendChild(bar);
+
+      // ---------- กราฟ: แท่งซ้อนตามหน่วยขาย (ทุก Channel = ตาม Channel) | แท่งรวม + เส้นประยอดปีก่อน ----------
+      var n = agg.units.length;
+      var stacks = all
+        ? tree.children.map(function (c) {
+          var list = agg.units.filter(function (u) { return u.channelId === c.id; });
+          return { id: c.id, label: c.name, colorToken: c.color, shade: 1, values: calc.addMonthly(list.map(function (u) { return u.amounts; })) };
+        })
+        : agg.units.map(function (u, i) { return { id: u.id, label: u.name, colorToken: u.color, shade: n > 1 ? 1 - i * (0.62 / (n - 1)) : 1, values: u.amounts }; });
+      var modeSeg = C.segmented({
+        label: A.chartLabel, value: chartMode,
+        options: [{ value: 'total', label: A.chartModes.total }, { value: 'stack', label: all ? A.chartModes.channels : A.chartModes.units }],
+        onChange: function (v) { chartMode = v; draw(); }
+      });
+      var chart = SP.core.charts.stackedBars({
+        stacks: stacks, line: agg.prior, mode: chartMode, totalToken: all ? '--c-bar' : picker.channel.color,
+        labels: { total: A.legendTotal, line: fill(A.legendPrior, { year: tree.priorYear }) },
+        tick: SP.core.charts.millionTick,
+        onLegend: function (id) { if (all) openChannel(id); else openUnit(id); },
+        legendTip: function (name) { return fill(A.legendTip, { name: name }); },
+        tip: function (m) {
+          var out = chartMode === 'total' ? [] : stacks.map(function (s) { return [s.label, F.baht(s.values[m]) + ' ' + L.baht]; });
+          out.push([A.tipTotal, F.baht(agg.amounts[m]) + ' ' + L.baht]);
+          if (agg.prior) out.push([fill(A.tipPrior, { year: tree.priorYear }), F.baht(agg.prior[m]) + ' ' + L.baht]);
+          return out;
+        }
+      });
+
+      // ---------- ตาราง: ผลรวม + แถวย่อยต่อหน่วยขาย (พับได้) ----------
+      var table = h('div', { class: 'ph-table ph-agg-table', role: 'table' });
+      function cell(cls, content, title) { return h('div', { class: 'ph-cell ' + (cls || ''), title: title, role: 'cell' }, content); }
+      function monthsRow(label, values, total, cls, fmt) {
+        table.appendChild(label);
+        values.forEach(function (v) { table.appendChild(cell('num ' + (cls || ''), fmt(v))); });
+        table.appendChild(cell('num ph-total', total));
+      }
+      table.appendChild(cell('ph-head ph-label', R.month));
+      F.MONTHS.forEach(function (m) { table.appendChild(cell('ph-head num', m)); });
+      table.appendChild(cell('ph-head num ph-total', page.totalColumn));
+      var noValues = F.MONTHS.map(function () { return null; });
+      monthsRow(cell('ph-label', C.priorLabel(tree.priorYear, fill(R.prior, { year: tree.priorYear }))), agg.prior || noValues, F.baht(agg.priorTotal), 'ph-prior', F.baht);
+      monthsRow(cell('ph-label', R.pct), agg.monthPct, agg.total ? F.number(calc.sum(agg.monthPct) * 100, 2) : '–', 'ph-value', function (v) { return F.number(v * 100, 2); });
+      monthsRow(cell('ph-label', R.amount), agg.amounts, F.baht(agg.total), 'ph-value', F.baht);
+      table.appendChild(cell('ph-label', R.growth));
+      agg.growth.forEach(function (g) { table.appendChild(cell('num', C.growthText(g))); });
+      table.appendChild(cell('num ph-total', C.growthText(agg.growthTotal)));
+      table.appendChild(h('div', { class: 'ph-cell ph-agg-toggle', role: 'cell' },
+        h('button', {
+          type: 'button', class: 'ph-agg-toggle-btn', 'aria-expanded': unitsOpen ? 'true' : 'false', title: A.unitsToggle,
+          onClick: function () { unitsOpen = !unitsOpen; draw(); }
+        }, (unitsOpen ? '▾ ' : '▸ ') + fill(A.unitsRow, { n: n }))));
+      if (unitsOpen) {
+        agg.units.forEach(function (u) {
+          var name = all ? channelName(u.channelId) + ' · ' + u.name : u.name;
+          var label = cell('ph-label ph-agg-unit', h('button', { type: 'button', class: 'ph-agg-link', title: fill(A.openUnit, { name: u.name }), onClick: function () { openUnit(u.id); } }, name));
+          label.style.setProperty('--c', C.tokenVar(u.color));
+          monthsRow(label, u.amounts, F.baht(calc.sum(u.amounts)), 'ph-agg-sub', F.baht);
+        });
+      }
+
+      // บรรทัดสรุปคงเหลือ (คงเหลือคิดต่อหน่วยขาย) + ลิงก์ไปหน่วยที่ยังจัดสรรไม่ครบ
+      var incomplete = agg.units.filter(function (u) { return agg.incomplete.indexOf(u.id) >= 0; });
+      var status = h('p', { class: 'ph-agg-status' + (incomplete.length ? ' has-issues' : '') },
+        incomplete.length ? fill(A.incomplete, { n: incomplete.length }) : A.complete,
+        incomplete.map(function (u) {
+          return h('button', { type: 'button', class: 'ph-agg-link ph-agg-issue', title: fill(A.openUnit, { name: u.name }), onClick: function () { openUnit(u.id); } },
+            u.name + ' · ', h('span', { class: 'text-' + u.remaining.status }, C.remainingText(u.remaining)));
+        }));
+
+      root.appendChild(h('section', { class: 'card ph-card ph-agg' },
+        h('div', { class: 'ph-chart-head' }, h('span', { class: 'ph-agg-title' }, fill(A.chartTitle, { name: title })), modeSeg),
+        h('div', { class: 'table-scroll ph-scroll' }, h('div', { class: 'ph-grid' }, chart, table)),
+        status));
     }
 
     draw();

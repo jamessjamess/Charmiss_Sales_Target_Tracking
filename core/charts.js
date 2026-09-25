@@ -8,6 +8,7 @@
  *   vsLastYearAxis(scaleMax) แกน 0 · … · สูงสุด ล้าน ใต้หัวคอลัมน์
  *   vsLastYearBar(target, lastYear, scaleMax, { colorToken, year }) แท่งเป้าหมายเทียบปีก่อน สเกลจริงเดียวกันทั้งตาราง → .info
  *   barLine({ bars, line, dashed, months, labels, tick, endText, tip }) แท่งเป้าหมาย 12 เดือน + เส้นแผน + เส้นประยอดปีก่อน (รายงานสรุปแผน)
+ *   stackedBars({ stacks, line, mode, labels, tick, tip, onLegend }) แท่งซ้อน 12 เดือน + เส้นประ (มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน — CR-13)
  *   hbars({ items })                          แท่งแนวนอนรายการเดียว (รายงาน: สัดส่วนตามกลุ่มสินค้า)
  *   splitBar(split, parts, opts)           แถบแบ่งเงิน Net Sales / GP / VAT (calc.moneySplit)
  *   waterfall({ start, steps, end, format, signed, tick, axisNote, onHover }) ที่มาของการเติบโต แนวนอน (รายงาน) → .info, .update(o), .highlight(id)
@@ -39,6 +40,14 @@
   function axisStart(values) { return SP.core.calc.axisStart(values); }
 
   function pctStyle(v) { return Math.round(v * 100000) / 1000 + '%'; }
+
+  // ป้ายแกนเป็นล้านบาท (ใช้กับ tick ของ barLine / waterfall / stackedBars): ขั้นเต็มล้าน = ไม่มีทศนิยม / ขั้น 2.5 ล้าน = 1 ตำแหน่ง / 0 = "0"
+  function millionTick(v, step) {
+    if (!v) return '0';
+    var s = step / 1e6;
+    var d = Math.abs(s - Math.round(s)) < 1e-9 ? 0 : Math.abs(s * 10 - Math.round(s * 10)) < 1e-9 ? 1 : 2;
+    return F.number(v / 1e6, d);
+  }
 
   function vsLastYearBar(target, lastYear, scaleMax, opts) {
     opts = opts || {};
@@ -157,6 +166,74 @@
       hits.addEventListener('mouseleave', function () { bands.forEach(function (b) { b.classList.remove('is-hl'); }); });
     }
     wrap.info = { top: top, step: axis.step, ticks: axis.ticks };
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // แท่งซ้อน 12 เดือน + เส้นประยอดปีก่อน (CR-13 มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน)
+  //   Grid คอลัมน์เดียวกับตารางใต้กราฟ (ป้าย | 12 เดือน | รวม — ความกว้างจาก CSS ของหน้า) ช่องป้าย = แกน Y
+  // o = { stacks: [{ id, label, colorToken, shade (0–1 ความเข้มของสี), values: [12] }], line: [12] | null,
+  //       mode: 'stack' (ซ้อนตามชุด) | 'total' (แท่งเดียว = ผลรวม), totalToken (สีแท่งรวม), labels: { total, line },
+  //       tick(v, step) → ป้ายแกน, tip(m) → [[ป้าย, ค่า]] (Tooltip ของเดือน), onLegend(id) (กดชื่อใน Legend), legendTip(label) }
+  //   แกน Y เริ่ม 0 ค่าสูงสุด = niceScaleMax(ผลรวมรายเดือน + เส้น, { headroom: CHART_HEADROOM }) → .info = { top, step, ticks }
+  // ---------------------------------------------------------------------
+  function stackedBars(o) {
+    var S = SP.data.settings;
+    var calc = SP.core.calc;
+    var totals = [];
+    for (var m = 0; m < 12; m++) totals.push(calc.sum(o.stacks.map(function (s) { return Math.max(0, s.values[m] || 0); })));
+    var axis = calc.niceAxis(0, calc.niceScaleMax(totals.concat(o.line || []), { headroom: S.CHART_HEADROOM }) || 1);
+    var top = axis.end;
+    function hgt(v) { return Math.round(Math.max(0, v || 0) / top * 100000) / 1000 + '%'; }
+    function shade(s) { return { '--c': C.tokenVar(s.colorToken), '--shade': Math.round((s.shade == null ? 1 : s.shade) * 100) + '%' }; }
+    var tick = o.tick || function (v) { return F.number(v); };
+    var grid = h('div', { class: 'sbc-grid' });
+    grid.appendChild(h('div', { class: 'sbc-axis', 'aria-hidden': 'true', style: { gridColumn: '1', gridRow: '1' } }, axis.ticks.map(function (v) {
+      return h('span', { class: 'sbc-tick', style: { bottom: hgt(v) } }, tick(v, axis.step));
+    })));
+    grid.appendChild(h('div', { class: 'sbc-lines', 'aria-hidden': 'true', style: { gridColumn: '2 / 14', gridRow: '1' } }, axis.ticks.map(function (v) {
+      return h('span', { class: 'sbc-gridline' + (v === 0 ? ' is-base' : ''), style: { bottom: hgt(v) } });
+    })));
+    totals.forEach(function (t, i) {
+      var stack = h('div', { class: 'sbc-stack', style: { height: hgt(t) } });
+      if (o.mode === 'total') stack.appendChild(h('span', { class: 'sbc-seg is-total', style: { flexGrow: '1', '--c': C.tokenVar(o.totalToken || '--c-bar'), '--shade': '100%' } }));
+      else o.stacks.forEach(function (s) {
+        var v = Math.max(0, s.values[i] || 0);
+        if (v > 0) stack.appendChild(h('span', { class: 'sbc-seg', dataset: { id: s.id }, style: Object.assign({ flexGrow: String(v) }, shade(s)) }));
+      });
+      grid.appendChild(h('div', { class: 'sbc-col', dataset: { m: String(i) }, tabindex: '0', 'aria-label': F.monthFull(i), style: { gridColumn: String(i + 2), gridRow: '1' } }, stack));
+    });
+    if (o.line) {
+      var svgEl = svg('svg', { class: 'sbc-line', viewBox: '0 0 1200 1000', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+      svgEl.appendChild(svg('path', {
+        d: o.line.map(function (v, i) { return (i ? 'L' : 'M') + ((i + 0.5) / 12 * 1200).toFixed(1) + ' ' + ((1 - Math.max(0, v || 0) / top) * 1000).toFixed(1); }).join(' '),
+        class: 'barline-dashed', fill: 'none', 'vector-effect': 'non-scaling-stroke'
+      }));
+      grid.appendChild(h('div', { class: 'sbc-line-layer', style: { gridColumn: '2 / 14', gridRow: '1' } }, svgEl));
+    }
+    function sym(kind, s) {
+      var el = svg('svg', { class: 'barline-sym', viewBox: '0 0 28 14', 'aria-hidden': 'true' });
+      if (kind === 'line') el.appendChild(svg('path', { d: 'M1 7 L27 7', class: 'barline-dashed' }));
+      return kind === 'line' ? el : h('span', { class: 'sbc-swatch', style: s ? shade(s) : { '--c': C.tokenVar(o.totalToken || '--c-bar'), '--shade': '100%' } });
+    }
+    var items = o.mode === 'total'
+      ? [h('span', { class: 'legend-item' }, sym('bar'), o.labels.total)]
+      : o.stacks.map(function (s) {
+        var body = [sym('bar', s), s.label];
+        return o.onLegend
+          ? h('button', { type: 'button', class: 'legend-item sbc-legend-btn', title: o.legendTip ? o.legendTip(s.label) : s.label, onClick: function () { o.onLegend(s.id); } }, body)
+          : h('span', { class: 'legend-item' }, body);
+      });
+    if (o.line) items.push(h('span', { class: 'legend-item' }, sym('line'), o.labels.line));
+    var wrap = h('div', { class: 'sbc' }, grid, h('div', { class: 'legend sbc-legend' }, items));
+    if (o.tip) {
+      C.hoverTip(grid, '.sbc-col', function (el) {
+        var i = Number(el.dataset.m);
+        return h('div', { class: 'barline-tip' }, h('strong', null, F.monthFull(i)),
+          h('table', { class: 'tip-table' }, h('tbody', null, o.tip(i).map(function (r) { return h('tr', null, h('td', null, r[0]), h('td', { class: 'num' }, r[1])); }))));
+      });
+    }
+    wrap.info = { top: top, step: axis.step, ticks: axis.ticks, totals: totals };
     return wrap;
   }
 
@@ -315,5 +392,5 @@
 
   function clearNode(el) { while (el.firstChild) el.removeChild(el.firstChild); return el; }
 
-  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, splitBar: splitBar, waterfall: waterfall, stackedShare: stackedShare };
+  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, splitBar: splitBar, waterfall: waterfall, stackedShare: stackedShare };
 })(window.SP);

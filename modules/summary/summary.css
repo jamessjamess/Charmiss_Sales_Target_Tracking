@@ -11,10 +11,8 @@
 .rp-owner { font-size: var(--fs-xs); white-space: nowrap; cursor: help; }
 .rp-owner.is-vacant { color: var(--c-vacant-fg); font-weight: var(--fw-bold); }
 
-/* ---------- แท็บ ---------- */
-.rp-tabs .seg { display: inline-flex; align-items: center; gap: var(--sp-2); }
-.rp-tab-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: 999px;
-  font-size: 11px; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; background: var(--c-wf-returned-bg); color: var(--c-wf-returned-fg); }
+/* ---------- แท็บ (รายงานสรุปแผน | ติดตามสถานะ (n)) ---------- */
+.rp-tabs .seg { display: inline-flex; align-items: center; gap: var(--sp-2); font-variant-numeric: tabular-nums; }
 
 /* =====================================================================
    แท็บติดตามสถานะ
@@ -35,8 +33,28 @@
 .rp-filter .field-label { font-size: var(--fs-xs); color: var(--c-text-muted); }
 .rp-filter .select { font-size: var(--fs-sm); padding-top: 3px; padding-bottom: 3px; }
 .rp-check { cursor: pointer; }
-.rp-act-table { min-width: 860px; }
-.rp-act-table th, .rp-act-table td { padding: 6px var(--sp-2); vertical-align: middle; }
+.rp-act-table { min-width: 1100px; }
+.rp-act-table th, .rp-act-table td { padding: 5px var(--sp-2); vertical-align: middle; }
+/* หัวตาราง 2 ชั้น: เป้าหมายรายเดือน / แผน SKU ครอบ สถานะ · ผู้อนุมัติ · วันที่อนุมัติ */
+.rp-act-table thead th, .rp-approvals-table thead th { font-size: var(--fs-xs); line-height: 1.25; vertical-align: bottom; }
+.data-table th.rp-group-head { text-align: center; border-bottom: 1px solid var(--c-border-strong); border-left: 1px solid var(--c-border-strong); }
+.rp-sub-head { font-weight: var(--fw-medium) !important; }
+.rp-act-table .is-first, .rp-approvals-table .is-first { border-left: 1px solid var(--c-border-strong); }
+.rp-appr { font-size: var(--fs-xs); white-space: nowrap; }
+.rp-act-row.no-issue > * { color: var(--c-text-muted); }
+.rp-act-row.no-issue .rp-act-ch { color: var(--c-text-muted); }
+.rp-status-btn { font: inherit; background: transparent; border: 0; padding: 0; cursor: pointer; border-bottom: 1px dotted var(--c-border-strong); }
+.rp-status-btn:hover { border-bottom-color: var(--c-primary); }
+.rp-switch { font-weight: var(--fw-medium); }
+/* Popover ประวัติการอนุมัติ */
+.rp-hist { display: grid; gap: var(--sp-2); min-width: 280px; max-width: 420px; font-size: var(--fs-sm); }
+.rp-hist-title { font-size: var(--fs-sm); }
+.rp-hist-list { margin: 0; padding: 0 0 0 1.2em; display: grid; gap: 4px; }
+.rp-hist-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--sp-3); }
+.rp-hist-at { color: var(--c-text-muted); font-size: var(--fs-xs); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rp-hist-note { grid-column: 1 / -1; font-size: var(--fs-xs); color: var(--c-wf-returned-fg); }
+.rp-hist-item.is-return .rp-hist-event { color: var(--c-wf-returned-fg); font-weight: var(--fw-bold); }
+.rp-hist-go { font-size: var(--fs-xs); justify-self: start; }
 .rp-act-table tbody th { font-weight: var(--fw-medium); white-space: nowrap; background: transparent; }
 .rp-act-ch { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-2) + 8px) !important; font-weight: var(--fw-bold); white-space: nowrap; }
 .rp-act-table .num { text-align: right; }
@@ -62,6 +80,8 @@
 .rp-doc-status { font-weight: var(--fw-bold); font-size: var(--fs-sm); }
 .rp-doc-td, .rp-doc-printed { font-size: var(--fs-sm); }
 .rp-doc-note { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.rp-doc-approval { font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.rp-approvals-td { font-size: var(--fs-sm); margin: 0 0 var(--sp-2); }
 
 .rp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
 

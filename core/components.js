@@ -600,65 +600,87 @@
   // ปุ่ม Dropdown ตอนปิดแสดงเฉพาะชื่อ / ตอนเปิดแต่ละรายการ: ชื่อ · ผู้รับผิดชอบ · สถานะคงเหลือ · สถานะ Workflow
   // คืน element (display: contents) ที่มี .channel, .unit (null = Channel ยังไม่มีหน่วย) และ .update()
   // ป้ายหน่วยตาม allocationUnit ของ Channel: Account | เขต / เลือก Channel ใหม่ = หน่วยแรกของ Channel นั้น
+  // opts.allowAggregate (CR-13 หน้าจัดสรรเป้าหมายรายเดือนเท่านั้น): ปุ่ม Channel มี "ทั้งหมด" เป็นตัวแรก / Dropdown มี "รวมทั้ง {Channel} ({n} หน่วย)"
+  //   บนสุด (เลือก "ทั้งหมด" = มีเฉพาะ "รวมทุก Channel") / ‹ › ไล่ถึงตัวเลือกรวม / มุมมองรวมอ่านจาก opts.selection.aggregate = 'channel' | 'all'
+  //   onSelect(channelId, unitId, aggregate) — aggregate = 'channel' | 'all' | null (unitId = หน่วยขายล่าสุด ใช้ต่อในหน้าวางแผน SKU)
+  //   → .aggregate ('channel' | 'all' | null) / มุมมองรวม .unit = null (มุมมองทุก Channel .channel = null ด้วย)
   // ---------------------------------------------------------------------
   function subChannelPicker(opts) {
     var calc = SP.core.calc;
     var L = labels();
     var P = L.picker;
+    var AGG = '_all';
     var sel = calc.resolveSelection(opts.tree, opts.selection);
-    var ch = sel.channel;
-    var unit = sel.unit;
-    var wrap = h('div', { class: 'sc-picker' });
+    var aggregate = opts.allowAggregate && opts.selection && sel.channel ? opts.selection.aggregate || null : null;
+    if (aggregate !== 'channel' && aggregate !== 'all') aggregate = null;
+    var ch = aggregate === 'all' ? null : sel.channel;
+    var unit = aggregate ? null : sel.unit;
+    var wrap = h('div', { class: 'sc-picker' + (opts.allowAggregate ? ' has-aggregate' : '') });
     wrap.channel = ch;
     wrap.unit = unit;
+    wrap.aggregate = aggregate;
     wrap.update = function () {};
-    if (!ch) return wrap;
+    if (!sel.channel) return wrap;
 
-    function go(channelId, unitId) {
+    function go(channelId, unitId, agg) {
       if (opts.guard && !opts.guard()) return false;
-      opts.onSelect(channelId, unitId);
+      opts.onSelect(channelId, unitId, agg || null);
       return true;
     }
+    function firstUnit(c) { return c && c.children[0] ? c.children[0].id : null; }
 
+    var chOptions = opts.tree.children.map(function (c) { return { value: c.id, label: c.name, title: c.fullName }; });
+    if (opts.allowAggregate) chOptions.unshift({ value: AGG, label: P.all, title: P.allTitle });
     wrap.appendChild(segmented({
-      label: P.channel, value: ch.id,
-      options: opts.tree.children.map(function (c) { return { value: c.id, label: c.name, title: c.fullName }; }),
+      label: P.channel, value: aggregate === 'all' ? AGG : ch.id,
+      options: chOptions,
       onChange: function (v) {
+        if (v === AGG) { go(sel.channel.id, sel.unit ? sel.unit.id : null, 'all'); return; }
         var next = calc.findById(opts.tree.children, v);
-        go(v, next.children[0] ? next.children[0].id : null);
+        // มุมมองรวมอยู่แล้ว → รวมของ Channel ที่เลือก / มุมมองหน่วยขาย → หน่วยแรกของ Channel นั้น
+        go(v, firstUnit(next), aggregate ? 'channel' : null);
       }
     }));
-    if (!unit) return wrap;
+    if (!unit && !aggregate) return wrap;
 
-    var units = ch.children;
-    var typeLabel = ch.unitLabel || P.unit;
+    var units = ch ? ch.children : [];
+    var typeLabel = (ch && ch.unitLabel) || P.unit;
     function options() {
-      return units.map(function (u) {
+      if (aggregate === 'all') return [{ value: AGG, label: P.allTotal }];
+      var list = units.map(function (u) {
         var o = opts.ownerOf ? opts.ownerOf(u.id) : null;
         var meta = [];
         if (opts.remainingOf) meta.push(alertBadge(opts.remainingOf(u.id)));
         if (opts.workflowOf) meta.push(wfBadge(opts.workflowOf(u.id)));
         return { value: u.id, label: u.name, sub: o ? o.name : null, meta: meta };
       });
+      if (opts.allowAggregate) list.unshift({ value: AGG, label: fill(P.channelTotal, { channel: ch.name, n: units.length }) });
+      return list;
     }
 
+    var current = aggregate ? AGG : unit.id;
     var picker = searchSelect({
       label: typeLabel, placeholder: P.search, emptyText: P.noMatch, plainButton: true,
-      options: options(), value: unit.id,
-      onChange: function (v) { if (!go(ch.id, v)) picker.update(options(), unit.id); }
+      options: options(), value: current,
+      onChange: function (v) {
+        var ok = v === AGG ? (aggregate === 'all' || go(ch.id, sel.unit && sel.unit.id && calc.findById(units, sel.unit.id) ? sel.unit.id : firstUnit(ch), 'channel')) : go(ch.id, v, null);
+        if (!ok) picker.update(options(), current);
+      }
     });
-    var idx = units.indexOf(unit);
+    // ลำดับของ ‹ ›: (ตัวเลือกรวม) → หน่วยขายใน Channel
+    var seq = aggregate === 'all' ? [AGG] : (opts.allowAggregate ? [AGG] : []).concat(units.map(function (u) { return u.id; }));
+    var idx = seq.indexOf(current);
     function step(delta, text, title) {
-      var target = units[idx + delta];
+      var target = aggregate === 'all' ? null : seq[idx + delta];
       return h('button', {
         type: 'button', class: 'btn btn-ghost btn-sm sc-step', title: title, 'aria-label': title, disabled: !target,
-        onClick: function () { go(ch.id, target.id); }
+        onClick: function () { if (target === AGG) go(ch.id, firstUnit(ch), 'channel'); else go(ch.id, target, null); }
       }, text);
     }
 
     wrap.appendChild(h('div', { class: 'sc-pick' },
       h('span', { class: 'field-label sc-type' }, typeLabel), step(-1, '‹', P.prev), picker, step(1, '›', P.next)));
-    var owner = opts.ownerOf ? opts.ownerOf(unit.id) : null;
+    var owner = unit && opts.ownerOf ? opts.ownerOf(unit.id) : null;
     if (owner) {
       wrap.appendChild(h('span', { class: 'sc-owner ctx-item' + (owner.vacant ? ' is-vacant' : ''), title: owner.title, tabindex: '0' },
         h('span', { class: 'field-label' }, L.owner.label + ':'), h('strong', null, owner.name)));
