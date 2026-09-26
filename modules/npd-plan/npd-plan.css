@@ -61,3 +61,12 @@
 
 @media (max-width: 1100px) { .npd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .npd-kpis { grid-template-columns: minmax(0, 1fr); } .npd-timeline { --npd-label: 200px; } }
+
+/* CR-20: คำขอจาก Sales (กลุ่มแยกด้านบน เลื่อนภายในเมื่อมีหลายรายการ) */
+.npd-requests { padding: var(--sp-2) var(--sp-3); }
+.npd-requests > * + * { margin-top: var(--sp-2); }
+.npd-req-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; }
+.npd-req-scroll { max-height: 180px; overflow: auto; }
+.npd-req-table { font-size: 13px; }
+.npd-req-note { max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.npd-req-empty { margin: 0; }

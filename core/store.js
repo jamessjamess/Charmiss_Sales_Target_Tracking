@@ -22,12 +22,17 @@
  *   master.listings                   [{ productKey, accountId (= unitId) }] (ไม่แยกปี)   default: data/listings.js
  *   master.taxonomy                   หมวดสินค้าและ Series   default: data/taxonomy.js
  *   master.priceList                  ราคาตามวันที่มีผล   default: data/pricing.js
+ *   master.accountPrices              ราคาต่อ Account [{ productKey, accountId, price }] ราคาเดียวทั้งปี รวม VAT (CR-18)   default: data/pricing.js (จาก seed)
  *   master.promotions                 Promotion Price   default: data/promotions.js
  *   master.npdPlans                   แผน NPD (มี workflow ของตัวเอง)   default: data/npd.js
  *   master.audit                      Audit log [{ entity, key, field, oldValue, newValue, by, at }]   default: []
  *   master.accounts / master.territories / master.salespeople / master.assignments
  *                                     Account, เขตการขาย, Sales Person, ผู้รับผิดชอบตามช่วงเดือน (ไม่แยกปี)
  *                                     default: data/accounts.js, territories.js, salespeople.js, assignments.js
+ *   master.stores                     ร้านค้า TT (CR-16 นำเข้าจาก data/seed/ อ่านอย่างเดียว)   default: core/stores.js
+ *   master.storeAssignments           [{ storeId, territoryId, fromMonth, toMonth | null }] ร้านอยู่ในเขตใดในเดือนใด
+ *   master.storeMoves                 [{ at, by, to, fromMonth, storeIds, before }] การย้ายร้านที่บันทึกแล้ว (ใช้หาการย้ายหลังอนุมัติเป้าหมาย)   default: []
+ *   master.provinceSuggestions        { <territoryId>: [จังหวัด] } จังหวัดแนะนำของเขต
  *   ui.selection                      { channel, unit } ที่เลือกใน subChannelPicker (หน้า Phasing และวางแผน SKU ใช้ร่วมกัน)
  *   ui.planMode                       'initial' สร้างแผนครั้งแรก | 'reforecast' ปรับแผน (ใช้ได้หลังล็อก Baseline)
  *   ui.currentMonth                   เดือนปัจจุบันจำลองของปีแผน (0–11)   default: DEMO_FORECAST_MONTH
@@ -45,10 +50,12 @@
  * API: get(key) / set(key, value) / remove(key) กลับไปใช้ค่าตั้งต้น / reset() ล้างทุก Key
  *      isSet(key) / keys() / onChange(fn) / status { persistent, crossPage }
  *      year() = ปีแผนที่เลือก / planKey('topDown') = 'plan.<ปีที่เลือก>.topDown'
- *      master() = { products, listings, taxonomy, priceList, promotions, npdPlans, audit, accounts, territories, salespeople,
- *                   assignments } จาก master.*
+ *      master() = { products, listings, taxonomy, priceList, accountPrices, promotions, npdPlans, audit, accounts, territories, salespeople,
+ *                   assignments, stores, storeAssignments, storeMoves, provinceSuggestions } จาก master.*
  *      data()   = SP.data ที่แทน Master ทุกชุดด้วยค่าใน master.*
  *                 (ส่งให้ calc แทน SP.data เพื่อให้ค่าที่แก้ในหน้า Master มีผลทุกหน้า)
+ *                 CR-16: ยอดขายปีก่อนของเขต TT ของปีแผนที่เลือก = ร้านที่อยู่ในเขต ณ เดือนแรกของปีแผน (core/stores.js applyHistory)
+ *                 ก่อนอนุมัติจัดสรรเป้าหมายประจำปีใช้ร้านปัจจุบัน / หลังอนุมัติใช้ร้าน ณ เวลาที่อนุมัติ
  *      role() = บทบาทจำลอง / currentKey() = เดือนปัจจุบันจำลองแบบ 'YYYY-MM' / today() = วันแรกของเดือนนั้น 'YYYY-MM-01'
  *      appendAudit(entries) = ต่อท้าย master.audit
  *      workflowStates() = { '<step>.<unitId|all>': state } ของปีที่เลือก / saveWorkflowStates(map)
@@ -63,8 +70,10 @@
 
   var PREFIX = 'SP:';
   // รุ่นโครงข้อมูล: v6 เปลี่ยนสินค้าเป็น productKey (TR Code / รหัสชั่วคราว) / 7 = CR-11 สินค้าจริงจาก data/seed/
+  // 8 = CR-16 เขต TT และ Sales Person TT จากข้อมูลร้านค้าจริง (id เขตเปลี่ยน)
+  // 9 = CR-18 ราคารวม VAT + ราคาต่อ Account แยกจาก Price List (master.accountPrices)
   // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด)
-  var DATA_VERSION = 7;
+  var DATA_VERSION = 9;
 
   function sessionAdapter() {
     var ss;
@@ -149,6 +158,7 @@
     { match: /^master\.listings$/, make: function () { return clone(SP.data.listings); } },
     { match: /^master\.taxonomy$/, make: function () { return clone(SP.data.taxonomy); } },
     { match: /^master\.priceList$/, make: function () { return clone(SP.data.priceList); } },
+    { match: /^master\.accountPrices$/, make: function () { return clone(SP.data.accountPrices || []); } },
     { match: /^master\.promotions$/, make: function () { return clone(SP.data.promotions); } },
     { match: /^master\.npdPlans$/, make: function () { return clone(SP.data.npdPlans); } },
     { match: /^master\.audit$/, make: function () { return []; } },
@@ -156,6 +166,10 @@
     { match: /^master\.territories$/, make: function () { return clone(SP.data.territories); } },
     { match: /^master\.salespeople$/, make: function () { return clone(SP.data.salespeople); } },
     { match: /^master\.assignments$/, make: function () { return clone(SP.data.assignments); } },
+    { match: /^master\.stores$/, make: function () { return clone(SP.data.stores || []); } },
+    { match: /^master\.storeAssignments$/, make: function () { return clone(SP.data.storeAssignments || []); } },
+    { match: /^master\.storeMoves$/, make: function () { return []; } },
+    { match: /^master\.provinceSuggestions$/, make: function () { return clone(SP.data.provinceSuggestions || {}); } },
     {
       match: /^ui\.selection$/,
       make: function () {
@@ -269,13 +283,18 @@
       listings: get('master.listings'),
       taxonomy: get('master.taxonomy'),
       priceList: get('master.priceList'),
+      accountPrices: get('master.accountPrices'),
       promotions: get('master.promotions'),
       npdPlans: get('master.npdPlans'),
       audit: get('master.audit'),
       accounts: get('master.accounts'),
       territories: get('master.territories'),
       salespeople: get('master.salespeople'),
-      assignments: get('master.assignments')
+      assignments: get('master.assignments'),
+      stores: get('master.stores'),
+      storeAssignments: get('master.storeAssignments'),
+      storeMoves: get('master.storeMoves'),
+      provinceSuggestions: get('master.provinceSuggestions')
     };
   }
 
@@ -284,6 +303,9 @@
     Object.keys(SP.data).forEach(function (k) { d[k] = SP.data[k]; });
     var m = master();
     Object.keys(m).forEach(function (k) { d[k] = m[k]; });
+    // CR-16: ยอดขายปีก่อนของเขต TT ตามร้านที่อยู่ในเขต (หลังอนุมัติจัดสรรเป้าหมายประจำปี = ร้าน ณ เวลาที่อนุมัติ)
+    var S = SP.core.stores;
+    if (S) d = S.applyHistory(d, year(), S.approvedAt(get('plan.' + year() + '.workflow.topDown.all')));
     return d;
   }
 

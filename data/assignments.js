@@ -9,7 +9,8 @@
  *
  * ตั้งใจให้เห็น:
  *   EVEANDBOY เปลี่ยนคนเมื่อ มี.ค. 2027 (วิทยาลาออก ก.พ. 2027) → ตาราง Performance มีคนที่ลาออกแล้ว
- *   TT เขต 3 ภาคกลาง ว่าง → Alert "หน่วยที่ว่าง"
+ * CR-16: ผู้รับผิดชอบของเขต TT (territoryAssignments) มาจาก data/seed/seed-tt-stores.js (core/stores.js นำเข้าตอนโหลด)
+ *   TT เขต 4: อัมพร ม.ค.–ก.ค. 2026 → กฤษดา ตั้งแต่ ส.ค. 2026 · เขตอื่นคนเดิมทั้งปี
  */
 (function (SP) {
   'use strict';
@@ -24,10 +25,6 @@
     { unitId: 'konvy',        salesPersonId: 'sp-kam',   fromMonth: '2026-01', toMonth: null },
     { unitId: 'lotuss',       salesPersonId: 'sp-kam',   fromMonth: '2026-01', toMonth: null },
     { unitId: 'tsuruha',      salesPersonId: 'sp-kam',   fromMonth: '2026-01', toMonth: null },
-    { unitId: 'tt-north',     salesPersonId: 'sp-korn',  fromMonth: '2026-01', toMonth: null },
-    { unitId: 'tt-northeast', salesPersonId: 'sp-nuch',  fromMonth: '2026-01', toMonth: null },
-    { unitId: 'tt-east',      salesPersonId: 'sp-thana', fromMonth: '2026-06', toMonth: null },
-    { unitId: 'tt-south',     salesPersonId: 'sp-thana', fromMonth: '2026-06', toMonth: null },
     { unitId: 'shopee',       salesPersonId: 'sp-mild',  fromMonth: '2026-01', toMonth: null },
     { unitId: 'lazada',       salesPersonId: 'sp-ton',   fromMonth: '2026-01', toMonth: null },
     { unitId: 'tiktok',       salesPersonId: 'sp-mild',  fromMonth: '2026-01', toMonth: null },

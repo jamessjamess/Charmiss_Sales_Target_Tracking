@@ -21,7 +21,7 @@
   SP.data.channels = [
     { id: 'mt',     name: 'MT',     fullName: 'Modern Trade',      colorToken: '--ch-1', allocationUnit: 'ACCOUNT',   sellOutMethod: 'ACTUAL',           hasGP: true,  active: true,  order: 1, unitLabel: 'Account',   gpLabel: 'GP' },
     { id: 'tt',     name: 'TT',     fullName: 'Traditional Trade', colorToken: '--ch-2', allocationUnit: 'TERRITORY', sellOutMethod: 'SELL_IN_MINUS_CN', hasGP: false, priceBasis: 'SELL_IN', active: true,  order: 2, unitLabel: 'เขตการขาย', gpLabel: null },
-    { id: 'ecom',   name: 'ECOM',   fullName: 'E-commerce',        colorToken: '--ch-3', allocationUnit: 'ACCOUNT',   sellOutMethod: 'ACTUAL',           hasGP: true,  active: true,  order: 3, unitLabel: 'Platform',  gpLabel: 'ค่าธรรมเนียม Platform' },
+    { id: 'ecom',   name: 'ECOM',   fullName: 'E-commerce',        colorToken: '--ch-3', allocationUnit: 'ACCOUNT',   sellOutMethod: 'ACTUAL',           hasGP: true,  active: true,  order: 3, unitLabel: 'Platform',  gpLabel: 'Platform Fee' },
     { id: 'export', name: 'Export', fullName: 'Export ต่างประเทศ',  colorToken: '--ch-4', allocationUnit: 'ACCOUNT',   sellOutMethod: 'ACTUAL',           hasGP: true,  active: false, order: 4, unitLabel: 'Account',   gpLabel: 'GP' }
   ];
 })(window.SP);

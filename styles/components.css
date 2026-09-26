@@ -682,6 +682,19 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .drawer-body > * + * { margin-top: var(--sp-3); }
 .drawer .segmented { flex-wrap: nowrap; }
 
+/* ---------------- ตัวกรองหมวดสินค้า (components.categoryFilter) และ Chip ตัวกรอง (components.filterChips) — CR-15 ---------------- */
+.cat-filter { display: contents; }
+.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2); font-size: var(--fs-xs); }
+.filter-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 2px 1px var(--sp-2); border-radius: 999px; background: var(--c-primary-soft);
+  color: var(--c-primary-strong); border: 1px solid var(--c-border); font-weight: var(--fw-medium); }
+.filter-chip-x { font: inherit; font-size: 14px; line-height: 1; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.filter-chip-x:hover, .filter-chip-x:focus-visible { background: var(--c-surface); outline: none; }
+.filter-chips-clear { font-size: var(--fs-xs); }
+/* ปุ่มที่หน้าตาเป็นลิงก์ (ล้างตัวกรอง · ดูทั้งหมดในรายการสินค้า) */
+.link-btn { font: inherit; padding: 0; border: 0; background: transparent; color: var(--c-primary-strong); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { color: var(--c-primary); }
+.link-btn:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; border-radius: 2px; }
+
 /* ---------------- ตารางที่เลื่อนภายในการ์ด (หน้า Product Master ที่สูงเท่าจอ) ---------------- */
 .card.fit-card { padding: 0; overflow: hidden; }
 .card.fit-card > * + * { margin-top: 0; }
@@ -760,6 +773,25 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .year-title-caret { font-size: 0.55em; color: var(--c-text-muted); }
 .year-popover { min-width: 120px; }
 .year-option { font-variant-numeric: tabular-nums; }
+/* CR-16: ข้อมูล ณ เดือน [ก.ย. 2026 ▾] (components.monthPicker) หน้าตาเดียวกับตัวเลือกปีแผน + ป้ายเล็กนำหน้า */
+.month-picker { display: contents; }
+.month-title { margin-left: 0; }
+.month-title-label { font-size: var(--fs-sm); font-weight: var(--fw-medium); color: var(--c-text-muted); margin-right: 2px; }
+.month-popover { padding: var(--sp-2); }
+.month-grid { display: grid; gap: 4px; }
+.month-grid-row { display: grid; grid-template-columns: 3.2em repeat(12, minmax(2.6em, auto)); gap: 2px; align-items: center; }
+.month-grid-year { font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.month-grid-cell { font: inherit; font-size: var(--fs-xs); padding: 3px 2px; border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; cursor: pointer; color: inherit; }
+.month-grid-cell:hover:not(:disabled) { background: var(--c-primary-soft); }
+.month-grid-cell:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 1px; }
+.month-grid-cell:disabled { color: var(--c-text-muted); opacity: 0.45; cursor: default; }
+.month-grid-cell.is-current { text-decoration: underline; text-underline-offset: 3px; font-weight: var(--fw-bold); }
+.month-grid-cell.is-selected { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-on-primary); }
+@media (max-width: 600px) { .month-grid-row { grid-template-columns: 3em repeat(6, minmax(2.6em, auto)); } .month-grid-year { grid-row: span 2; } }
+/* CR-16: ไอคอนชื่อที่ถูกซ่อน (ร้านค้าบุคคลธรรมดา) */
+.privacy-mark { display: inline-flex; align-items: center; margin-left: 4px; color: var(--c-text-muted); vertical-align: middle; cursor: help; }
+.privacy-mark .icon { width: 14px; height: 14px; }
+.dlg-text-input { width: 100%; min-width: 18em; }
 .year-option.is-current { font-weight: var(--fw-bold); color: var(--c-primary-strong); }
 
 /* ป้าย P = มี Promotion บางวัน (หน้าวางแผนราย SKU และ Promotion Price) */
@@ -796,3 +828,33 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .pd-list { margin: 0; padding-left: 1.2em; font-size: var(--fs-sm); display: grid; gap: 2px; }
 .pd-section.is-dirty-cell { box-shadow: inset 0 0 0 2px var(--c-dirty); border-radius: var(--radius-sm); padding: var(--sp-1); }
 .pd-temp { margin-top: var(--sp-1); }
+
+/* CR-21: Chip ระดับสิทธิ์ (components.permChip) ไม่เห็น เทา · ดู ฟ้าอ่อน · แก้ไข เขียว / ปุ่มเฉพาะ ✓ – / จุดมุม = ต่างจากค่าตั้งต้น */
+.perm-chip { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 4.2em; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 1.5; white-space: nowrap; border: 1px solid transparent; }
+.perm-chip.is-none { background: var(--c-surface-2); color: var(--c-text-muted); border-color: var(--c-border); }
+.perm-chip.is-view { background: var(--c-wf-submitted-bg); color: var(--c-wf-submitted-fg); }
+.perm-chip.is-edit { background: var(--c-wf-approved-bg); color: var(--c-wf-approved-fg); }
+.perm-chip.is-action { min-width: 3em; }
+.perm-chip.is-changed::after { content: ''; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-dirty); box-shadow: 0 0 0 2px var(--c-surface); }
+/* CR-21: หน้าที่ไม่มีสิทธิ์ (layout) · ลิงก์ไปหน้าที่ไม่เห็น · ไม่มีสิทธิ์ส่งออก = ซ่อนปุ่มส่งออก / CSV / พิมพ์ */
+.perm-denied { max-width: 48em; }
+.perm-denied .perm-home { margin-top: var(--sp-1); }
+/* CR-25: Toast หลังสลับมุมมองผู้ใช้ (layout.showToast) — ล่างกลางจอ เหนือแถบก่อนหน้า/ถัดไป หายเอง */
+.toast {
+  position: fixed; left: 50%; bottom: 64px; z-index: 1000; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--sp-2); max-width: calc(100vw - 32px);
+  padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4); border-radius: var(--radius-sm);
+  background: var(--c-text); color: var(--c-surface); font-size: var(--fs-sm); box-shadow: 0 8px 24px var(--c-shadow);
+  transition: opacity 0.3s;
+}
+.toast.is-leaving { opacity: 0; }
+.toast-close { border: 0; background: transparent; color: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; cursor: pointer; opacity: 0.8; }
+.toast-close:hover { opacity: 1; }
+@media print { .toast { display: none; } }
+.perm-hidden-link { display: none !important; }
+body.perm-no-export .export-btn, body.perm-no-export .pl-csv, body.perm-no-export .rp-print { display: none !important; }
+/* CR-21: ข้อความอ่านอย่างเดียวยาวขึ้น (ชื่อบทบาทจาก master.roles หลายบทบาท) → จอแคบตัดบรรทัดได้ ไม่ดันหน้าให้เลื่อนแนวนอน */
+@media (max-width: 767px) {
+  .wf-hint { white-space: normal; }
+  .wf-actions { max-width: 100%; }
+}

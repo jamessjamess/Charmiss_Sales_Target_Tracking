@@ -1,0 +1,23 @@
+/* modules/sales-team/sales-team.css — ทีมขาย (CR-19): การ์ดต่อ Channel · Manager / Officer · ฟอร์มใน <dialog> */
+.page-salesTeam .module-body > * + * { margin-top: var(--sp-3); }
+.st-note { margin: 0; }
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--sp-3); align-items: start; }
+.st-card { border-top: 4px solid var(--c, var(--c-border)); display: flex; flex-direction: column; gap: var(--sp-2); }
+.st-card > * + * { margin-top: 0; }
+.st-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--sp-2); }
+.st-ch-name { font-weight: var(--fw-bold); }
+.st-units { margin-left: auto; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.st-empty { margin: 0; font-size: var(--fs-sm); }
+.st-role-title { margin: 0 0 4px; font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--c-text-muted); }
+.st-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.st-member { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--sp-2); padding: 4px 6px; border-radius: var(--radius-sm); font-size: var(--fs-sm); }
+.st-member:nth-child(odd) { background: var(--c-surface-2); }
+.st-member.is-ended .st-name { color: var(--c-text-muted); text-decoration: line-through; }
+.st-member.is-dirty-row { box-shadow: inset 3px 0 0 var(--c-dirty); }
+.st-name { font-weight: var(--fw-medium); }
+.st-period { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.st-tools { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.st-actions { display: flex; justify-content: flex-end; }
+.st-form { display: grid; gap: 2px; min-width: min(420px, 80vw); }
+.st-form .select { width: 100%; }
+.st-error { margin: 4px 0 0; }

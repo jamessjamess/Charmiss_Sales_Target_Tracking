@@ -22,6 +22,10 @@
 .rp-year-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: var(--fs-sm); }
 .rp-year-lines li { display: flex; align-items: baseline; gap: var(--sp-2); }
 .rp-dot { flex: 0 0 auto; width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 1px solid; align-self: center; }
+/* CR-16: ร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย + รายการร้าน */
+.rp-year-detail .rp-dot { align-self: flex-start; margin-top: 6px; }
+.rp-year-text { min-width: 0; }
+.rp-moved-list { margin: 2px 0 0; padding-left: 1.2em; font-size: var(--fs-xs); color: var(--c-text-muted); display: grid; gap: 1px; }
 .rp-lock { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
 .rp-lock.is-locked { color: var(--c-text-muted); }
 
@@ -34,7 +38,9 @@
 .rp-filter .select { font-size: var(--fs-sm); padding-top: 3px; padding-bottom: 3px; }
 .rp-check { cursor: pointer; }
 .rp-act-table { min-width: 1100px; }
-.rp-act-table th, .rp-act-table td { padding: 5px var(--sp-2); vertical-align: middle; }
+.rp-act-table.is-lite { min-width: 720px; }   /* CR-17: ไม่มีคอลัมน์การอนุมัติ */
+/* CR-16: 10 หน่วยขาย (TT 4 เขต) — แถวเตี้ยลงให้แท็บติดตามสถานะไม่เลื่อนที่ 1920×937 (CR-13 ข้อ 8.2) */
+.rp-act-table th, .rp-act-table td { padding: 3px var(--sp-2); vertical-align: middle; }
 /* หัวตาราง 2 ชั้น: เป้าหมายรายเดือน / แผน SKU ครอบ สถานะ · ผู้อนุมัติ · วันที่อนุมัติ */
 .rp-act-table thead th, .rp-approvals-table thead th { font-size: var(--fs-xs); line-height: 1.25; vertical-align: bottom; }
 .data-table th.rp-group-head { text-align: center; border-bottom: 1px solid var(--c-border-strong); border-left: 1px solid var(--c-border-strong); }

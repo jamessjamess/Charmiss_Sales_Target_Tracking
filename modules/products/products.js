@@ -10,15 +10,20 @@
  *                 ผูกรหัสจริง (โหมดดู): ย้ายทุกข้อมูลที่อ้างรหัสชั่วคราวไปใช้ TR Code รวมแผน SKU ทุกปี (calc.bindTrCode, calc.renamePlanKey)
  *                 Status (ณ เดือนปัจจุบันจำลอง), ความครบถ้วน, ราคา คำนวณจาก calc เท่านั้น / รูปย่อด้วย Canvas (components.resizeImage)
  * อ่านจาก data/:  channels, settings, erp-snapshot, content (pages.productList, labels) + Master ผ่าน store.data()
- * store อ่าน:     master.products, master.priceList, master.listings, master.promotions, master.npdPlans, master.taxonomy, master.audit,
+ * store อ่าน:     master.products, master.priceList, master.accountPrices, master.listings, master.promotions, master.npdPlans, master.taxonomy, master.audit,
  *                 master.accounts, master.territories, ui.seriesFilter, ui.productColumns, ui.currentMonth, ui.role, plan.<ปี>.sku/forecast.*
+ * รับตัวกรองจากหน้าหมวดสินค้าและ Series (CR-15): ui.productFilterHandoff = { node, level, series } อ่านครั้งเดียวตอนเปิดหน้าแล้วลบ
+ *                 → กรองหมวดสินค้าระดับใดก็ได้ (Category / Sub Category / Type) + Series (ui.seriesFilter)
  * store เขียน:    master.products, master.priceList, master.audit (ตอนกด บันทึก) / ผูกรหัสจริง: master.products, listings, priceList,
- *                 promotions, npdPlans, plan.<ปี>.sku.* และ plan.<ปี>.forecast.* ที่บันทึกไว้ / ui.seriesFilter, ui.productColumns
+ *                 accountPrices, promotions, npdPlans, plan.<ปี>.sku.* และ plan.<ปี>.forecast.* ที่บันทึกไว้ / ui.seriesFilter, ui.productColumns
+ * CR-20:          ป้าย "จาก Sales" (สินค้าที่ Sales สร้างจากหน้าวางแผน SKU source SALES_REQUEST) + ตัวกรองที่มา: ทีม Product / จาก Sales
+ * CR-18:          แท็บราคา = ประวัติ RSP / ราคา Dealer + ราคาต่อ Account (แก้ที่หน้าราคาขายต่อ Account) · Promotion เฉพาะเมื่อเปิด Flag promotionCalendar
  */
 (function (SP) {
   'use strict';
 
   var C = SP.core.components;
+  var Perm = SP.core.permissions;
   var F = SP.core.format;
   var calc = SP.core.calc;
   var store = SP.core.store;
@@ -26,7 +31,7 @@
   var fill = C.fill;
 
   var OPTIONAL = ['internalCode', 'barcode', 'itemType', 'packSize', 'launchDate', 'listedCount', 'sellIn', 'updatedAt'];
-  var filters = { q: '', status: '', category: '', channel: '', itemType: 'SALE', completeness: '', kpi: '' };
+  var filters = { q: '', status: '', category: '', channel: '', itemType: 'SALE', completeness: '', source: '', kpi: '', node: '', nodeLevel: '' };
   var view = 'list';
   var tab = 'general';
 
@@ -45,9 +50,18 @@
     var creating = false;    // Drawer อยู่ในโหมดเพิ่ม SKU
     var notice = null;
 
+    // ตัวกรองที่ส่งมาจากหน้าหมวดสินค้าและ Series (ใช้ครั้งเดียว)
+    var handoff = store.get('ui.productFilterHandoff');
+    if (handoff) {
+      store.remove('ui.productFilterHandoff');
+      filters = { q: '', status: '', category: '', channel: '', itemType: '', completeness: '', source: '', kpi: '', node: handoff.node || '', nodeLevel: handoff.level || '' };
+      store.set('ui.seriesFilter', handoff.series || []);
+    }
+
     function cur() { return editing ? draft : saved; }
-    function role() { return store.role().type; }
-    function canEdit() { return SP.core.workflow.canEditMaster(store.role(), ['product']); }
+    // CR-21: สิทธิ์จากตารางสิทธิ์ (หน้ารายการสินค้า) / ผู้แก้ไข = ผู้ใช้ในมุมมองปัจจุบัน
+    function byName() { return C.roleName(store.role()); }
+    function canEdit() { return Perm.can(Perm.user(), 'productList'); }
     function tax() { return store.get('master.taxonomy'); }
 
     function diffCount() {
@@ -64,7 +78,7 @@
     C.guardUnsaved(dirty);
 
     var bar = C.workflowBar({
-      simple: true, editRoles: ['product'],
+      simple: true,
       editing: function () { return editing; },
       onEdit: function () { startEdit(); },
       onSave: function () { save(); },
@@ -75,7 +89,7 @@
     function startEdit() { editing = true; draft = clone(saved); draw(); }
 
     function save() {
-      var by = L.roles[role()] || '', at = new Date().toISOString();
+      var by = byName(), at = new Date().toISOString();
       var entries = [];
       draft.products.forEach(function (p) {
         var key = calc.productKey(p);
@@ -112,9 +126,20 @@
       var key = calc.productKey(p);
       return listings().some(function (l) { return l.productKey === key; }) ||
         store.get('master.promotions').some(function (x) { return x.productKey === key; }) ||
+        (store.get('master.accountPrices') || []).some(function (x) { return x.productKey === key; }) ||
         store.get('master.npdPlans').some(function (x) { return x.productKey === key; });
     }
 
+    function sourceOf(p) { return p.source === 'SALES_REQUEST' ? 'sales' : 'product'; }
+    // ป้าย "จาก Sales" + Tooltip ผู้ขอ · วันที่ · หน่วยขาย · หมายเหตุ
+    function salesTag(p) {
+      if (sourceOf(p) !== 'sales') return null;
+      var r = p.request || {};
+      var d = store.data();
+      var units = (r.unitIds || []).map(function (u) { var i = calc.unitInfo(d, u); return i ? i.unit.name : u; }).join(', ');
+      return h('span', { class: 'badge tag-warn pl-from-sales', title: fill(page.filters.fromSalesTip, { by: p.requestedBy || '–', date: p.requestedAt ? F.date(p.requestedAt.slice(0, 10)) : '–', units: units || '–', note: r.note || '–' }) },
+        page.filters.fromSales);
+    }
     function matches(p, skip) {
       var q = filters.q.trim().toLowerCase();
       if (q) {
@@ -124,10 +149,12 @@
       var st = statusOf(p), c = completeness(p);
       if (filters.status && st !== filters.status) return false;
       if (filters.category && p.categoryId !== filters.category) return false;
+      if (filters.node && p[calc.taxonomyField(filters.nodeLevel)] !== filters.node) return false;
       if (!calc.inSeries(p, store.get('ui.seriesFilter') || [])) return false;
       if (filters.channel && !listings().some(function (l) { return l.productKey === calc.productKey(p) && unitChannel(l.accountId) === filters.channel; })) return false;
       if (filters.itemType && (p.itemType || 'SALE') !== filters.itemType) return false;
       if (filters.completeness && c.level !== filters.completeness) return false;
+      if (filters.source && sourceOf(p) !== filters.source) return false;
       if (!skip && filters.kpi) {
         if ((filters.kpi === 'active' || filters.kpi === 'new') && st !== filters.kpi) return false;
         if ((filters.kpi === 'required' || filters.kpi === 'recommended') && c.level !== filters.kpi) return false;
@@ -250,6 +277,7 @@
         sel(Fl.channel, 'channel', [{ value: '', label: Fl.channelAll }].concat(SP.data.channels.map(function (c) { return { value: c.id, label: c.name }; }))),
         sel(Fl.itemType, 'itemType', [{ value: '', label: Fl.itemTypeAll }].concat(SP.data.settings.ITEM_TYPES.map(function (t) { return { value: t, label: L.itemTypes[t] }; }))),
         sel(Fl.completeness, 'completeness', [{ value: '', label: Fl.completenessAll }].concat(['ok', 'required', 'recommended'].map(function (k) { return { value: k, label: Fl.completenessOptions[k] }; }))),
+        sel(Fl.source, 'source', [{ value: '', label: Fl.sourceAll }].concat(['product', 'sales'].map(function (k) { return { value: k, label: Fl.sourceOptions[k] }; }))),
         h('span', { class: 'tool-right' },
           colBtn,
           h('button', { type: 'button', class: 'btn btn-secondary btn-sm pl-csv', onClick: exportCsv }, page.exportCsv),
@@ -265,6 +293,8 @@
       if (filters.q.trim()) parts.push('"' + filters.q.trim() + '"');
       if (filters.status) parts.push(Fl.status + ' ' + L.status[filters.status]);
       if (filters.category) parts.push(calc.taxonomyName(T, 'category', filters.category));
+      if (filters.source) parts.push(Fl.source + ' ' + Fl.sourceOptions[filters.source]);
+      if (filters.node) parts.push(calc.taxonomyName(T, 'category', filters.node));
       (store.get('ui.seriesFilter') || []).forEach(function (s) { parts.push(calc.taxonomyName(T, 'series', s) || L.series.none); });
       if (filters.channel) parts.push(Fl.channel + ' ' + calc.findById(SP.data.channels, filters.channel).name);
       if (filters.itemType) parts.push(L.itemTypes[filters.itemType]);
@@ -274,7 +304,7 @@
         h('span', { class: 'pl-count' }, fill(page.resultCount, { n: F.number(n), total: F.number(products.length) })),
         parts.length ? h('span', null, ' · ' + fill(page.filterSummary, { list: parts.join(' · ') }) + ' ') : null,
         parts.length ? h('button', { type: 'button', class: 'link-btn pl-clear', onClick: function () {
-          filters = { q: '', status: '', category: '', channel: '', itemType: '', completeness: '', kpi: '' };
+          filters = { q: '', status: '', category: '', channel: '', itemType: '', completeness: '', source: '', kpi: '', node: '', nodeLevel: '' };
           store.set('ui.seriesFilter', []);
           draw();
         } }, page.clearFilters) : null,
@@ -344,7 +374,7 @@
       var key = calc.productKey(p);
       var tds = cols.map(function (c) {
         if (c.key === 'code') {
-          return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, key), p.trCode ? null : h('span', { class: 'badge tag-warn pl-temp' }, L.product.tempTag));
+          return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, key), p.trCode ? null : h('span', { class: 'badge tag-warn pl-temp' }, L.product.tempTag), salesTag(p));
         }
         if (c.key === 'name') return h('td', { class: 'ellipsis pl-name', title: p.name }, p.name);
         if (c.key === 'status') {
@@ -538,7 +568,8 @@
         h('div', { class: 'pd-inline' }, input,
           h('button', { type: 'button', class: 'btn btn-primary btn-sm pd-bind-btn', onClick: function () {
             var code = input.value.trim();
-            var master = { products: store.get('master.products'), listings: store.get('master.listings'), priceList: store.get('master.priceList'), promotions: store.get('master.promotions'), npdPlans: store.get('master.npdPlans') };
+            var master = { products: store.get('master.products'), listings: store.get('master.listings'), priceList: store.get('master.priceList'),
+              accountPrices: store.get('master.accountPrices'), promotions: store.get('master.promotions'), npdPlans: store.get('master.npdPlans') };
             var check = calc.bindTrCode(master, p.tempCode, code);
             if (!check.ok) { msg.className = 'pm-msg is-error'; msg.textContent = B.errors[check.error] || check.error; return; }
             C.dialog({ title: fill(B.title, { temp: p.tempCode, code: code }), lines: B.lines, confirmLabel: B.button }).then(function (r) {
@@ -550,6 +581,7 @@
               store.set('master.products', out.products);
               store.set('master.listings', out.listings);
               store.set('master.priceList', out.priceList);
+              store.set('master.accountPrices', out.accountPrices);
               store.set('master.promotions', out.promotions);
               store.set('master.npdPlans', out.npdPlans);
               store.keys().filter(function (k) { return /^plan\.\d{4}\.(sku|forecast)\./.test(k); }).forEach(function (k) {
@@ -557,7 +589,7 @@
                 var moved = calc.renamePlanKey(plan, p.tempCode, code);
                 if (moved !== plan) store.set(k, moved);
               });
-              store.appendAudit([{ entity: 'product', key: code, field: 'trCode', oldValue: p.tempCode, newValue: code, by: L.roles[role()] || '', at: bound.updatedAt }]);
+              store.appendAudit([{ entity: 'product', key: code, field: 'trCode', oldValue: p.tempCode, newValue: code, by: byName(), at: bound.updatedAt }]);
               saved = { products: store.get('master.products'), priceList: store.get('master.priceList') };
               draft = clone(saved);
               selected = code;
@@ -588,6 +620,19 @@
               h('td', null, r.effectiveTo ? F.date(r.effectiveTo) : Pr.open), h('td', { class: 'num' }, F.baht(r.price, 2)), h('td', null, r.by || '–'));
           }))) : h('p', { class: 'muted' }, Pr.noPrice)));
       if (editing) body.appendChild(priceForm(p));
+      // CR-18: ราคาต่อ Account (ราคาเดียวทั้งปี รวม VAT) เทียบ RSP ณ วันนี้ของ Channel ของ Account
+      var accPrices = (store.get('master.accountPrices') || []).filter(function (x) { return x.productKey === key; });
+      var pageLink = h('a', { href: SP.core.paths.to(SP.core.registry.byId('promotionPrice').path) }, Pr.accountLink);
+      body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, Pr.accountTitle),
+        accPrices.length ? h('ul', { class: 'pd-list' }, accPrices.map(function (x) {
+          var u = calc.unitInfo(data, x.accountId);
+          var rsp = calc.priceOn(data.priceList, key, 'RSP', u && u.channel ? u.channel.id : null, today);
+          var diff = rsp > 0 ? x.price / rsp - 1 : null;
+          return h('li', null, fill(Pr.accountLine, { unit: u ? u.unit.name : x.accountId, price: F.baht(x.price, 2),
+            diff: diff == null ? '' : ' (' + (diff < 0 ? '−' : '+') + F.pct(Math.abs(diff), 0) + ' ' + fill(Pr.vsRsp, { rsp: F.baht(rsp, 2) }) + ')' }));
+        })) : h('p', { class: 'muted' }, Pr.accountEmpty),
+        SP.core.features.isOn('promotionCalendar') ? null : pageLink));
+      if (!SP.core.features.isOn('promotionCalendar')) return;
       var promos = store.get('master.promotions').filter(function (x) { return x.productKey === key; });
       var PP = SP.data.content.pages.promotionPrice;
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, Pr.promosTitle),
@@ -610,7 +655,7 @@
       return h('section', { class: 'pd-section pd-price-form' }, h('h3', null, Pr.addTitle),
         h('div', { class: 'pd-inline' }, type, channel, from, price,
           h('button', { type: 'button', class: 'btn btn-primary btn-sm pd-add-price', onClick: function () {
-            var res = calc.addPrice(draft.priceList, { productKey: calc.productKey(p), priceType: type.value, channelId: channel.value || null, price: Number(price.value), effectiveFrom: from.value, by: L.roles[role()] || '', at: new Date().toISOString() });
+            var res = calc.addPrice(draft.priceList, { productKey: calc.productKey(p), priceType: type.value, channelId: channel.value || null, price: Number(price.value), effectiveFrom: from.value, by: byName(), at: new Date().toISOString() });
             if (!res.ok) { msg.className = 'pm-msg is-error'; msg.textContent = Pr.errors[res.error]; return; }
             draft.priceList = res.list;
             refresh();
@@ -632,7 +677,10 @@
         field(Li.launch, editing ? textInput(p, 'launchDate', Li.launch, { type: 'date' }) : (p.launchDate ? F.date(p.launchDate) : '–')),
         field(Li.discontinue, editing ? textInput(p, 'discontinueMonth', Li.discontinue, { type: 'month' }) : (p.discontinueMonth ? F.date(p.discontinueMonth) : Li.discontinueNone)),
         field(Li.clearance, cl ? fill(Li.clearanceText, { from: F.date(cl.fromMonth), to: F.date(cl.toMonth), stock: F.units(cl.stockQty) }) : Li.clearanceNone),
-        npd ? field(NP.title, fill(Li.npdLink, { stage: NP.stages[calc.npdStage(npd, store.currentKey())], status: L.workflow.status[(npd.workflow || {}).status || 'draft'] })) : null));
+        // CR-17: ปิด npdApproval = ไม่แสดงสถานะอนุมัติของแผน NPD
+        npd ? field(NP.title, SP.core.features.isOn('npdApproval')
+          ? fill(Li.npdLink, { stage: NP.stages[calc.npdStage(npd, store.currentKey())], status: L.workflow.status[(npd.workflow || {}).status || 'draft'] })
+          : fill(Li.npdLinkStage, { stage: NP.stages[calc.npdStage(npd, store.currentKey())] })) : null));
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, fill(Li.timelineTitle, { year: year })), C.statusStrip(calc.statusSegments(p, year), year)));
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, fill(Li.listedTitle, { n: units.length })),
         units.length ? h('ul', { class: 'pd-list' }, Object.keys(byChannel).map(function (ch) { return h('li', null, h('strong', null, ch + ': '), byChannel[ch].join(', ')); })) : h('p', { class: 'muted' }, Li.listedEmpty),
@@ -706,7 +754,7 @@
             draft.products.push(np);
             var key = calc.productKey(np);
             if (Number(rspIn.value) > 0) {
-              var res = calc.addPrice(draft.priceList, { productKey: key, priceType: 'RSP', channelId: null, price: Number(rspIn.value), effectiveFrom: today, by: L.roles[role()] || '', at: at });
+              var res = calc.addPrice(draft.priceList, { productKey: key, priceType: 'RSP', channelId: null, price: Number(rspIn.value), effectiveFrom: today, by: byName(), at: at });
               if (res.ok) draft.priceList = res.list;
             }
             creating = false;

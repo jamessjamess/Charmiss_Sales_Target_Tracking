@@ -1,8 +1,9 @@
 /* modules/sku-planning/sku-planning.css — SKU Grid (CR-11)
- * แถบเครื่องมือ: แถบบริบท + ตัวควบคุมตาราง (+ แถบแก้ไข) / 12 เดือน + ทั้งปี (+ ปีก่อน · การเติบโต) พอดีกว้าง 1920px / ห้ามตัดตัวเลขด้วย "…"
- * หัวตาราง + แถวเป้าหมาย ติดบน / คอลัมน์ SKU ติดซ้าย (~300px) / แถว SKU สูงคงที่ ~48px (ชื่อ 2 บรรทัด)
+ * แถบเครื่องมือ: แถบบริบท + ตัวควบคุมตาราง (+ แถบแก้ไข) / 12 เดือน + ทั้งปี พอดีกว้าง 1920px เมื่อเมนูข้างเปิด / ห้ามตัดตัวเลขด้วย "…"
+ * CR-24: ชื่อ SKU ~260px · เดือน ~90px · ทั้งปี 110px / แสดงยอดอ้างอิง (+ L12M · การเติบโต) = ตัวเลขเล็กลง 1 ขั้น ไม่พอเลื่อนแนวนอนภายในตาราง
+ * หัวตาราง + แถวเป้าหมาย ติดบน / คอลัมน์ SKU ติดซ้าย / แถว SKU สูงคงที่ ~48px (ชื่อ 2 บรรทัด)
  * กล่องตารางสูงตามแถว: แถวน้อย = แถวรวมต่อจากแถวสุดท้ายทันที / แถวล้นกล่อง = ตารางเลื่อนภายใน แถวรวมและคงเหลือติดล่าง
- * จอกว้างตั้งแต่ 1024px: หน้าไม่ยืด (body.fit-screen) / จอแคบกว่า 1920px Side Menu พับให้เอง (layout.js) */
+ * จอกว้างตั้งแต่ 1024px: หน้าไม่ยืด (body.fit-screen) / CR-24: Side Menu ไม่พับเอง (ผู้ใช้พับเองได้) หน้าไม่เลื่อนแนวนอน */
 
 .page-skuPlanning {
   --sp-owner-h: 0px;
@@ -11,10 +12,11 @@
   --sp-group-h: 30px;
   --sp-foot-h: 30px;
   --sp-rem-h: 40px;
-  --sp-col-sku: 300px;
-  --sp-col-sum: 112px;
-  --sp-col-ly: 104px;
-  --sp-col-growth: 76px;
+  --sp-col-sku: 260px;
+  --sp-col-sum: 110px;
+  --sp-col-ly: 100px;
+  --sp-col-growth: 70px;
+  --sp-col-month: 90px;
   --fs-cell: 13px;
 }
 @media (max-height: 700px) {
@@ -76,8 +78,8 @@
 
 /* ---------- ตาราง ---------- */
 .sp-scroll { overflow: auto; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
-.sku-grid { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-cell); }
-.sku-grid.has-ly { min-width: 1240px; }
+.sku-grid { width: 100%; min-width: calc(var(--sp-col-sku) + 12 * var(--sp-col-month) + var(--sp-col-sum)); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-cell); }
+.sku-grid.has-ly { --sp-col-month: 84px; min-width: calc(var(--sp-col-sku) + 12 * var(--sp-col-month) + var(--sp-col-sum) + var(--sp-col-ly) + var(--sp-col-growth)); }
 .sku-grid.has-owner { --sp-owner-h: 24px; }
 .sku-grid col.col-sku { width: var(--sp-col-sku); }
 .sku-grid col.col-sum { width: var(--sp-col-sum); }
@@ -234,6 +236,9 @@
 .cell-icon { font-size: 10px; margin-right: 2px; opacity: 0.8; }
 
 .override-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-override); }
+/* CR-24: ยอดอ้างอิงเป็นประมาณการ (ไม่มียอดจริงเดือนนี้) — จุดกลวงมุมล่างขวา */
+.est-dot { position: absolute; bottom: 2px; right: 1px; width: 5px; height: 5px; border-radius: 50%; border: 1.5px solid var(--c-ly-fg); background: var(--c-surface); pointer-events: none; }
+.sp-override-swatch .est-dot { bottom: 1px; right: 1px; }
 
 /* ป้าย P มุมบนซ้ายภายในช่องเสมอ (อยู่เหนือช่องกรอก ไม่คร่อมเส้นช่อง) */
 .sku-grid td .promo-mark { position: absolute; left: 2px; top: 2px; z-index: 1; font-size: 9px; line-height: 1.3; padding: 0 2px; pointer-events: none; }
@@ -246,9 +251,37 @@
 
 @media (min-width: 1600px) {
   .page-skuPlanning { --fs-cell: 14px; }
+  .sku-grid.has-ly { --fs-cell: 13px; }
 }
 @media (max-width: 1599px) {
-  .page-skuPlanning { --sp-col-sku: 236px; --sp-col-sum: 96px; --sp-col-ly: 88px; --sp-col-growth: 60px; --fs-cell: 12.5px; }
-  .sku-grid.has-ly { --sp-col-sku: 212px; --sp-col-ly: 82px; --sp-col-growth: 56px; }
+  .page-skuPlanning { --sp-col-sku: 236px; --sp-col-sum: 96px; --sp-col-ly: 88px; --sp-col-growth: 60px; --sp-col-month: 72px; --fs-cell: 12.5px; }
+  .sku-grid.has-ly { --sp-col-sku: 212px; --sp-col-ly: 82px; --sp-col-growth: 56px; --sp-col-month: 70px; --fs-cell: 12px; }
   .sku-grid th, .sku-grid td { padding-left: 3px; padding-right: 3px; }
 }
+
+/* CR-19: ข้อความอ่านอย่างเดียวยาวขึ้น (หน่วยขายนี้อยู่ในทีม … / หน้านี้แก้ไขโดย Sales Manager / Officer ทีม …) ตัดบรรทัดได้บนจอแคบ */
+@media (max-width: 600px) {
+  .page-skuPlanning .wf-hint { white-space: normal; }
+}
+
+/* CR-20: Drawer เพิ่ม SKU จาก Product Master · ฟอร์มสร้าง NPD · ข้อความแนะนำในแถวคงเหลือ · จุดเตือนสินค้าจาก Sales ที่ทีม Product แก้ */
+.sp-drawer .sp-add-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.sp-drawer .sp-add-search { flex: 1 1 12em; min-width: 10em; }
+.sp-add-list { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
+.sp-add-group-head { display: flex; align-items: center; gap: var(--sp-2); padding: 4px 0; border-bottom: 1px solid var(--c-border); }
+.sp-add-note { margin: 4px 0; }
+.sp-add-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.sp-add-row { display: flex; align-items: flex-start; gap: var(--sp-2); padding: 4px 6px; border-radius: var(--radius-sm); font-size: var(--fs-sm); cursor: pointer; }
+.sp-add-row:hover { background: var(--c-surface-2); }
+.sp-add-row.is-blocked { cursor: default; color: var(--c-text-muted); }
+.sp-add-text { display: flex; flex-direction: column; min-width: 0; }
+.sp-add-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.sp-add-foot { position: sticky; bottom: calc(-1 * var(--sp-5)); display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); margin-top: var(--sp-3);
+  margin-bottom: calc(-1 * var(--sp-5)); padding: var(--sp-2) 0 calc(var(--sp-2) + var(--sp-5)); background: var(--c-surface); border-top: 1px solid var(--c-border); }
+.sp-add-count { font-size: var(--fs-sm); color: var(--c-text-muted); }
+.sp-npd-units { display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); }
+.sp-npd-note { width: 100%; }
+.sp-rem-hint { display: block; margin: 2px 0; font-size: var(--fs-xs); font-weight: normal; color: var(--status-short-fg); white-space: normal; }
+.row-remaining .sp-fill-target, .row-remaining .sp-new-npd { margin: 2px 4px 2px 0; }
+.sp-req-warn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: var(--fw-bold);
+  background: var(--status-over-bg); color: var(--status-over-fg); border: 1px solid var(--status-over-fg); cursor: help; }

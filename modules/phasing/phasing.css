@@ -1,30 +1,150 @@
-/* modules/phasing/phasing.css — แถบบริบทแถวเดียว + กราฟ/ตาราง 12 เดือนที่คอลัมน์ตรงกัน
- * ทดสอบที่ viewport 1920×937 และ 1366×625 เหมือนหน้า Top-down */
+/* modules/phasing/phasing.css — ขั้นที่ 2 Sub-channel Allocation (CR-23): แถบบริบท (ปุ่ม Channel) + ส่วน A ตารางหน่วยขาย + ส่วน B รายเดือน
+ * จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ (body.fit-screen): ส่วน A สูงตามแถว (สูงสุด ~45% เลื่อนภายใน) ส่วน B ใช้พื้นที่ที่เหลือ เลื่อนภายใน
+ * ทดสอบที่ viewport 1920×937 และ 1366×625 · กราฟรายเดือน / ตารางใช้คอลัมน์ร่วม --ph-cols */
 
-/* คอลัมน์ร่วมของกราฟและตาราง: ป้ายแถว | 12 เดือน | รวม */
 .page-phasing {
   --ph-cols: 176px repeat(12, minmax(0, 1fr)) 132px;
-  --bar-height: 160px;
+  --bar-height: 130px;
+  --sa-row-h: 30px;
+  --row-h: 30px;
+  --sa-col-hist: 96px;
+  --sa-col-pct: 110px;
+  --sa-col-amount: 148px;
+  --sa-col-pct-total: 96px;
+  --sa-col-growth: 88px;
+  --sa-col-compare: 240px;
+  --sa-col-manage: 60px;
+}
+@media (max-width: 1599px) {
+  .page-phasing {
+    --sa-col-hist: 76px;
+    --sa-col-pct: 92px;
+    --sa-col-amount: 122px;
+    --sa-col-pct-total: 78px;
+    --sa-col-growth: 66px;
+    --sa-col-compare: 160px;
+    --sa-col-manage: 48px;
+  }
 }
 @media (max-height: 760px) {
-  .page-phasing { --bar-height: 120px; }
+  .page-phasing { --bar-height: 100px; }
 }
 @media (max-height: 700px) {
-  .page-phasing { --bar-height: 66px; --row-h: 30px; }
+  .page-phasing { --bar-height: 66px; --row-h: 30px; --sa-row-h: 30px; }
   .page-phasing .page { padding-top: var(--sp-3); }
   .page-phasing .page-intro { margin-bottom: var(--sp-2); }
   .card.ph-card { padding-top: var(--sp-2); padding-bottom: var(--sp-2); }
 }
 
-.page-phasing .module-body > * + * { margin-top: var(--sp-3); }
+.page-phasing .module-body > * + * { margin-top: var(--sp-2); }
 
-/* ---------- การ์ดกราฟ + ตาราง ---------- */
-.card.ph-card { padding: var(--sp-3) var(--sp-4); }
-.card.ph-card > * + * { margin-top: var(--sp-2); }
-.ph-chart-head { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); min-height: 26px; }
+/* ---------- แถบบริบท + บรรทัดแจ้งการเปลี่ยนเป้าหมาย Channel ---------- */
+.sa-target-by { font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+@media (max-width: 767px) { .sa-ctx .ctx-item, .sa-ctx .ctx-item strong { white-space: normal; min-width: 0; } }
+.sa-notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3);
+  margin: 0; padding: 4px var(--sp-3); border-radius: var(--radius-sm);
+  background: var(--c-warn-bg); border: 1px solid var(--c-warn-bd); color: var(--c-warn-fg); font-size: var(--fs-sm);
+}
+.sa-notice-close { margin-left: auto; padding: 0 var(--sp-2); }
+.sa-ctx .sa-banner { margin: 0 0 0 auto; padding: 3px var(--sp-3); }
+
+/* ---------- การ์ด: หัวส่วน ---------- */
+.sa-card-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--sp-1) var(--sp-3); }
+.sa-card-title { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+.sa-hint { font-size: var(--fs-xs); }
+.sa-add { margin-left: auto; }
+.sa-add .account-picker .btn { padding: 0 var(--sp-2); min-height: 0; height: 22px; line-height: 20px; font-size: var(--fs-xs); border: 1px solid var(--c-border-strong); background: var(--c-surface); }
+.sa-add .account-picker .select-sm, .sa-add .account-picker select { height: 22px; padding-top: 0; padding-bottom: 0; font-size: var(--fs-xs); }
+.sa-wait { margin: 0; }
+.sa-wait a { margin-left: var(--sp-2); }
+
+/* ---------- ส่วน A: ตารางหน่วยขาย (สูงตามแถว สูงสุด ~45% เลื่อนภายใน) ---------- */
+.card.sa-units { padding: var(--sp-2) var(--sp-3); border-top: 4px solid var(--c); }
+.card.sa-units > * + * { margin-top: var(--sp-1); }
+.sa-scroll { overflow-y: auto; overflow-x: hidden; }
+@media (min-width: 1024px) {
+  /* ส่วน A สูงตามแถว (ไม่ถูกบีบ) สูงสุด 45% (CR-24: เดิม 48% · 7 หน่วยขายให้ส่วน B ไม่เลื่อน) · ส่วน B ใช้พื้นที่ที่เหลือและเลื่อนภายในเมื่อไม่พอ */
+  .fit-screen .module-body > .sa-units { flex: 0 0 auto; min-height: 0; max-height: 45%; display: flex; flex-direction: column; }
+  .fit-screen .sa-units .sa-scroll { flex: 0 1 auto; min-height: 0; }
+}
+
+.sa-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-table); }
+.sa-table col.col-hist { width: var(--sa-col-hist); }
+.sa-table col.col-pct { width: var(--sa-col-pct); }
+.sa-table col.col-amount { width: var(--sa-col-amount); }
+.sa-table col.col-pct-total { width: var(--sa-col-pct-total); }
+.sa-table col.col-growth { width: var(--sa-col-growth); }
+.sa-table col.col-compare { width: var(--sa-col-compare); }
+.sa-table col.col-manage { width: var(--sa-col-manage); }
+.sa-table th, .sa-table td {
+  height: var(--sa-row-h);
+  padding: 0 var(--sp-2);
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sa-table .num { text-align: right; }
+.sa-table thead th {
+  position: sticky; top: 0; z-index: 2; height: 22px;
+  background: var(--c-surface-2); font-size: 12px; font-weight: var(--fw-bold); color: var(--c-text-muted);
+}
+.sa-table thead .sa-head-years th { top: 22px; }
+.sa-table thead th[rowspan] { vertical-align: bottom; padding-bottom: 3px; }
+.sa-table thead th.sa-hist-group { text-align: center; border-bottom: 1px solid var(--c-border-strong); }
+.sa-table thead .prior-label { display: inline; }
+.sa-table thead .prior-label .info-dot { margin-left: 4px; }
+@media (max-width: 1599px) { .sa-table thead th { font-size: 11px; } }
+.has-tip { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
+.sa-hist { color: var(--c-text-muted); }
+.sa-hist.is-latest { color: var(--c-text); }
+.sa-table td.is-derived { color: var(--c-text-muted); font-weight: var(--fw-medium); opacity: 0.85; }
+
+/* แถวหน่วยขาย: คลิกเพื่อเลือก (ไฮไลต์แถวที่เลือก) · ผู้รับผิดชอบตัวเล็ก · จุดสถานะเป้าหมายรายเดือน */
+.sa-row { cursor: pointer; }
+.sa-row:hover > * { background: var(--c-surface-2); }
+.sa-row.is-selected > * { background: var(--c-primary-soft); }
+.sa-row > th:first-child { box-shadow: inset 4px 0 0 var(--c); padding-left: var(--sp-3); white-space: normal; line-height: 1.2; }
+.sa-row.is-selected > th:first-child { box-shadow: inset 6px 0 0 var(--c-primary); }
+.sa-agg-row > * { font-weight: var(--fw-bold); }
+.sa-pick { font: inherit; font-weight: var(--fw-bold); color: inherit; background: transparent; border: 0; padding: 0; cursor: pointer; text-align: left; border-bottom: 1px dotted var(--c-border-strong); }
+.sa-pick:hover, .sa-pick:focus-visible { color: var(--c-primary-strong); }
+.sa-dot { width: 8px; height: 8px; margin: 0 var(--sp-1) 1px var(--sp-2); vertical-align: middle; cursor: help; }
+.sa-owner { font-size: 11px; font-weight: var(--fw-medium); color: var(--c-text-muted); white-space: nowrap; }
+.sa-owner.is-vacant { font-style: italic; }
+.sa-compare { padding-right: var(--sp-3) !important; }
+.sa-table thead th.sa-vly-head { padding-right: var(--sp-3); }
+
+/* แถวคงเหลือ + เพิ่มหน่วยขาย */
+.sa-table .remaining-row > * { height: 30px; font-size: 12px; }
+.sa-table .sa-rem > * { border-top: 2px solid var(--c-border-strong); }
+.sa-table .sa-rem > .rem-label { padding-left: var(--sp-3); white-space: normal; line-height: 1.15; }
+.sa-manage-group { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.sa-manage .trash-btn, .sa-manage .more-btn { width: 26px; height: 26px; }
+.sa-normalize { padding: 0 var(--sp-2); min-height: 0; height: 22px; line-height: 20px; font-size: 12px; }
+.sa-table .sa-rem .more-btn { width: 24px; height: 22px; min-height: 0; padding: 0; line-height: 1; }
+.sa-table .sa-rem > td.sa-manage { overflow: hidden; }
+
+/* โหมดแก้ไข: ช่อง % และบาท (percentAmountInput) */
+.sa-table .num-input { width: 100%; }
+.sa-table input.num { width: 100%; font-size: var(--fs-table); padding: 1px 4px; height: calc(var(--sa-row-h) - 8px); }
+.sa-table .num-suffix { display: none; }
+
+/* ---------- ส่วน B: เป้าหมายรายเดือน (ใช้พื้นที่ที่เหลือ เลื่อนภายใน) ---------- */
+.card.ph-card { padding: var(--sp-2) var(--sp-3); }
+.card.ph-card > * + * { margin-top: var(--sp-1); }
+@media (min-width: 1024px) {
+  .fit-screen .module-body > .sa-monthly { flex: 1 1 0; min-height: 120px; display: flex; flex-direction: column; }
+  .fit-screen .sa-monthly .ph-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
+.ph-chart-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); min-height: 24px; }
+.sa-annual { font-size: var(--fs-sm); font-weight: var(--fw-medium); font-variant-numeric: tabular-nums; }
+.sa-head-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); margin-left: auto; }
 .ph-chart-head .legend { font-size: var(--fs-xs); gap: var(--sp-3); }
 .ph-chart-head .swatch { width: 14px; height: 14px; }
-.ph-basis { background: var(--c-warn-bg); border-color: var(--c-warn-bd); color: var(--c-warn-fg); margin-right: auto; }
+.ph-basis { background: var(--c-warn-bg); border-color: var(--c-warn-bd); color: var(--c-warn-fg); }
+.sa-chart-toggle { padding: 1px var(--sp-2); font-size: var(--fs-xs); }
 
 .ph-grid { min-width: 1000px; }
 .ph-chart .bar-chart { grid-template-columns: var(--ph-cols); gap: 0; }
@@ -34,20 +154,10 @@
 .ph-chart .bar-ghost { left: 10%; right: 10%; }
 
 /* ตารางเรียงเป็นแถว: เดือน / ยอดขายปีก่อน / สัดส่วน / เป้าหมาย / การเติบโต / คงเหลือ */
-.ph-table {
-  display: grid;
-  grid-template-columns: var(--ph-cols);
-  grid-auto-rows: var(--row-h);
-  font-size: var(--fs-table);
-}
+.ph-table { display: grid; grid-template-columns: var(--ph-cols); grid-auto-rows: var(--row-h); font-size: var(--fs-table); }
 .ph-cell {
-  display: flex;
-  align-items: center;
-  padding: 0 var(--sp-1);
-  border-bottom: 1px solid var(--c-border);
-  min-width: 0;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; padding: 0 var(--sp-1); border-bottom: 1px solid var(--c-border);
+  min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums;
 }
 .ph-cell.num { justify-content: flex-end; }
 .ph-head { font-weight: var(--fw-bold); background: var(--c-surface-2); }
@@ -67,16 +177,14 @@
 .ph-table .remaining-row > .rem-label { white-space: nowrap; }
 .rem-line { display: block; }
 
-/* แถวผู้รับผิดชอบรายเดือน (คอลัมน์เดียวกับตาราง: ป้าย | 12 เดือน | รวม) — แสดงเฉพาะเมื่อมีหลายคนในปี */
+/* แถวผู้รับผิดชอบรายเดือน (คอลัมน์เดียวกับตาราง) — แสดงเฉพาะเมื่อมีหลายคนในปี */
 .ph-owner { display: grid; grid-template-columns: var(--ph-cols); align-items: stretch; min-height: 24px; margin-top: var(--sp-1); font-size: var(--fs-table); }
 .ph-owner .owner-seg { display: flex; align-items: center; margin: 2px 1px; }
 .ph-owner-label { border-bottom: 0; cursor: help; }
 
-/* โหมดดู: % และบาทเป็นข้อความ */
 .ph-value { font-weight: var(--fw-medium); }
 
-/* โหมดแก้ไข: ช่อง % และบาทของแต่ละเดือน (percentAmountInput.parts วางเป็นช่องของ Grid)
- * ตัวอักษรในช่องกรอกเล็กกว่าตารางเล็กน้อย ให้ตัวเลข 7 หลักไม่ถูกตัด (ห้ามตัดตัวเลข) */
+/* โหมดแก้ไข: ช่อง % และบาทของแต่ละเดือน — ตัวอักษรเล็กกว่าตารางเล็กน้อย ให้ตัวเลข 7 หลักไม่ถูกตัด */
 .page-phasing { --ph-in-fs: var(--fs-table); --ph-in-pad: 2px 4px; }
 .ph-table .num-input.ph-cell { padding: 0 2px; }
 .ph-table input.num { width: 100%; min-width: 0; font-size: var(--ph-in-fs); padding: var(--ph-in-pad); height: calc(var(--row-h) - 8px); }
@@ -85,7 +193,6 @@
 @media (min-width: 1800px) {
   .page-phasing { --fs-table: 15px; --ph-cols: 196px repeat(12, minmax(0, 1fr)) 140px; }
 }
-/* จอไม่กว้าง (มี Side Menu): ตัวเลขเล็กลงเล็กน้อยให้ 12 เดือนพอดี */
 @media (max-width: 1799px) {
   .page-phasing { --fs-table: 14px; --ph-cols: 160px repeat(12, minmax(0, 1fr)) 120px; --ph-in-fs: 13px; --ph-in-pad: 1px 3px; }
 }
@@ -97,13 +204,9 @@
   .page-phasing { --fs-table: 12px; --ph-cols: 132px repeat(12, minmax(0, 1fr)) 100px; --ph-in-fs: 11px; --ph-in-pad: 1px 2px; }
   .ph-table .num-input.ph-cell { padding: 0 1px; }
 }
-/* ---------- มุมมองรวม (CR-13): อ่านอย่างเดียว ---------- */
-/* ตัวเลือกรวมใน Dropdown หน่วยขาย (subChannelPicker allowAggregate) คั่นจากรายการหน่วยขายด้วยเส้น */
-.sc-picker.has-aggregate .ss-list > .ss-option:first-child:not(:only-child) { border-bottom: 1px solid var(--c-border-strong); margin-bottom: 2px; font-weight: var(--fw-bold); }
-.ph-agg-bar { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+
+/* ---------- มุมมองรวมทั้ง Channel (CR-13): อ่านอย่างเดียว ---------- */
 .ph-agg-note { font-size: var(--fs-xs); white-space: nowrap; }
-.ph-agg .ph-chart-head { justify-content: space-between; }
-.ph-agg-title { font-weight: var(--fw-bold); font-size: var(--fs-sm); }
 .ph-agg-toggle { grid-column: 1 / -1; background: var(--c-surface); }
 .ph-agg-toggle-btn { font: inherit; font-weight: var(--fw-bold); color: var(--c-text-muted); background: transparent; border: 0; padding: 0; cursor: pointer; }
 .ph-agg-toggle-btn:hover { color: var(--c-primary-strong); }
@@ -138,4 +241,13 @@
 /* จอแคบ: ตารางกับกราฟเลื่อนแนวนอนด้วยกันภายในการ์ด (หน้าไม่เลื่อนแนวนอน) */
 @media (max-width: 1023px) {
   .ph-grid { min-width: 1240px; }
+  .sa-scroll { overflow-x: auto; }
+  .sa-table { min-width: 880px; }
 }
+
+/* ---------- CR-24: ยอดขายอ้างอิงรายเดือน — หัวเดือนบอกปีที่ใช้ (26 / 25) · เส้นแบ่งจางก่อนเดือนแรกที่ใช้ยอดปีก่อนหน้า ---------- */
+.sa-ref-table .sa-month-head { flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.05; }
+.sa-ref-year { font-size: 10px; font-weight: var(--fw-medium); color: var(--c-text-muted); }
+.sa-ref-year.is-older { color: var(--c-warn-fg); }
+.sa-ref-table .sa-split { box-shadow: inset 1px 0 0 var(--c-border-strong); }
+.sa-l12m .prior-label { display: inline; }

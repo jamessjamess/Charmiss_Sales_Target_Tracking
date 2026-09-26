@@ -4,6 +4,7 @@
  * หน้าที่:  แท็บใต้หัวข้อ รายงานสรุปแผน | ติดตามสถานะ (n) — ค่าเริ่มต้น = รายงานสรุปแผนเสมอ จำแท็บล่าสุดที่ ui.summaryTab (CR-13)
  *   ติดตามสถานะ (งานที่ต้องทำ พิมพ์ไม่ได้):
  *     บรรทัดสรุป (จัดสรรเป้าหมายประจำปี · Baseline · รายงานที่เคยล็อก) + ล็อก / ปลดล็อก Baseline (Sales Director)
+ *     CR-16: อนุมัติเป้าหมายแล้วมีร้านค้าย้ายเขต → บรรทัด ร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย + รายการร้าน (report.storeMoves) นับเป็น 1 รายการ
  *     ตารางเดียว 1 แถวต่อหน่วยขาย (ทุกหน่วย calc.planActions all เรียงตามความรุนแรง ไม่มีประเด็นอยู่ท้าย): ส่วนต่าง ·
  *     เป้าหมายรายเดือน / แผน SKU (สถานะ · ผู้อนุมัติ · วันที่อนุมัติ กดสถานะ = Popover ประวัติ) · การดำเนินการถัดไป
  *     + ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง · แสดงเฉพาะที่มีประเด็น
@@ -16,10 +17,13 @@
  *     ล็อกแล้ว = ตารางย่อ 1 แถวต่อหน่วยขาย (ผู้อนุมัติ · วันที่ ของเป้าหมายรายเดือนและแผน SKU) + ช่องลงนาม
  *     ตัวเลขเป็นล้านบาท 2 ตำแหน่ง (KPI บาทเต็ม) / พิมพ์ A4 แนวนอน
  * อ่านจาก data/:  settings, content (pages.summary, pages.<ขั้น>.title, labels) — ตัวเลขทั้งหมดของรายงานมาจาก core/report.js
+ * CR-17 Feature Flags: ปิด approvalWorkflow = ติดตามสถานะเหลือ Channel · หน่วยขาย · ผู้รับผิดชอบ · ส่วนต่าง · การดำเนินการถัดไป (ปิดส่วนต่าง /
+ *   กำหนดผู้รับผิดชอบ / –) ไม่มีบรรทัดจัดสรรเป้าหมายประจำปี · รายงานไม่มีบรรทัดสถานะ การอนุมัติ และคอลัมน์สถานะอนุมัติ · KPI = หน่วยขายที่จัดสรรครบ x / y
+ *   ปิด baseline = ไม่มีปุ่มล็อก / บรรทัด Baseline / ส่วนการอนุมัติ / ช่องลงนาม รายงานเป็น {ปี}-DRAFT + ลายน้ำเสมอ
  * store อ่าน:     app.planYear, plan.<ปี>.workflow.*, plan.<ปี>.baselineVersions, ui.role, ui.summaryTab (+ Key ที่ core/report.js อ่าน)
  * store เขียน:    ui.summaryTab · ui.selection (ก่อนพาไปหน้าของรายการที่กด)
  *                 plan.<ปี>.workflow.baseline.all (ล็อก / ปลดล็อกผ่าน core/workflow.js — snapshot = { gp ต่อหน่วยขาย, priceList,
- *                 promotions ที่ยืนยันแล้ว, report = core/report.js build() }) · plan.<ปี>.baselineVersions (ต่อท้ายฉบับใหม่ตอนล็อก)
+ *                 accountPrices (CR-18), promotions ที่ยืนยันแล้ว, report = core/report.js build() }) · plan.<ปี>.baselineVersions (ต่อท้ายฉบับใหม่ตอนล็อก)
  */
 (function (SP) {
   'use strict';
@@ -30,6 +34,7 @@
   var W = SP.core.workflow;
   var store = SP.core.store;
   var R = SP.core.report;
+  var FT = SP.core.features;
   var h = C.h;
   var fill = C.fill;
 
@@ -53,6 +58,8 @@
     var year = store.year();
     var reg = SP.core.registry;
     var printedAt = null;
+    var AP_ON = FT.isOn('approvalWorkflow');   // CR-17
+    var BL_ON = FT.isOn('baseline');
 
     function go(entryId, channelId, unitId) {
       return function (e) {
@@ -71,14 +78,15 @@
     function draw() {
       C.clear(root);
       var states = store.workflowStates();
-      var locked = W.isLocked(states);
+      var locked = R.locked(states);
       var live = R.build();
       var acts = R.actions(live);
+      var moved = R.storeMoves();
       var tab = store.get('ui.summaryTab');
       if (tab !== 'status' && tab !== 'report') tab = 'report';
       document.body.classList.toggle('rp-on-status', tab === 'status');
-      root.appendChild(tabs(tab, acts.length));
-      (tab === 'status' ? statusTab(live, acts, states, locked) : reportTab(live, states, locked)).forEach(function (n) { root.appendChild(n); });
+      root.appendChild(tabs(tab, acts.length + (!locked && moved.length ? 1 : 0)));
+      (tab === 'status' ? statusTab(live, acts, states, locked, moved) : reportTab(live, states, locked)).forEach(function (n) { root.appendChild(n); });
     }
 
     // ---------- แท็บ ----------
@@ -88,7 +96,7 @@
         label: page.tabLabel, value: tab,
         options: [
           { value: 'report', title: page.tabTips.report, label: T.report },
-          { value: 'status', title: page.tabTips.status + (n ? ' · ' + fill(page.tabCountTip, { n: n }) : ''), label: n ? fill(T.statusCount, { n: n }) : T.status }
+          { value: 'status', title: (BL_ON ? page.tabTips.status : page.tabTips.statusLite) + (n ? ' · ' + fill(page.tabCountTip, { n: n }) : ''), label: n ? fill(T.statusCount, { n: n }) : T.status }
         ],
         onChange: function (v) { store.set('ui.summaryTab', v); draw(); window.scrollTo(0, 0); }
       }));
@@ -97,33 +105,57 @@
     // =====================================================================
     // แท็บติดตามสถานะ
     // =====================================================================
-    function statusTab(live, acts, states, locked) {
+    function statusTab(live, acts, states, locked, moved) {
       var Y = page.yearLines;
       var versions = store.get(store.planKey('baselineVersions'));
       var ver = W.baselineVersion(versions, year, locked);
       var td = W.stateOf(states, 'topDown');
       var lines = [];
-      if (td.status === 'approved') {
+      if (!AP_ON) { /* CR-17: ไม่มีขั้นอนุมัติ = ไม่มีบรรทัดจัดสรรเป้าหมายประจำปี */ }
+      else if (td.status === 'approved') {
         var ap = W.lastOf(td, 'approve');
         lines.push({ tag: 'tag-ok', text: fill(Y.topDownApproved, { at: F.dateTime(ap && ap.at), by: ap ? ap.by : '' }) });
+        if (moved && moved.length) lines.push(storesMovedLine(moved));
       } else {
         lines.push({ tag: 'tag-warn', text: fill(Y.topDown, { status: WL.status[td.status] }), entry: 'topDown' });
       }
-      if (locked) {
+      if (!BL_ON) { /* CR-17: ไม่มี Baseline */ }
+      else if (locked) {
         var lk = W.lastOf(W.stateOf(states, 'baseline'), 'lock');
         lines.push({ tag: 'tag-ok', text: fill(Y.locked, { at: F.dateTime(lk && lk.at), code: ver.code }) });
       } else {
         lines.push({ tag: 'tag-warn', text: Y.notLocked });
       }
-      if (versions.length) {
+      if (BL_ON && versions.length) {
         lines.push({ tag: 'tag-muted', text: fill(Y.versions, { list: versions.map(function (v) { return v.code + ' (' + F.dateTime(v.at) + ')'; }).join(' · ') }) });
       }
-      var year1 = h('section', { class: 'card rp-section rp-year no-print' },
-        h('div', { class: 'rp-year-head' }, h('h2', null, page.yearTitle), lockBox(live, states, locked, ver, versions)),
+      var year1 = !lines.length && !BL_ON ? null : h('section', { class: 'card rp-section rp-year no-print' },
+        h('div', { class: 'rp-year-head' }, h('h2', null, page.yearTitle), BL_ON ? lockBox(live, states, locked, ver, versions) : null),
         h('ul', { class: 'rp-year-lines' }, lines.map(function (l) {
-          return h('li', null, h('span', { class: 'rp-dot badge ' + l.tag, 'aria-hidden': 'true' }), l.entry ? link(l.entry, l.text) : h('span', null, l.text));
+          return h('li', { class: l.details ? 'rp-year-detail' : null }, h('span', { class: 'rp-dot badge ' + l.tag, 'aria-hidden': 'true' }),
+            h('span', { class: 'rp-year-text' }, l.entry ? link(l.entry, l.text) : h('span', { title: l.title || null }, l.text), l.details || null));
         })));
-      return [year1, statusTable(live, acts, states, locked), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)];
+      return [year1, statusTable(live, acts, states, locked), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)].filter(Boolean);
+    }
+
+    // CR-16 §5.4: ร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย (เป้าหมายของเขตไม่เปลี่ยน) + รายการร้าน + ลิงก์หน้าเขตการขายและร้านค้า
+    function storesMovedLine(moved) {
+      var Y = page.yearLines;
+      var MAX = 8;
+      var data = store.data();
+      function zone(id) { var t = id ? calc.findById(data.territories, id) : null; return t ? String(t.name).split(' · ')[0] : Y.unassigned; }
+      var amount = calc.sum(moved.map(function (m) { return m.salesRef; }));
+      var names = SP.data.channels.filter(function (c) { return c.allocationUnit === 'TERRITORY'; }).map(function (c) { return c.name; }).join(', ');
+      var items = moved.slice(0, MAX).map(function (m) {
+        return h('li', null, fill(Y.storesMovedItem, { name: m.name, id: m.systemId, from: zone(m.from), to: zone(m.to), month: F.date(m.fromMonth), amount: F.baht(m.salesRef) }));
+      });
+      if (moved.length > MAX) items.push(h('li', { class: 'muted' }, fill(Y.storesMovedMore, { n: moved.length - MAX })));
+      items.push(h('li', null, link('territories', fill(Y.storesMovedLink, { page: fill(pageTitle('territories'), { territoryChannels: names }) }))));
+      return {
+        tag: 'tag-warn', title: Y.storesMovedTip,
+        text: fill(Y.storesMoved, { n: F.number(moved.length), amount: F.baht(amount) }),
+        details: h('ul', { class: 'rp-moved-list' }, items)
+      };
     }
 
     function lockBox(live, states, locked, ver, versions) {
@@ -161,7 +193,7 @@
         var by = L.roles.director;
         var res = W.applyAction(store.workflowStates(), {
           step: 'baseline', unitId: null, action: 'lock', by: by, at: at,
-          snapshot: { gp: gp, priceList: data.priceList, promotions: (data.promotions || []).filter(function (p) { return p.status === 'CONFIRMED'; }), report: rep }
+          snapshot: { gp: gp, priceList: data.priceList, accountPrices: data.accountPrices || [], promotions: (data.promotions || []).filter(function (p) { return p.status === 'CONFIRMED'; }), report: rep }
         });
         if (!res.ok) return;
         store.saveWorkflowStates(res.states);
@@ -198,7 +230,7 @@
       live.channels.forEach(function (c) { chById[c.id] = c; });
       var all = calc.planActions(live.units.map(function (u) {
         return { id: u.id, name: u.name, channelId: u.channelId, target: u.target, plan: u.plan, phasing: u.phasing, sku: u.sku, vacant: u.owner.vacant, owner: u.owner };
-      }), { topDown: live.topDown, locked: locked, all: true });
+      }), { topDown: live.topDown, locked: locked, all: true, approval: AP_ON });
       var approvalOf = {};
       live.approvals.forEach(function (a) { approvalOf[a.step + '.' + a.unitId] = a; });
       var owners = [];
@@ -250,8 +282,12 @@
         var done = a.status === 'approved' && a.approvedBy;
         return [h('td', { class: 'rp-appr' }, done ? a.approvedBy : page.noIssue), h('td', { class: 'rp-when' }, done ? F.dateTime(a.approvedAt) : page.noIssue)];
       }
-      var body = rows.length ? h('div', { class: 'table-scroll' }, h('table', { class: 'data-table rp-act-table' },
-        h('thead', null,
+      // CR-17 ปิด approvalWorkflow: ไม่มีกลุ่มคอลัมน์เป้าหมายรายเดือน / แผน SKU (สถานะ · ผู้อนุมัติ · วันที่)
+      var liteHead = h('thead', null, h('tr', null,
+        h('th', { scope: 'col' }, AC.channel), h('th', { scope: 'col' }, AC.unit), h('th', { scope: 'col' }, AC.owner),
+        h('th', { scope: 'col', class: 'num' }, AC.gap), h('th', { scope: 'col' }, AC.next)));
+      var body = rows.length ? h('div', { class: 'table-scroll' }, h('table', { class: 'data-table rp-act-table' + (AP_ON ? '' : ' is-lite') },
+        !AP_ON ? liteHead : h('thead', null,
           h('tr', null,
             h('th', { scope: 'col', rowspan: '2' }, AC.channel), h('th', { scope: 'col', rowspan: '2' }, AC.unit), h('th', { scope: 'col', rowspan: '2' }, AC.owner),
             h('th', { scope: 'col', rowspan: '2', class: 'num' }, AC.gap),
@@ -267,13 +303,13 @@
             h('th', { scope: 'row' }, link('skuPlanning', u.name, ch.id, u.id, fill(page.openPlan, { name: u.name }))),
             h('td', { class: 'rp-owner' + (u.owner.vacant ? ' is-vacant' : ''), title: u.owner.title }, u.owner.vacant ? A.ownerNone : u.owner.name),
             h('td', { class: 'num' }, gapText(r.rem)),
-            h('td', { class: 'rp-status is-first' }, statusCell('phasing', u.phasing, ch, u)), approvalCells('phasing', u),
-            h('td', { class: 'rp-status is-first' }, statusCell('sku', u.sku, ch, u)), approvalCells('sku', u),
+            AP_ON ? [h('td', { class: 'rp-status is-first' }, statusCell('phasing', u.phasing, ch, u)), approvalCells('phasing', u),
+              h('td', { class: 'rp-status is-first' }, statusCell('sku', u.sku, ch, u)), approvalCells('sku', u)] : null,
             h('td', null, r.next ? link(r.entry, page.next[r.next], ch.id, u.id, fill(page.nextTip, { page: pageTitle(r.entry), name: u.name }), 'rp-next') : page.noIssue));
         }))))
         : h('p', { class: 'rp-note rp-empty' }, act.issuesOnly && !acts.length ? page.actionsNone : page.actionsNoneFiltered);
       return h('section', { class: 'card rp-section rp-actions no-print' },
-        h('div', { class: 'rp-act-head' }, h('h2', null, page.actionsTitle, h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: acts.length, total: all.length }))), filters),
+        h('div', { class: 'rp-act-head' }, h('h2', null, AP_ON ? page.actionsTitle : page.actionsTitleLite, h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: acts.length, total: all.length }))), filters),
         body);
     }
 
@@ -293,8 +329,8 @@
       wrap.appendChild(unitTable(M));
       wrap.appendChild(mix(M));
       wrap.appendChild(people(M));
-      if (!ver.draft) {
-        wrap.appendChild(approvals(M));
+      if (!ver.draft && BL_ON) {
+        if (AP_ON) wrap.appendChild(approvals(M));
         wrap.appendChild(signatures());
       }
       return [wrap];
@@ -336,10 +372,11 @@
         h('div', { class: 'rp-doc-top' },
           h('h2', { class: 'rp-doc-title' }, fill(page.docTitle, { year: year })),
           h('span', { class: 'rp-doc-version' }, fill(page.version, { code: ver.code }))),
-        h('p', { class: 'rp-doc-status' }, locked ? fill(page.statusLocked, { at: F.dateTime(lk && lk.at), by: lk ? lk.by : '' }) : page.statusDraft),
-        h('p', { class: 'rp-doc-td' }, tdLine),
+        // CR-17: ปิด approvalWorkflow = ไม่มีบรรทัดสถานะ / จัดสรรเป้าหมายประจำปี / การอนุมัติ (ลายน้ำฉบับร่างยังอยู่)
+        AP_ON ? h('p', { class: 'rp-doc-status' }, locked ? fill(page.statusLocked, { at: F.dateTime(lk && lk.at), by: lk ? lk.by : '' }) : page.statusDraft) : null,
+        AP_ON ? h('p', { class: 'rp-doc-td' }, tdLine) : null,
         // ยังไม่ล็อก: การอนุมัติเป็นบรรทัดเดียว (ตารางการอนุมัติแสดงเมื่อล็อก Baseline แล้ว)
-        ver.draft ? h('p', { class: 'rp-doc-approval' }, fill(page.approvalLine, {
+        ver.draft && AP_ON ? h('p', { class: 'rp-doc-approval' }, fill(page.approvalLine, {
           done: M.units.filter(function (u) { return u.phasing === 'approved' && u.sku === 'approved'; }).length, total: M.units.length
         })) : null,
         printedAt,
@@ -362,7 +399,8 @@
     function kpis(M, locked) {
       var K = page.kpi;
       var rem = calc.remaining(M.target, M.plan);
-      var done = M.units.filter(function (u) { return locked || u.sku === 'approved'; }).length;
+      // CR-17 ปิด approvalWorkflow: หน่วยขายที่แผน SKU จัดสรรครบ (คงเหลือ ±1 บาท) แทนความคืบหน้าการอนุมัติ
+      var done = M.units.filter(function (u) { return AP_ON ? locked || u.sku === 'approved' : calc.remaining(u.target, u.plan).status === 'ok'; }).length;
       var total = M.units.length;
       function card(cls, label, value, sub) {
         return h('div', { class: 'card rp-kpi ' + (cls || '') }, h('span', { class: 'rp-kpi-label' }, label), h('strong', { class: 'rp-kpi-value' }, value), sub ? h('span', { class: 'rp-kpi-sub' }, sub) : null);
@@ -373,9 +411,9 @@
         card('rp-kpi-gap alert-' + rem.status, K.gap + ' (' + L.baht + ')',
           rem.status === 'ok' || rem.status === 'empty' ? L.alert[rem.status] : F.baht(Math.abs(rem.amount)),
           rem.status === 'ok' || rem.status === 'empty' ? null : L.alert[rem.status]),
-        card('rp-kpi-approval', K.approval, fill(K.approvalValue, { done: done, total: total }), [
+        card('rp-kpi-approval', AP_ON ? K.approval : K.allocated, fill(K.approvalValue, { done: done, total: total }), [
           h('span', { class: 'rp-progress', role: 'img', 'aria-label': F.pct(total ? done / total : 0, 0) }, h('span', { class: 'rp-progress-fill', style: { width: (total ? done / total * 100 : 0) + '%' } })),
-          h('span', null, K.approvalSub)]));
+          h('span', null, AP_ON ? K.approvalSub : K.allocatedSub)]));
     }
 
     // ---------- กราฟเป้าหมายเทียบแผน รายเดือน ----------
@@ -418,7 +456,7 @@
         }),
         h('h3', { class: 'rp-growth-share' }, fill(TD.shareTitle, { prior: year - 1, year: year })),
         charts.stackedShare({
-          rows: [{ label: String(year - 1), parts: parts(share.prior) }, { label: String(year), parts: parts(share.target) }],
+          rows: [{ label: L.priorInfo.short, parts: parts(share.prior) }, { label: String(year), parts: parts(share.target) }],
           legend: M.channels.map(function (c) { return { id: c.id, label: c.name, colorToken: c.color }; })
         }));
     }
@@ -450,7 +488,7 @@
         h('th', { scope: 'row' }, page.totalRow),
         h('td', { class: 'num' }, mb(M.prior)), h('td', { class: 'num' }, mb(M.target)), pct(M.target), h('td', { class: 'rp-vly' }), h('td', { class: 'num' }, mb(M.plan)),
         h('td', null, gapText(calc.remaining(M.target, M.plan))),
-        h('td', { class: 'rp-approved' }, approvedOf(M.units)), h('td')));
+        AP_ON ? h('td', { class: 'rp-approved' }, approvedOf(M.units)) : null, h('td')));
       M.channels.forEach(function (ch) {
         var list = M.units.filter(function (u) { return u.channelId === ch.id; });
         var plan = calc.sum(list.map(function (u) { return u.plan; }));
@@ -464,18 +502,18 @@
             ch.name + ' · ' + ch.fullName),
           h('td', { class: 'num' }, mb(ch.prior)), h('td', { class: 'num' }, mb(ch.amount)), pct(ch.amount), bar(ch.amount, ch.prior, ch.color), h('td', { class: 'num' }, mb(plan)),
           h('td', null, gapText(calc.remaining(ch.amount, plan))),
-          h('td', { class: 'rp-approved' }, approvedOf(list)), h('td')));
+          AP_ON ? h('td', { class: 'rp-approved' }, approvedOf(list)) : null, h('td')));
         list.forEach(function (u) {
           body.appendChild(h('tr', { class: 'rp-unit-row', hidden: isCollapsed, style: { '--c': C.tokenVar(ch.color) } },
             h('th', { scope: 'row' }, link('skuPlanning', u.name, ch.id, u.id, fill(page.openPlan, { name: u.name }))),
             h('td', { class: 'num' }, mb(u.prior)), h('td', { class: 'num' }, mb(u.target)), pct(u.target), bar(u.target, u.prior, ch.color), h('td', { class: 'num' }, mb(u.plan)),
             h('td', null, gapText(calc.remaining(u.target, u.plan))),
-            h('td', { class: 'rp-ap-cell', title: fill(page.approvalTip, { phasing: WL.status[u.phasing], sku: WL.status[u.sku] }) },
-              icon('phasing', u.phasing, ch, u), icon('sku', u.sku, ch, u)),
+            AP_ON ? h('td', { class: 'rp-ap-cell', title: fill(page.approvalTip, { phasing: WL.status[u.phasing], sku: WL.status[u.sku] }) },
+              icon('phasing', u.phasing, ch, u), icon('sku', u.sku, ch, u)) : null,
             h('td', { class: 'rp-owner' + (u.owner.vacant ? ' is-vacant' : ''), title: u.owner.title }, u.owner.name)));
         });
       });
-      var cols = ['name', 'num', 'num', 'pct', 'vly', 'num', 'gap', 'ap', 'owner'];
+      var cols = ['name', 'num', 'num', 'pct', 'vly', 'num', 'gap', 'ap', 'owner'].filter(function (c) { return AP_ON || c !== 'ap'; });
       var table = h('table', { class: 'data-table rp-table' },
         h('colgroup', null, cols.map(function (c) { return h('col', { class: 'rp-col-' + c }); })),
         h('thead', null, h('tr', null,
@@ -486,13 +524,13 @@
           h('th', { scope: 'col', class: 'rp-vly-head', title: V.headerTip }, h('span', { class: 'has-tip' }, V.header), SP.core.charts.vsLastYearAxis(scaleMax)),
           h('th', { scope: 'col', class: 'num' }, T.plan),
           h('th', { scope: 'col' }, T.gap),
-          h('th', { scope: 'col', title: page.approvalHeadTip }, T.approval),
+          AP_ON ? h('th', { scope: 'col', title: page.approvalHeadTip }, T.approval) : null,
           h('th', { scope: 'col' }, T.owner))),
         body);
       var legend = h('p', { class: 'rp-legend' }, h('span', null, page.approvalLegend), AP_STATES.map(function (s) {
         return h('span', { class: 'rp-legend-item' }, h('span', { class: 'rp-ap wf-text wf-' + s, 'aria-hidden': 'true' }, I[s]), WL.status[s]);
       }));
-      return h('section', { class: 'card rp-section rp-break rp-table-card' }, h('h2', null, page.tableTitle), h('div', { class: 'table-scroll' }, table), legend);
+      return h('section', { class: 'card rp-section rp-break rp-table-card' }, h('h2', null, page.tableTitle), h('div', { class: 'table-scroll' }, table), AP_ON ? legend : null);
     }
 
     // ---------- สัดส่วนแผนตามกลุ่มสินค้า ----------

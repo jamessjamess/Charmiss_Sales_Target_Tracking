@@ -6,17 +6,14 @@
  *               History ปีก่อน, Listing, Run-rate และยอดจริงของ TT ผูกกับ id เขต ไม่ผูกกับคน
  *   channelId = id ใน data/channels.js
  *   active    = false → ไม่แสดงในรายการ "+ เพิ่มเขต"
- * เป้าของเขต = Quota ของเขตนั้น การแบ่งลงร้านค้า/สาขาในเขตเป็นงานของ Sales Person ระบบไม่ลงถึงสาขา
- * ค่าที่แก้ในหน้าเขตการขายเก็บที่ store: master.territories
+ * เป้าของเขต = Quota ของเขตนั้น เขตการขาย = กลุ่มร้านค้า (CR-16) ร้านค้าอยู่ในเขตใดในเดือนใดเก็บที่ storeAssignments (core/stores.js)
+ * CR-16: เขตของ TT มาจาก data/seed/seed-tt-stores.js (core/stores.js นำเข้าตอนโหลด แทนที่เขตของ Channel เดียวกันในรายการนี้)
+ *   TT เขต 1 · เหนือ–กลาง–กทม. · TT เขต 2 · อีสานตอนบน–ลาว · TT เขต 3 · อีสานใต้–ตะวันออก · TT เขต 4 · ตะวันตก–ใต้ (id TT-01 … TT-04)
+ * ค่าที่แก้ในหน้าเขตการขายและร้านค้าเก็บที่ store: master.territories
  */
 (function (SP) {
   'use strict';
 
-  SP.data.territories = [
-    { id: 'tt-north',     channelId: 'tt', name: 'TT เขต 1 · ภาคเหนือ',   active: true },
-    { id: 'tt-northeast', channelId: 'tt', name: 'TT เขต 2 · ภาคอีสาน',   active: true },
-    { id: 'tt-central',   channelId: 'tt', name: 'TT เขต 3 · ภาคกลาง',    active: true },
-    { id: 'tt-east',      channelId: 'tt', name: 'TT เขต 4 · ภาคตะวันออก', active: true },
-    { id: 'tt-south',     channelId: 'tt', name: 'TT เขต 5 · ภาคใต้',      active: true }
-  ];
+  // เขตของ Channel อื่นที่แบ่งตามเขตแต่ไม่มีข้อมูลร้านค้า (ตอนนี้ไม่มี) / TT เติมโดย core/stores.js
+  SP.data.territories = [];
 })(window.SP);

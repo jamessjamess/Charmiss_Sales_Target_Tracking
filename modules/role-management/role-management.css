@@ -1,0 +1,66 @@
+/* modules/role-management/role-management.css — Role Management (CR-21 · CR-25 แยก 3 หน้า Permissions · Roles · Users ใช้ไฟล์นี้ร่วมกัน):
+ * เมทริกซ์ (หัวตารางและคอลัมน์แรกติด) · ตารางบทบาท / ผู้ใช้ · ฟอร์มใน <dialog> */
+.page-roleManagement .module-body > * + *, .page-roleRoles .module-body > * + *, .page-roleUsers .module-body > * + * { margin-top: var(--sp-3); }
+.rm-tabs { align-items: center; }
+.rm-limit { font-size: var(--fs-xs); }
+.rm-head-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rm-toolbar { align-items: center; }
+.rm-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); white-space: nowrap; }
+.rm-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rm-notice { margin: 0; }
+
+/* เมทริกซ์: คอลัมน์แรก (หน้า / สิทธิ์) ติดซ้าย หัวตารางติดบน */
+.rm-matrix { width: 100%; }
+.rm-matrix .rm-page-col { position: sticky; left: 0; z-index: 2; min-width: 15em; max-width: 22em; white-space: normal; background: var(--c-surface); font-weight: var(--fw-medium); font-size: var(--fs-sm); color: var(--c-text); }
+.rm-matrix thead th { z-index: 3; }
+.rm-matrix thead .rm-page-col { z-index: 4; background: var(--c-surface-2); }
+.rm-matrix .rm-role-col { text-align: center; min-width: 6.5em; }
+.rm-matrix .rm-cell { text-align: center; padding: 3px 4px; }
+.rm-matrix tr.is-sub .rm-page-col { padding-left: calc(var(--sp-2) + 1.4em); font-weight: normal; color: var(--c-text-muted); }
+.rm-matrix tr.is-sub .rm-page-col::before { content: '└ '; color: var(--c-border-strong); }
+.rm-matrix tr.rm-group > * { background: var(--c-surface-2); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text-muted); padding-top: 6px; padding-bottom: 6px; }
+.rm-matrix tr.rm-group .rm-page-col { background: var(--c-surface-2); }
+.rm-group-label { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.rm-matrix tr.rm-page-head .rm-page-col { color: var(--c-text); }
+.rm-matrix tr.rm-row:hover > * { background: var(--c-primary-soft); }
+.rm-col-menu { width: auto; height: auto; min-height: 28px; padding: 2px 6px; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text); white-space: nowrap; }
+.rm-group-menu { width: 24px; height: 24px; }
+.rm-cell-btn { width: auto; height: auto; padding: 0; border-radius: var(--radius-sm); background: none; }
+.rm-cell-btn:hover .perm-chip, .rm-cell-btn:focus-visible .perm-chip { outline: 2px solid var(--c-primary); outline-offset: 1px; }
+/* CR-25: บรรทัดสรุปใต้ชื่อบทบาท · ช่องไม่เห็น = พื้นเทาอ่อนว่าง (เห็นภาพรวมในแวบเดียว) */
+.rm-role-sum { display: block; margin-top: 1px; font-size: 11px; font-weight: normal; color: var(--c-text-muted); white-space: nowrap; cursor: help; }
+.rm-matrix .rm-cell.is-none { background: var(--c-surface-2); }
+.rm-none { position: relative; display: inline-block; width: 3em; height: 20px; vertical-align: middle; }
+.rm-none.is-changed::after { content: ''; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-dirty); box-shadow: 0 0 0 2px var(--c-surface); }
+.rm-none-legend { width: 1.6em; height: 16px; border: 1px solid var(--c-border); border-radius: 4px; background: var(--c-surface-2); }
+.rm-cell-btn:hover .rm-none, .rm-cell-btn:focus-visible .rm-none { outline: 2px solid var(--c-primary); outline-offset: 1px; border-radius: 4px; }
+.rm-home { white-space: nowrap; }
+.rm-home-select { min-width: 12em; }
+
+/* บทบาท / ผู้ใช้ */
+.rm-roles td, .rm-users td { vertical-align: middle; }
+.rm-order { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rm-drag { cursor: grab; color: var(--c-text-muted); margin-right: 6px; letter-spacing: -2px; }
+.rm-move { display: inline-flex; gap: 2px; margin-left: 6px; }
+.rm-move .icon-btn { width: 26px; height: 26px; }
+.rm-role-row.is-dragging { opacity: 0.5; }
+.rm-role-name { width: 14em; max-width: 100%; }
+.rm-role-desc { width: 100%; min-width: 16em; }
+.rm-role-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.rm-user-row.is-inactive td { color: var(--c-text-muted); }
+.rm-user-row.is-dirty-row td:first-child { box-shadow: inset 3px 0 0 var(--c-dirty); }
+.rm-user-name { font-weight: var(--fw-medium); text-align: left; }
+.rm-user-search { width: 14em; }
+.rm-form { display: grid; gap: var(--sp-2); min-width: min(420px, 80vw); }
+.rm-form .select, .rm-form .pm-input { width: 100%; }
+.rm-role-boxes { display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); }
+
+/* Drawer สิทธิ์ที่มีผลจริง */
+.rm-effective { width: 100%; font-size: var(--fs-sm); }
+.rm-effective td { vertical-align: middle; }
+.rm-history-list { max-height: 60vh; overflow: auto; }
+
+@media (max-width: 1023px) {
+  .rm-matrix .rm-page-col { min-width: 11em; }
+  .rm-limit { flex-basis: 100%; }
+}

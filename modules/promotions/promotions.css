@@ -69,3 +69,42 @@
 .pr-actions { flex-wrap: wrap; align-items: center; }
 .pr-spacer { flex: 1 1 auto; }
 .pr-copy-popover { min-width: 280px; }
+
+/* CR-18 ราคาขายต่อ Account: SKU ติดซ้าย · RSP · 1 คอลัมน์ต่อ Account (--ap-cols = จำนวน Account) */
+.ap-table { min-width: calc(400px + var(--ap-cols, 3) * 84px); }
+.ap-table .ap-rsp-col, .ap-table .ap-rsp-cell { width: 96px; }
+.ap-table thead th.ap-unit-col { white-space: normal; overflow-wrap: anywhere; line-height: 1.2; }
+.ap-table thead th.is-hover-col { background: var(--c-grid-hover-head); }
+.ap-table tbody tr.is-hover-row > td, .ap-table tbody tr.is-hover-row > th.pr-sku { background-image: linear-gradient(var(--c-grid-hover), var(--c-grid-hover)); }
+.ap-cell { position: relative; height: 36px; border-left: 1px solid var(--c-border); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ap-cell:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.ap-table td.is-sel { background-image: linear-gradient(var(--c-grid-sel), var(--c-grid-sel)) !important; box-shadow: inset 0 0 0 1px var(--c-grid-sel-bd); }
+.ap-rsp-cell { background: var(--c-surface-2); font-weight: var(--fw-medium); }
+.ap-sub { display: block; font-size: 10px; line-height: 1.1; color: var(--c-text-muted); font-weight: normal; }
+.ap-faint, .ap-cell.is-rsp .ap-price { color: var(--c-text-muted); opacity: 0.75; }
+.ap-cell.is-custom { background: var(--promo-bg); }
+.ap-cell.is-custom .ap-price, .ap-cell.is-custom .ap-input { font-weight: var(--fw-bold); }
+.ap-cell.is-unlisted { background: var(--c-surface-2); color: var(--c-text-muted); }
+.ap-off { display: block; font-size: 10px; line-height: 1; color: var(--promo-fg); }
+.ap-warn { position: absolute; top: 2px; left: 3px; font-size: 10px; line-height: 1.2; padding: 0 3px; border-radius: 3px; font-weight: var(--fw-bold);
+  background: var(--status-over-bg); color: var(--status-over-fg); }
+.ap-table input.num.ap-input { width: 100%; min-width: 0; box-sizing: border-box; height: 24px; padding: 1px 4px; font-size: 13px; background: var(--c-surface); border-color: var(--c-border-strong); }
+.ap-input::placeholder { color: var(--c-text-muted); opacity: 0.75; font-weight: normal; }
+.ap-cell .ap-meta { display: block; min-height: 0; }
+.ap-cell .ap-meta:empty { display: none; }
+.ap-sw { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 16px; padding: 0 3px; border-radius: 3px;
+  border: 1px solid var(--c-border); background: var(--c-surface); font-size: 10px; font-variant-numeric: tabular-nums; }
+.ap-sw.is-custom { background: var(--promo-bg); font-weight: var(--fw-bold); }
+.ap-sw.is-unlisted { background: var(--c-surface-2); color: var(--c-text-muted); }
+.ap-sw .ap-warn { position: static; }
+.ap-edit-row { gap: var(--sp-2); align-items: center; }
+.ap-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-2); }
+.ap-sel-text { font-size: var(--fs-sm); color: var(--c-text-muted); }
+.ap-warn-note { margin: 0; font-size: var(--fs-xs); color: var(--status-over-fg); }
+@media (max-width: 1599px) {
+  .ap-table { min-width: calc(320px + var(--ap-cols, 3) * 70px); font-size: 12px; }
+  .ap-table .pr-sku { width: 220px; }
+  .ap-table .ap-rsp-col, .ap-table .ap-rsp-cell { width: 64px; }
+  .ap-table thead th.ap-unit-col { font-size: 11px; }
+  .ap-table input.num.ap-input { font-size: 12px; padding: 1px 3px; }
+}

@@ -12,6 +12,11 @@
  * รายการไฟล์ core/ และ data/ อยู่ที่นี่ที่เดียว ถ้าเพิ่มไฟล์ใน core/ หรือ data/ ให้เพิ่มใน FILES
  * data/seed/ (ข้อมูลจริงจาก Excel ห้ามแก้ด้วยมือ) โหลดก่อน data/products.js แล้ว core/seed.js แปลงเข้าโครง Product Master
  * หลัง core/calc.js และก่อน core/store.js
+ * CR-16: data/seed/seed-tt-stores.js + data/stores.js (กฎนำเข้า) → core/stores.js นำเข้าร้านค้า TT หลัง core/calc.js และก่อน core/seed.js
+ * CR-19: data/teams.js (ทีมขายต่อ Channel) หลัง data/salespeople.js · core/permissions.js (สิทธิ์) หลัง core/workflow.js
+ * CR-21: data/permissions.js (บทบาท + ค่าตั้งต้นของสิทธิ์) · data/users.js (ผู้ใช้จำลอง) หลัง data/teams.js
+ * CR-24: core/clock.js (เดือนปัจจุบันกลาง · L12M) หลัง core/features.js
+ *   (ยอดขายปีก่อนของเขตต้องมีก่อน core/seed.js สร้างยอดขายปีก่อนราย SKU ของเขต)
  */
 (function () {
   'use strict';
@@ -20,11 +25,18 @@
     'core/paths.js',
     'core/format.js',
     'data/settings.js',
+    'core/features.js',
+    'core/clock.js',
     'data/channels.js',
     'data/accounts.js',
     'data/territories.js',
     'data/salespeople.js',
+    'data/teams.js',
+    'data/permissions.js',
+    'data/users.js',
     'data/assignments.js',
+    'data/seed/seed-tt-stores.js',
+    'data/stores.js',
     'data/taxonomy.js',
     'data/seed/seed-charmiss.js',
     'data/products.js',
@@ -39,8 +51,11 @@
     'data/erp-snapshot.js',
     'data/content.js',
     'core/calc.js',
+    'core/stores.js',
     'core/seed.js',
+    'core/taxonomy.js',
     'core/workflow.js',
+    'core/permissions.js',
     'core/registry.js',
     'core/store.js',
     'core/components.js',

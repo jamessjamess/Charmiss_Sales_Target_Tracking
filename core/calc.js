@@ -26,37 +26,56 @@
   function copy(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
 
   // =====================================================================
-  // 1) Measure chain: จำนวนชิ้น → Sell-out Amount → Net Sales
+  // 1) Measure chain: จำนวนชิ้น → Sale Amount (รวม VAT) → Net Sales (CR-18)
   // =====================================================================
 
-  // Sell-out Amount ก่อน VAT = จำนวนชิ้น × ราคา (ถ้าราคารวม VAT ให้ ÷ (1 + VAT))
-  function sellOutExVat(units, price, includesVat) {
-    if (includesVat == null) includesVat = settings().PRICE_INCLUDES_VAT;
-    var gross = units * price;
-    return includesVat ? gross / (1 + settings().VAT) : gross;
+  // CR-18: ราคาใน Product Master และราคาต่อ Account รวม VAT (settings.PRICE_INCLUDES_VAT = true)
+  //   Sale Amount = จำนวนชิ้น × ราคาขาย (ราคาต่อ Account ถ้ามี · TT = ราคา Dealer · นอกนั้น RSP)
+  //   Net Sales   = Sale Amount ÷ (1 + VAT) × (1 − GP)   Channel ที่มี GP (MT = GP ของ Account · ECOM = Platform Fee)
+  //               = Sale Amount ÷ (1 + VAT)              Channel ที่ไม่มี GP (TT)
+  //   ย้อนกลับ   Sale Amount = Net Sales ÷ (1 − GP) × (1 + VAT)
+  //   netSales() คือสูตรเดียวของระบบ — chain / moneySplit / cellBreakdown / ยอดปีก่อน / ยอดจริง / core/seed.js เรียกผ่านฟังก์ชันนี้
+
+  function includesVatOf(v) { return v == null ? settings().PRICE_INCLUDES_VAT : v; }
+
+  // ยอดก่อน VAT ของยอดขาย (ราคารวม VAT → ÷ (1 + VAT) / ราคาไม่รวม VAT → เท่าเดิม)
+  function exVat(sale, includesVat) { return includesVatOf(includesVat) ? sale / (1 + settings().VAT) : sale; }
+
+  // Net Sales ของ qty ชิ้นที่ราคา price (บาท รวม VAT) → ตัวเลข | null
+  //   channel = Channel หรือ { hasGP } (ไม่ส่ง = มี GP) / account = Account หรือ { gp } (สัดส่วน 0.40 = 40%)
+  //   Channel ที่มี GP แต่ Account ยังไม่มี GP → null (คำนวณไม่ได้) / opts.includesVat (ค่าตั้งต้น settings)
+  //   MT 100 × 50 GP 45% → 2,570.09 · ECOM Platform Fee 20% → 3,738.32 · TT → 4,672.90
+  function netSales(qty, price, channel, account, opts) {
+    var ex = exVat((Number(qty) || 0) * (Number(price) || 0), opts && opts.includesVat);
+    if (channel && channel.hasGP === false) return ex;
+    var gp = account ? account.gp : null;
+    if (gp == null || gp === '' || isNaN(Number(gp))) return null;
+    return ex * (1 - Number(gp));
   }
 
-  // Net Sales = Sell-out Amount ก่อน VAT × (1 − GP)
-  function netSales(sellOutEx, gp) { return sellOutEx * (1 - gp); }
+  // ย้อนกลับ: Sale Amount (รวม VAT) ที่ได้ Net Sales นี้ = Net Sales ÷ (1 − GP) × (1 + VAT) → ตัวเลข | null (ยังไม่มี GP)
+  //   hasGP false = ไม่หัก GP / Net Sales 100 GP 45% → 194.55
+  function saleFromNet(net, gp, hasGP, includesVat) {
+    var g = hasGP === false ? 0 : gp;
+    if (g == null || isNaN(Number(g)) || Number(g) >= 1) return null;
+    var ex = net / (1 - Number(g));
+    return includesVatOf(includesVat) ? ex * (1 + settings().VAT) : ex;
+  }
 
-  // Sell-out Amount รวม VAT = Sell-out Amount ก่อน VAT × (1 + VAT) (ใช้แสดงผล)
-  function sellOutIncVat(sellOutEx) { return sellOutEx * (1 + settings().VAT); }
-
-  // กลับด้าน: Sell-out Amount ก่อน VAT = Net Sales ÷ (1 − GP)
-  function sellOutFromNet(net, gp) { return gp >= 1 ? NaN : net / (1 - gp); }
-
-  // ทุกขั้นในครั้งเดียว: { units, price, gp, includesVat }
+  // ทุกขั้นในครั้งเดียว: { units, price, gp, hasGP, includesVat }
+  //   → { saleAmount (รวม VAT), exVat, netSales (null = ยังไม่มี GP), gpAmount, vatAmount }
   function chain(o) {
-    var ex = sellOutExVat(o.units, o.price, o.includesVat);
-    var net = netSales(ex, o.gp);
-    var inc = sellOutIncVat(ex);
-    return { sellOutExVat: ex, netSales: net, sellOutIncVat: inc, gpAmount: ex - net, vatAmount: inc - ex };
+    var sale = (Number(o.units) || 0) * (Number(o.price) || 0);
+    var hasGP = o.hasGP !== false;
+    var net = netSales(o.units, o.price, { hasGP: hasGP }, { gp: o.gp }, { includesVat: o.includesVat });
+    var ex = exVat(sale, o.includesVat);
+    return { saleAmount: sale, exVat: ex, netSales: net, gpAmount: net == null ? null : ex - net, vatAmount: sale - ex };
   }
 
-  function reverseChain(net, gp) {
-    var ex = sellOutFromNet(net, gp);
-    var inc = sellOutIncVat(ex);
-    return { netSales: net, sellOutExVat: ex, sellOutIncVat: inc, gpAmount: ex - net, vatAmount: inc - ex };
+  function reverseChain(net, gp, hasGP) {
+    var sale = saleFromNet(net, gp, hasGP);
+    var ex = sale == null ? null : exVat(sale);
+    return { netSales: net, saleAmount: sale, exVat: ex, gpAmount: ex == null ? null : ex - net, vatAmount: sale == null ? null : sale - ex };
   }
 
   // =====================================================================
@@ -127,11 +146,13 @@
     return { unit: unit, channel: findById(data.channels, unit.channelId) };
   }
 
-  // GP ที่ใช้กับหน่วย: Channel ที่ hasGP = false → 0 / นอกนั้น GP ของ Account (ไม่มีข้อมูล = 0)
+  // GP ที่ใช้กับหน่วย (สัดส่วน ค่าเดียวทั้งปี — CR-18): Channel ที่ hasGP = false → 0 / นอกนั้น GP ของ Account
+  //   (ECOM = Platform Fee) / Account ยังไม่มี GP → null (Net Sales คำนวณไม่ได้)
   function gpOf(data, unitId) {
     var info = unitInfo(data, unitId);
     if (!info || !info.channel || info.channel.hasGP === false) return 0;
-    return info.unit.gp || 0;
+    var g = info.unit.gp;
+    return g == null || g === '' || isNaN(Number(g)) ? null : Number(g);
   }
 
   // =====================================================================
@@ -253,8 +274,53 @@
     return found ? total : null;
   }
 
+  // ---------------------------------------------------------------------
+  // CR-24: ยอดขายอ้างอิง = ยอดจริงล่าสุดของแต่ละเดือน ตามเดือนปัจจุบันกลาง (core/clock.js)
+  //   เดือน ≤ เดือนปิดล่าสุด (ม.ค.–ส.ค.) = ปี 2026 · หลังจากนั้น (ก.ย.–ธ.ค.) = ปี 2025 → ผลรวม 12 เดือน = L12M (ก.ย. 2025 – ส.ค. 2026)
+  //   ยอดของเดือนที่เป็นประมาณการ (เกิน history.years[ปี].actualMonths) ไม่ใช้เสมอ
+  // ---------------------------------------------------------------------
+  function clock() { return SP.core.clock; }
+  // ยอดจริงเดือน m (0–11) ของหน่วยขายในปี year → บาท | null (ไม่มีข้อมูล หรือยังเป็นประมาณการ)
+  function actualMonthValue(history, year, unitId, m) {
+    var y = history && history.years && history.years[year];
+    var row = y && y.monthly && unitId != null ? y.monthly[unitId] : null;
+    if (!row) return null;
+    var n = y.actualMonths == null ? 12 : y.actualMonths;
+    return m < n ? (row[m] || 0) : null;
+  }
+  function referenceOfUnit(history, unitId) {
+    var out = [];
+    for (var m = 0; m < 12; m++) {
+      var y = clock().referenceYear(m);
+      out.push({ month: m + 1, value: actualMonthValue(history, y, unitId, m), sourceYear: y });
+    }
+    return out;
+  }
+  // ยอดอ้างอิงรายเดือนของหน่วยขาย หรือ Channel (= ผลรวมทุกหน่วยใน Master ของ Channel) → [{ month (1–12), value (บาท | null), sourceYear }]
+  //   planYear ไม่เปลี่ยนผล (ยอดจริงล่าสุด ณ เดือนปัจจุบันกลาง) ใช้กับทุกปีแผน
+  function referenceMonthly(data, id, planYear) {
+    if (findById(data.channels, id)) {
+      var units = unitsOfChannel(data, id).map(function (u) { return referenceOfUnit(data.history, u.id); });
+      return referenceOfUnit(data.history, null).map(function (r, m) {
+        var vals = units.map(function (u) { return u[m].value; }).filter(function (v) { return v != null; });
+        return { month: r.month, value: vals.length ? sum(vals) : null, sourceYear: r.sourceYear };
+      });
+    }
+    return referenceOfUnit(data.history, id);
+  }
+  // ยอดอ้างอิงเป็นตัวเลข 12 เดือน (เดือนที่ไม่มีข้อมูล = 0) → [12] | null (ไม่มีข้อมูลเลย)
+  function referenceValues(ref) {
+    if (!ref || !ref.some(function (r) { return r.value != null; })) return null;
+    return ref.map(function (r) { return r.value || 0; });
+  }
+  // L12M = ยอดขายจริง 12 เดือนที่ปิดแล้วล่าสุดของหน่วยขายหรือ Channel (= ผลรวมยอดอ้างอิง) → บาท | null
+  function l12m(data, id) {
+    var v = referenceValues(referenceMonthly(data, id));
+    return v ? sum(v) : null;
+  }
+
   // plan = { total, channels: [channelId], pct: { <channelId|unitId>: สัดส่วนของชั้นบน }, units: { <channelId>: [unitId] } }
-  // data = SP.data (หรือ store.data()) / year = ปีแผน (ปีก่อน = year − 1 ใช้หา History และ Growth)
+  // data = SP.data (หรือ store.data()) / year = ปีแผน · CR-24: ยอดขายปีก่อน (prior) = L12M ของหน่วย / Channel (ใช้เทียบการเติบโต)
   // → { amount, prior, growth, pct: 1, allocatedPct, remaining, children: [Channel] }
   //   Channel = { id, name, fullName, color, allocationUnit, hasGP, sellOutMethod,
   //               pct, amount, prior, growth, allocatedPct, remaining, children: [Unit] }
@@ -271,13 +337,13 @@
         var info = unitInfo(data, id);
         var p = pct[id] || 0;
         var amount = amountFromPct(chAmount, p);
-        var prior = unitHistory(data.history, prev, id);
+        var prior = l12m(data, id);
         return {
           id: id, name: info ? info.unit.name : id, type: ch.allocationUnit, pct: p, pctOfTotal: pctOfTotal(p, chPct), amount: amount,
           prior: prior, growth: growth(amount, prior), growthAmount: growthAmount(amount, prior)
         };
       });
-      var chPrior = channelHistory(data, prev, ch.id);
+      var chPrior = l12m(data, ch.id);
       return {
         id: ch.id,
         name: ch.name,
@@ -527,11 +593,54 @@
     return out;
   }
 
-  // ข้อมูลราคาที่ใช้คำนวณ: ปัจจุบัน (data.priceList, data.promotions, GP ของหน่วย) หรือ Snapshot ตอนล็อก Baseline
-  // snapshot = { priceList, promotions, gp: { <unitId>: GP } } (ราคาและ Promotion ที่แก้หลังล็อกไม่เปลี่ยน Baseline)
+  // ---------------------------------------------------------------------
+  // CR-18 ราคาต่อ Account: accountPrices = [{ productKey, accountId (= unitId), price }] ราคาเดียวทั้งปี (รวม VAT)
+  //   มาก่อนราคาของ Channel (ราคา Dealer ของ TT) และ RSP / ไม่มีรายการ = ใช้ราคาปกติ
+  // ---------------------------------------------------------------------
+  function accountPriceOf(accountPrices, key, unitId) {
+    var r = (accountPrices || []).filter(function (x) { return x.productKey === key && x.accountId === unitId; })[0];
+    return r && Number(r.price) > 0 ? Number(r.price) : null;
+  }
+
+  // ตั้งราคาต่อ Account (price = null / ว่าง = ลบ → กลับไปใช้ราคาปกติ) → รายการใหม่ (ไม่แก้รายการเดิม)
+  function setAccountPrice(accountPrices, key, unitId, price) {
+    var out = (accountPrices || []).filter(function (x) { return !(x.productKey === key && x.accountId === unitId); }).map(copy);
+    if (price != null && price !== '' && Number(price) > 0) out.push({ productKey: key, accountId: unitId, price: Math.round(Number(price) * 100) / 100 });
+    return out;
+  }
+
+  // ราคาปกติของสินค้าในหน่วยขาย ณ วันที่ (ไม่รวมราคาต่อ Account): Channel ที่ priceBasis = SELL_IN (TT) = ราคา Dealer ถ้ามี / นอกนั้น RSP
+  //   → { price, source: 'dealer' | 'rsp', rsp } (ไม่มีราคา → price null)
+  function basePriceOn(data, key, unitId, date) {
+    var info = unitInfo(data, unitId);
+    var ch = info && info.channel;
+    var rsp = priceOn(data.priceList, key, 'RSP', ch ? ch.id : null, date, unitId);
+    var type = (ch && ch.priceBasis) || 'RSP';
+    var dealer = type !== 'RSP' ? priceOn(data.priceList, key, type, ch.id, date, unitId) : null;
+    return dealer != null ? { price: dealer, source: 'dealer', rsp: rsp } : { price: rsp, source: 'rsp', rsp: rsp };
+  }
+
+  // ตรวจราคาต่อ Account (เตือนเท่านั้น ไม่บล็อก) → { ok, error: 'price' | null, warnings: ['aboveRsp' | 'belowRsp'], diff (สัดส่วนเทียบ RSP) }
+  //   aboveRsp = สูงกว่า RSP / belowRsp = ต่ำกว่า RSP เกิน settings.ACCOUNT_PRICE_WARN_BELOW (50%)
+  function checkAccountPrice(price, rsp, below) {
+    if (below == null) below = settings().ACCOUNT_PRICE_WARN_BELOW;
+    var p = Number(price);
+    if (!(p > 0)) return { ok: false, error: 'price', warnings: [], diff: null };
+    var warnings = [];
+    var diff = rsp > 0 ? p / rsp - 1 : null;
+    if (rsp > 0 && p > rsp + 1e-9) warnings.push('aboveRsp');
+    if (rsp > 0 && p < rsp * (1 - below) - 1e-9) warnings.push('belowRsp');
+    return { ok: true, error: null, warnings: warnings, diff: diff };
+  }
+
+  // ข้อมูลราคาที่ใช้คำนวณ: ปัจจุบัน (data.priceList, data.accountPrices, data.promotions, GP ของหน่วย) หรือ Snapshot ตอนล็อก Baseline
+  // snapshot = { priceList, accountPrices, promotions, gp: { <unitId>: GP } } (ราคาและ Promotion ที่แก้หลังล็อกไม่เปลี่ยน Baseline)
+  //   Snapshot ที่ไม่มี accountPrices (ก่อน CR-18) ใช้ราคาต่อ Account ปัจจุบัน
   function pricingOf(data, snapshot) {
-    if (snapshot && snapshot.priceList) return { priceList: snapshot.priceList, promotions: snapshot.promotions || [], gp: snapshot.gp || {} };
-    return { priceList: data.priceList || [], promotions: data.promotions || [], gp: null };
+    if (snapshot && snapshot.priceList) {
+      return { priceList: snapshot.priceList, accountPrices: snapshot.accountPrices || data.accountPrices || [], promotions: snapshot.promotions || [], gp: snapshot.gp || {} };
+    }
+    return { priceList: data.priceList || [], accountPrices: data.accountPrices || [], promotions: data.promotions || [], gp: null };
   }
 
   // Channel, GP ปกติ และราคาที่ใช้คำนวณของหน่วยขาย (Channel ที่ hasGP = false → GP = 0 ทุกกรณี)
@@ -540,28 +649,33 @@
     var info = unitInfo(data, unitId);
     var ch = info && info.channel;
     var hasGP = !!(ch && ch.hasGP !== false);
-    var gp = !hasGP ? 0 : pricing.gp && pricing.gp[unitId] != null ? pricing.gp[unitId] : gpOf(data, unitId);
+    var gp = !hasGP ? 0 : pricing.gp && pricing.gp[unitId] != null ? pricing.gp[unitId] : gpOf(data, unitId);   // null = ยังไม่มี GP
     return { channelId: ch ? ch.id : null, unitId: unitId, hasGP: hasGP, gp: gp, priceType: (ch && ch.priceBasis) || 'RSP' };
   }
 
-  // ราคาและ GP ที่มีผลของเดือน m (ถ่วงตามจำนวนวัน) ของสินค้า × หน่วยขาย — ใช้ Promotion ที่ยืนยันแล้วเท่านั้น
-  //   ราคาปกติของวัน = ราคาเฉพาะ Account → ของ Channel → ทั่วไป ตามประเภทราคาของ Channel (ไม่มี SELL_IN ใช้ RSP)
-  // → { days, rsp (RSP เฉลี่ย), base (ราคาปกติเฉลี่ยตามประเภทราคา), price (ราคาที่มีผลเฉลี่ย), gp (GP ที่มีผล ถ่วงตามยอดเงิน),
-  //     priceType, promoDays, promos: [{ promo, days, price }], drafts: [{ promo, days }] (ฉบับร่างที่ครอบเดือนนี้ ไม่นับในราคา) }
+  // ราคาและ GP ที่มีผลของเดือน m (ถ่วงตามจำนวนวัน) ของสินค้า × หน่วยขาย
+  //   ราคาปกติของวัน (CR-18) = ราคาต่อ Account (ทั้งปี) → ราคาของ Channel ตามประเภทราคา (TT = ราคา Dealer) → RSP ตามวันที่มีผล
+  //   Promotion ที่ยืนยันแล้วมาก่อนเมื่อเปิด FEATURES.promotionCalendar เท่านั้น (Phase 1 ปิด = ไม่นับ Promotion)
+  // → { days, rsp (RSP เฉลี่ย), base (ราคาปกติเฉลี่ย), price (ราคาที่มีผลเฉลี่ย), gp (GP ที่มีผล ถ่วงตามยอดเงิน · null = ยังไม่มี GP),
+  //     source ('account' | 'dealer' | 'rsp' ที่มาของราคาปกติ), priceType, promoDays, promos: [{ promo, days, price }], drafts: [{ promo, days }] }
   function monthPricing(pricing, key, unitId, ctx, year, m) {
     var days = daysInMonth(year, m);
     var first = dateKey(year, m, 1), last = dateKey(year, m, days);
     var rows = (pricing.priceList || []).filter(function (r) { return r.productKey === key && (r.priceType === 'RSP' || r.priceType === ctx.priceType); });
-    var promos = (pricing.promotions || []).filter(function (p) {
+    var calendarOn = !SP.core.features || SP.core.features.isOn('promotionCalendar');
+    var promos = !calendarOn ? [] : (pricing.promotions || []).filter(function (p) {
       return p.productKey === key && (p.accountIds || []).indexOf(unitId) >= 0 && p.startDate <= last && p.endDate >= first;
     });
+    var acct = accountPriceOf(pricing.accountPrices, key, unitId);
     var rspSum = 0, baseSum = 0, priceSum = 0, netSum = 0, promoDays = 0, used = {}, drafts = {};
     var type = ctx.priceType || 'RSP';
+    var source = acct != null ? 'account' : 'rsp';
     for (var d = 1; d <= days; d++) {
       var date = dateKey(year, m, d);
       var rsp = priceOn(rows, key, 'RSP', ctx.channelId, date, unitId) || 0;
-      var base = type === 'RSP' ? rsp : priceOn(rows, key, type, ctx.channelId, date, unitId);
-      if (base == null) base = rsp;
+      var typed = type === 'RSP' ? null : priceOn(rows, key, type, ctx.channelId, date, unitId);
+      var base = acct != null ? acct : typed != null ? typed : rsp;
+      if (acct == null && typed != null) source = 'dealer';
       var promo = null;
       promos.forEach(function (p) {
         if (date < p.startDate || date > p.endDate) return;
@@ -569,7 +683,7 @@
         else (drafts[p.id] = drafts[p.id] || { promo: p, days: 0 }).days += 1;
       });
       var price = promo ? promoPrice(promo, base) : base;
-      var gp = !ctx.hasGP ? 0 : promo && promo.promoGpPct != null ? promo.promoGpPct : ctx.gp;
+      var gp = !ctx.hasGP ? 0 : promo && promo.promoGpPct != null ? promo.promoGpPct : ctx.gp || 0;
       rspSum += rsp;
       baseSum += base;
       priceSum += price;
@@ -580,8 +694,9 @@
       }
     }
     function list(map) { return Object.keys(map).map(function (k) { return map[k]; }); }
+    var gpOut = ctx.hasGP && ctx.gp == null && !promoDays ? null : priceSum > 0 ? 1 - netSum / priceSum : ctx.gp;
     return {
-      days: days, rsp: rspSum / days, base: baseSum / days, price: priceSum / days, gp: priceSum > 0 ? 1 - netSum / priceSum : ctx.gp,
+      days: days, rsp: rspSum / days, base: baseSum / days, price: priceSum / days, gp: gpOut, source: source,
       priceType: type, promoDays: promoDays, promos: list(used), drafts: list(drafts)
     };
   }
@@ -648,10 +763,10 @@
   // 8) Phasing: Seasonality ปีก่อน → สัดส่วนรายเดือน
   // =====================================================================
 
-  // ยอดรายเดือนของปีก่อน (year − 1) ของหน่วยนั้น (null = ไม่มีข้อมูล)
+  // CR-24: ยอดอ้างอิงรายเดือนของหน่วยนั้น (ยอดจริงล่าสุดของแต่ละเดือน · ผลรวม = L12M) → [12] | null (ไม่มีข้อมูล)
+  //   year (ปีแผน) คงไว้ในพารามิเตอร์เพื่อให้ผู้เรียกเดิมใช้ได้ ไม่เปลี่ยนผล
   function priorMonthly(history, year, unitId) {
-    var y = history.years[year - 1];
-    return (y && y.monthly[unitId]) || null;
+    return referenceValues(referenceOfUnit(history, unitId));
   }
 
   // ยอดรายเดือนรวมของทุกหน่วยใน Master ของ Channel นั้น ในปี year (null = ไม่มีข้อมูล)
@@ -668,13 +783,13 @@
     return out;
   }
 
-  // ฐานของ Seasonality ปีแผน year: ยอดปีก่อนของหน่วย → ไม่มี ใช้ของ Channel → ไม่มี เท่ากันทุกเดือน
-  // → { monthly: [12] | null, source: 'account' (ของหน่วยเอง) | 'channel' | 'flat' }
+  // ฐานของ Seasonality ปีแผน year (CR-24 ยอดอ้างอิง): ของหน่วย → ไม่มี ใช้ของ Channel → ไม่มี เท่ากันทุกเดือน
+  //   → สัดส่วนตั้งต้นเดือน M = ยอดอ้างอิงเดือน M ÷ L12M / { monthly: [12] | null, source: 'account' (ของหน่วยเอง) | 'channel' | 'flat' }
   function phasingBasis(data, year, unitId) {
     var own = priorMonthly(data.history, year, unitId);
-    if (own) return { monthly: own, source: 'account' };
+    if (own && sum(own) > 0) return { monthly: own, source: 'account' };
     var info = unitInfo(data, unitId);
-    var ch = info && info.channel && channelMonthly(data, year - 1, info.channel.id);
+    var ch = info && info.channel && referenceValues(referenceMonthly(data, info.channel.id));
     if (ch) return { monthly: ch, source: 'channel' };
     return { monthly: null, source: 'flat' };
   }
@@ -832,9 +947,21 @@
   function fill(n, v) { var a = []; for (var i = 0; i < n; i++) a.push(v); return a; }
 
   // ใช้ในแผน SKU ได้หรือไม่ → null | 'notSale' (ไม่ใช่สินค้าขายจริง) | 'incomplete' (ขาดข้อมูลจำเป็น)
+  //   CR-20: สินค้าที่ Sales สร้าง (source SALES_REQUEST) ยกเว้นกฎขาดข้อมูลจำเป็น (หน้ารายการสินค้ายังแสดงความครบถ้วนตามปกติ)
   function planBlockReason(product, priceList) {
     if ((product.itemType || 'SALE') !== 'SALE') return 'notSale';
+    if (product.source === SALES_REQUEST) return null;
     return productCompleteness(product, priceList).complete ? null : 'incomplete';
+  }
+  var SALES_REQUEST = 'SALES_REQUEST';
+
+  // สินค้าที่ใช้คำนวณ Status ในแผน SKU: สินค้าจาก Sales ใช้วันเริ่มขายที่ Sales กรอกไว้ (ไม่มี = สินค้าเดิม)
+  function planProduct(product) {
+    var r = product && product.source === SALES_REQUEST ? product.request : null;
+    if (!r || !r.launchDate || r.launchDate === product.launchDate) return product;
+    var out = copy(product);
+    out.launchDate = r.launchDate;
+    return out;
   }
 
   // แผน NPD ที่อนุมัติแล้วของสินค้า × หน่วยขาย → เดือนเริ่มขาย (index ในปีแผน) | null
@@ -889,6 +1016,96 @@
     });
   }
 
+  // CR-20: สินค้าที่เพิ่มในแผนได้จาก Product Master ทั้งหมด (ไม่ใช่เฉพาะที่ Listing แล้ว)
+  //   = itemType SALE · ขายในปีแผน (ไม่เลิกขายก่อนปีแผน และเปิดตัวไม่เกินปีแผน) · ยังไม่อยู่ในแผน
+  //   → [{ product, key, listed (Listing แล้วในหน่วยนี้), status, npd, fromSales, blocked: null | 'incomplete', missing, startMonth }]
+  //   เรียง Listing แล้วก่อน / blocked = แสดงแต่เลือกไม่ได้ (สินค้าจาก Sales ไม่ติด)
+  function addableSkus(master, unitId, plan, year) {
+    var items = (plan && plan.items) || {};
+    return master.products.filter(function (p) {
+      return (p.itemType || 'SALE') === 'SALE' && !items[productKey(p)] && soldInYear(planProduct(p), year);
+    }).map(function (p) {
+      var key = productKey(p);
+      var c = productCompleteness(p, master.priceList);
+      var block = planBlockReason(p, master.priceList);
+      return {
+        product: p, key: key, listed: isListed(master.listings, key, unitId), status: planYearStatus(planProduct(p), year), npd: launchesIn(planProduct(p), year),
+        fromSales: p.source === SALES_REQUEST, blocked: block, missing: block ? c.missingRequired : [], startMonth: npdStartMonth(master.npdPlans, key, unitId, year)
+      };
+    }).sort(function (a, b) { return (a.listed ? 0 : 1) - (b.listed ? 0 : 1); });
+  }
+
+  // Listing ที่ Sales สร้าง (ไม่ซ้ำกับที่มีอยู่) → รายการใหม่ { productKey, accountId, addedBy: 'SALES', addedAt, fromMonth }
+  function addSalesListings(listings, keys, unitIds, meta) {
+    meta = meta || {};
+    var out = copy(listings || []);
+    keys.forEach(function (k) {
+      unitIds.forEach(function (u) {
+        if (isListed(out, k, u)) return;
+        out.push({ productKey: k, accountId: u, addedBy: 'SALES', addedAt: meta.at || null, addedByName: meta.by || null, fromMonth: meta.fromMonth || null });
+      });
+    });
+    return out;
+  }
+
+  // สร้าง NPD จากหน้าวางแผน SKU (CR-20 ข้อ 3.1) — ใช้ได้ทันที ไม่มีขั้นอนุมัติ
+  //   master = { products, priceList, accountPrices, listings }
+  //   input  = { name, seriesId (null = ยังไม่ระบุ · undefined / '' = ยังไม่เลือก), categoryId, subCategoryId, typeId, price (รวม VAT), startMonth (0–11),
+  //             year, unitId (หน่วยขายที่สร้าง), unitIds (หน่วยขายอื่นใน Channel เดียวกัน), note }
+  //   meta   = { by, at }
+  // → { ok, errors: ['name' | 'series' | 'price' | 'month'], key, product, master } — สินค้ารหัสชั่วคราว NPD_{ปี}Q{ไตรมาส}_{ลำดับ} · source SALES_REQUEST ·
+  //   วันเริ่มขาย = วันแรกของเดือนเริ่มขาย · ราคาต่อ Account ของหน่วยที่สร้าง · RSP ชั่วคราว (ถ้ายังไม่มี) · Listing (addedBy SALES) ทุกหน่วยที่เลือก
+  function createSalesNpd(master, input, meta) {
+    meta = meta || {};
+    var errors = [];
+    var name = String(input.name || '').trim();
+    if (!name) errors.push('name');
+    if (input.seriesId === undefined || input.seriesId === '') errors.push('series');
+    if (!(Number(input.price) > 0)) errors.push('price');
+    var m = Number(input.startMonth);
+    if (input.startMonth === '' || input.startMonth == null || isNaN(m) || m < 0 || m > 11) errors.push('month');
+    if (errors.length) return { ok: false, errors: errors, key: null, product: null, master: master };
+    var year = input.year;
+    var launch = dateKey(year, m, 1);
+    var code = nextTempCode(master.products, launch, year);
+    var units = [input.unitId].concat((input.unitIds || []).filter(function (u) { return u && u !== input.unitId; }));
+    var price = Math.round(Number(input.price) * 100) / 100;
+    var product = {
+      trCode: '', tempCode: code, tempCodeHistory: [], internalCode: '', barcode: '', name: name, nameEn: '', shortName: '', inferred: false,
+      categoryId: input.categoryId || null, subCategoryId: input.subCategoryId || null, typeId: input.typeId || null,
+      seriesId: input.seriesId || null, subSeriesId: null, itemType: 'SALE', packSize: null, uom: null, image: null,
+      launchDate: launch, discontinueMonth: null, clearance: null, note: '',
+      source: SALES_REQUEST, requestedBy: meta.by || '', requestedAt: meta.at || '',
+      request: { unitId: input.unitId, unitIds: units, price: price, launchDate: launch, startMonth: monthKey(year, m), note: String(input.note || '').trim() },
+      createdAt: meta.at || '', updatedAt: meta.at || ''
+    };
+    var out = {
+      products: (master.products || []).concat([product]),
+      priceList: master.priceList || [],
+      accountPrices: setAccountPrice(master.accountPrices, code, input.unitId, price),
+      listings: addSalesListings(master.listings, [code], units, { at: meta.at, by: meta.by, fromMonth: monthKey(year, m) })
+    };
+    if (priceOn(out.priceList, code, 'RSP', null, launch) == null) {
+      var res = addPrice(out.priceList, { productKey: code, priceType: 'RSP', channelId: null, accountId: null, price: price, effectiveFrom: launch, by: meta.by || '', at: meta.at || '' });
+      if (res.ok) out.priceList = res.list;
+    }
+    return { ok: true, errors: [], key: code, product: product, master: out };
+  }
+
+  // สินค้าจาก Sales ที่ทีม Product แก้ภายหลัง → ['price' (ราคาต่อ Account ของหน่วยที่ขอ หรือ RSP ต่างจากที่ Sales กรอก) | 'launch' (วันเริ่มขายเปลี่ยน)]
+  //   data = { accountPrices, priceList } / สินค้าอื่น = []
+  function salesRequestChanges(product, data) {
+    var r = product && product.source === SALES_REQUEST ? product.request : null;
+    if (!r) return [];
+    var key = productKey(product);
+    var out = [];
+    var acc = accountPriceOf(data.accountPrices, key, r.unitId);
+    var rsp = priceOn(data.priceList, key, 'RSP', null, r.launchDate);
+    if ((acc != null && Math.abs(acc - r.price) > 0.005) || acc == null || (rsp != null && Math.abs(rsp - r.price) > 0.005)) out.push('price');
+    if ((product.launchDate || null) !== (r.launchDate || null)) out.push('launch');
+    return out;
+  }
+
   // หยุดวางแผน (ลบในโหมดปรับแผน): เดือนที่แก้ได้ (หลัง M+frozen) = 0 คงเดือน Actual และเดือนที่ล็อกไว้
   function stopPlanItem(item, currentMonth, frozen) {
     if (frozen == null) frozen = settings().FROZEN_MONTHS;
@@ -909,11 +1126,12 @@
   //   data   = store.data() (priceList, promotions, history, settings, actuals, accounts/territories/channels สำหรับ GP)
   //   master = { products, listings } จาก store (master.*)
   //   plan   = { method, items: { <productKey>: item } } จาก store (plan.<ปี>.sku.<id> หรือ plan.<ปี>.forecast.<id>)
-  //            method = วิธีเติมยอดของช่องระบบเติม 'lastYear' | 'runRate' (ไม่มี = settings.DEFAULT_FILL_METHOD)
+  //            method = วิธีเติมยอดของช่องระบบเติม 'priorYear' (ค่าตั้งต้น CR-20) | 'lastYear' | 'runRate' (ไม่มี = settings.DEFAULT_FILL_METHOD)
   //   opts   = { year, mode: 'initial' | 'reforecast', currentMonth, includesVat, snapshot (ราคาตอนล็อก Baseline),
   //              target (เป้าหมายทั้งปีของหน่วย บาท — การเติบโต g ของวิธี lastYear), prior (true = คำนวณยอดปีก่อนเป็นเงินด้วย) }
   // ชิ้นต่อช่อง: เดือน Actual (โหมดปรับแผน) = ยอดจริง / ล็อก = 0 / กรอกเอง หรือ Override = qty
-  //             ระบบเติม = defaultPlanQty (ยอดเดือนเดียวกันปีก่อน × g หรือ Run-rate × Seasonality) / Clearance = Stock ของหน่วย ÷ จำนวนเดือน
+  //             ระบบเติม = defaultPlanQty (ยอดเดือนเดียวกันปีก่อน / × g / Run-rate × Seasonality) / Clearance = Stock ของหน่วย ÷ จำนวนเดือน
+  //   สินค้าจาก Sales (CR-20): Status ในแผนใช้วันเริ่มขายที่ Sales กรอก (product.request.launchDate) — ทีม Product เลื่อนวันภายหลัง จำนวนชิ้นในแผนไม่เปลี่ยน
   // ราคาและ GP ต่อช่อง = monthPricing (ราคาตามวันที่มีผล + Promotion ที่ยืนยันแล้ว ถ่วงตามจำนวนวัน)
   // ยอดปีก่อน (ราคาปีก่อน): cell.ly (ชิ้น) · cell.lySellOut · cell.lyNet (เมื่อ opts.prior) / row.ly = ผลรวมทั้งปี | null / grid.prior = รวมทุกแถว
   function skuPlanGrid(data, master, unitId, plan, opts) {
@@ -928,18 +1146,20 @@
     var live = pricingOf(data, null);
     var liveCtx = unitPricing(data, live, unitId);
     var si = seasonalityIndex(priorMonthly(data.history, year, unitId) || fill(12, 1));
-    var method = (plan && plan.method) || st.DEFAULT_FILL_METHOD || 'lastYear';
-    var unitLY = unitHistory(data.history, year - 1, unitId);
+    var method = (plan && plan.method) || st.DEFAULT_FILL_METHOD || 'priorYear';
+    var unitLY = l12m(data, unitId);   // CR-24: ยอดขายปีก่อนของหน่วย = L12M
     var g = method === 'lastYear' ? growthFactor(opts.target, unitLY) : null;
     var totals = { units: zeros(12), sellOut: zeros(12), net: zeros(12) };
     var prior = { units: zeros(12), sellOut: zeros(12), net: zeros(12) };
     var items = (plan && plan.items) || {};
 
-    var rows = master.products.filter(function (p) { return items[productKey(p)]; }).map(function (p) {
-      var key = productKey(p);
+    var rows = master.products.filter(function (p) { return items[productKey(p)]; }).map(function (p0) {
+      var key = productKey(p0);
+      var p = planProduct(p0);
       var item = items[key];
       var listed = isListed(master.listings, key, unitId);
-      var ly = skuHistory(data.history, year - 1, unitId, key);
+      var ref = skuReference(data.history, unitId, key);   // CR-24: ยอดอ้างอิงราย SKU (ยอดจริงล่าสุดของเดือน · ไม่มี = ประมาณการปีล่าสุด + ทำเครื่องหมาย)
+      var ly = ref ? ref.monthly : null;
       var rr = runRateOf(data.history, key, unitId);
       var sys = listed ? defaultPlanQty(method, { monthly: ly, runRate: rr }, opts.target, unitLY, si) : null;
       var clFrom = p.clearance ? monthIndex(p.clearance.fromMonth, year) : 0;
@@ -957,35 +1177,36 @@
         var planned = source === 'locked' ? 0 : (source === 'manual' || override) ? Number(item.qty[m] || 0) : systemUnits;
         var units = state.reason === 'actual' ? actualUnits(data.actuals, year, unitId, key, m) : planned;
         var pm = monthPricing(pricing, key, unitId, ctx, year, m);
-        var c = chain({ units: units, price: pm.price, gp: pm.gp, includesVat: includesVat });
+        var c = chain({ units: units, price: pm.price, gp: pm.gp, hasGP: ctx.hasGP, includesVat: includesVat });
         totals.units[m] += units;
-        totals.sellOut[m] += c.sellOutExVat;
-        totals.net[m] += c.netSales;
+        totals.sellOut[m] += c.saleAmount;
+        totals.net[m] += c.netSales || 0;
         var cell = {
           m: m, status: statusAt(p, year, m, st.NPD_MONTHS), source: source, lockReason: lock, state: state, units: units, planned: planned,
           systemUnits: systemUnits, override: override, price: pm.price, rsp: pm.rsp, base: pm.base, normalPrice: pm.base, priceType: pm.priceType,
-          gp: pm.gp, promos: pm.promos, promoDays: pm.promoDays, days: pm.days, sellOut: c.sellOutExVat, net: c.netSales,
-          ly: ly ? (ly[m] || 0) : null, lySellOut: null, lyNet: null
+          gp: pm.gp, priceSource: pm.source, promos: pm.promos, promoDays: pm.promoDays, days: pm.days, sellOut: c.saleAmount, net: c.netSales,
+          ly: ly ? (ly[m] || 0) : null, lySellOut: null, lyNet: null,
+          lyYear: ref ? ref.sourceYears[m] : null, lyEstimated: !!(ref && ref.estimated[m])
         };
         if (ly) {
           lyTotal.units += cell.ly;
           prior.units[m] += cell.ly;
           if (opts.prior) {
-            var lp = monthPricing(live, key, unitId, liveCtx, year - 1, m);
-            var lc = chain({ units: cell.ly, price: lp.price, gp: lp.gp, includesVat: includesVat });
-            cell.lySellOut = lc.sellOutExVat;
+            var lp = monthPricing(live, key, unitId, liveCtx, cell.lyYear, m);
+            var lc = chain({ units: cell.ly, price: lp.price, gp: lp.gp, hasGP: liveCtx.hasGP, includesVat: includesVat });
+            cell.lySellOut = lc.saleAmount;
             cell.lyNet = lc.netSales;
-            lyTotal.sellOut += lc.sellOutExVat;
-            lyTotal.net += lc.netSales;
-            prior.sellOut[m] += lc.sellOutExVat;
-            prior.net[m] += lc.netSales;
+            lyTotal.sellOut += lc.saleAmount;
+            lyTotal.net += lc.netSales || 0;
+            prior.sellOut[m] += lc.saleAmount;
+            prior.net[m] += lc.netSales || 0;
           }
         }
         cells.push(cell);
       }
       return {
         key: key,
-        product: p,
+        product: p0,
         item: item,
         listed: listed,
         status: planYearStatus(p, year, st.NPD_MONTHS),
@@ -1006,7 +1227,8 @@
     });
 
     return {
-      accountId: unitId, unitId: unitId, year: year, mode: mode, gp: ctx.gp, hasGP: ctx.hasGP, priceType: ctx.priceType, includesVat: includesVat,
+      accountId: unitId, unitId: unitId, year: year, mode: mode, gp: ctx.gp, hasGP: ctx.hasGP, gpMissing: ctx.hasGP && ctx.gp == null,
+      priceType: ctx.priceType, includesVat: includesVat,
       si: si, method: method, g: g, unitPrior: unitLY, rows: rows, totals: totals, prior: prior,
       priorTotal: { units: sum(prior.units), sellOut: sum(prior.sellOut), net: sum(prior.net) },
       yearTotal: { units: sum(totals.units), sellOut: sum(totals.sellOut), net: sum(totals.net) }
@@ -1210,14 +1432,30 @@
   // =====================================================================
 
   // values = { <unitId>: [12 ตัวเลข] } ของ source ที่ต้องการ (Target Baseline หรือ Actual)
+  // opts.stores (CR-16) = { values: { <storeId>: [12] }, territory: { <storeId>: [12 territoryId | null] } } (core/stores.js performanceInput)
+  //   → เขตที่มีข้อมูลร้านค้า: ยอดของร้าน × เดือนที่ร้านอยู่ในเขต × เดือนที่คนรับผิดชอบเขต (แทน values ของเขตนั้น)
   // → { personId, months: [12], total, owned: [12 bool], units: [{ unitId, months, total }] }
-  function performanceByPerson(assignments, salespeople, personId, year, values) {
+  function performanceByPerson(assignments, salespeople, personId, year, values, opts) {
     var months = zeros(12), owned = fill(12, false), units = [];
-    Object.keys(values || {}).forEach(function (unitId) {
+    var st = opts && opts.stores;
+    var byStore = {};
+    if (st) {
+      Object.keys(st.territory || {}).forEach(function (sid) {
+        (st.territory[sid] || []).forEach(function (t, m) {
+          if (!t) return;
+          var row = byStore[t] = byStore[t] || zeros(12);
+          row[m] += (st.values[sid] || [])[m] || 0;
+        });
+      });
+    }
+    var rows = {};
+    Object.keys(values || {}).forEach(function (unitId) { if (!byStore[unitId]) rows[unitId] = values[unitId]; });
+    Object.keys(byStore).forEach(function (unitId) { rows[unitId] = byStore[unitId]; });
+    Object.keys(rows).forEach(function (unitId) {
       var row = zeros(12), any = false;
       for (var m = 0; m < 12; m++) {
         if (ownerOf(assignments, salespeople, unitId, monthKey(year, m)) !== personId) continue;
-        row[m] = values[unitId][m] || 0;
+        row[m] = rows[unitId][m] || 0;
         months[m] += row[m];
         owned[m] = true;
         any = true;
@@ -1259,7 +1497,7 @@
         var units = rows[key][m] || 0;
         if (!units) continue;
         var pm = monthPricing(pricing, key, unitId, ctx, year, m);
-        out[m] += chain({ units: units, price: pm.price, gp: pm.gp }).netSales;
+        out[m] += chain({ units: units, price: pm.price, gp: pm.gp, hasGP: ctx.hasGP }).netSales || 0;
       }
     });
     return out;
@@ -1269,27 +1507,27 @@
   // 15) คำอธิบายการคำนวณ (ⓘ และ Tooltip รายช่องในหน้าวางแผน SKU)
   // =====================================================================
 
-  // การคำนวณของช่องเดียว: ชิ้น × ราคา → Sell-out ก่อน VAT → Net Sales → รวม VAT
-  function cellBreakdown(units, price, gp, includesVat) {
-    var c = chain({ units: units, price: price, gp: gp, includesVat: includesVat });
+  // การคำนวณของช่องเดียว: ชิ้น × ราคา (รวม VAT) → Sale Amount → ÷ VAT × (1 − GP) → Net Sales
+  // CR-18: 3,000 ชิ้น × 149 บาท GP 40% → Sale Amount 447,000.00 · Net Sales 250,654.21 (÷ 1.07 × 0.60)
+  function cellBreakdown(units, price, gp, hasGP, includesVat) {
+    var c = chain({ units: units, price: price, gp: gp, hasGP: hasGP, includesVat: includesVat });
     return {
-      units: units, price: price, gp: gp,
-      sellOutExVat: c.sellOutExVat, netSales: c.netSales, sellOutIncVat: c.sellOutIncVat,
-      gpAmount: c.gpAmount, vatAmount: c.vatAmount
+      units: units, price: price, gp: gp, hasGP: hasGP !== false, vatFactor: 1 + settings().VAT, includesVat: includesVatOf(includesVat),
+      saleAmount: c.saleAmount, exVat: c.exVat, netSales: c.netSales, gpAmount: c.gpAmount, vatAmount: c.vatAmount
     };
   }
 
-  // เงินที่ลูกค้าจ่าย (รวม VAT) ไปอยู่ที่ใคร: Net Sales (บริษัท) / GP (ร้านค้า) / VAT
-  // hasGP = false → ไม่มีส่วน GP → { sellOutExVat, total, parts: [{ key: 'net' | 'gp' | 'vat', value, share }] }
-  function moneySplit(sellOutEx, gp, hasGP) {
-    var g = hasGP === false ? 0 : gp;
-    var net = netSales(sellOutEx, g);
-    var inc = sellOutIncVat(sellOutEx);
-    var parts = [{ key: 'net', value: net }];
-    if (hasGP !== false) parts.push({ key: 'gp', value: sellOutEx - net });
-    parts.push({ key: 'vat', value: inc - sellOutEx });
-    parts.forEach(function (p) { p.share = inc ? p.value / inc : 0; });
-    return { sellOutExVat: sellOutEx, total: inc, parts: parts };
+  // Sale Amount (เงินที่ลูกค้าจ่าย รวม VAT) ไปอยู่ที่ใคร: Net Sales (บริษัท) / GP (ร้านค้า) / VAT
+  // hasGP = false → ไม่มีส่วน GP / ยังไม่มี GP → ไม่มีส่วน net และ gp (gpMissing) → { saleAmount, total, gpMissing, parts: [{ key, value, share }] }
+  function moneySplit(sale, gp, hasGP, includesVat) {
+    var ex = exVat(sale, includesVat);
+    var net = netSales(1, sale, { hasGP: hasGP !== false }, { gp: gp }, { includesVat: includesVat });
+    var parts = [];
+    if (net != null) parts.push({ key: 'net', value: net });
+    if (hasGP !== false && net != null) parts.push({ key: 'gp', value: ex - net });
+    parts.push({ key: 'vat', value: sale - ex });
+    parts.forEach(function (p) { p.share = sale ? p.value / sale : 0; });
+    return { saleAmount: sale, total: sale, gpMissing: net == null, parts: parts };
   }
 
   // =====================================================================
@@ -1516,8 +1754,8 @@
     return prefix + pad2(n + 1);
   }
 
-  // ผูกรหัสจริง: ย้ายทุกข้อมูลที่อ้างรหัสชั่วคราวไปใช้ TR Code (สินค้า, Listing, ราคา, Promotion, แผน NPD) และเก็บ tempCode ไว้เป็นประวัติ
-  // master = { products, listings, priceList, promotions, npdPlans } → { ok, error: 'empty' | 'notFound' | 'duplicate', master }
+  // ผูกรหัสจริง: ย้ายทุกข้อมูลที่อ้างรหัสชั่วคราวไปใช้ TR Code (สินค้า, Listing, ราคา, ราคาต่อ Account, Promotion, แผน NPD) และเก็บ tempCode ไว้เป็นประวัติ
+  // master = { products, listings, priceList, accountPrices, promotions, npdPlans } → { ok, error: 'empty' | 'notFound' | 'duplicate', master }
   // แผน SKU ทุกปีย้ายด้วย renamePlanKey (Module เรียกกับทุก Key plan.<ปี>.sku / forecast ที่บันทึกไว้)
   function bindTrCode(master, tempCode, trCode) {
     var code = String(trCode == null ? '' : trCode).trim();
@@ -1528,7 +1766,7 @@
     if (taken) return { ok: false, error: 'duplicate', master: master };
     var out = copy(master);
     out.products.forEach(function (p) { if (!p.trCode && p.tempCode === tempCode) p.trCode = code; });
-    ['listings', 'priceList', 'promotions', 'npdPlans'].forEach(function (k) {
+    ['listings', 'priceList', 'accountPrices', 'promotions', 'npdPlans'].forEach(function (k) {
       (out[k] || []).forEach(function (r) { if (r.productKey === tempCode) r.productKey = code; });
     });
     return { ok: true, error: null, master: out };
@@ -1623,26 +1861,82 @@
     };
   }
 
-  // แถวสำหรับส่งออกหน้า Top-down (แบบแบน ไม่ Merge): Channel → หน่วยขาย · ท้ายไฟล์: Total + คงเหลือระดับ Total + คงเหลือแต่ละ Channel
+  // แถวสำหรับส่งออก (แบบแบน ไม่ Merge): Channel → หน่วยขาย · ท้ายไฟล์: Total + คงเหลือระดับ Total + คงเหลือแต่ละ Channel
+  //   CR-23 opts: { level: 'channel' } = หน้า Annual Target (แถว Channel + Total + คงเหลือระดับ Total ไม่มีแถวหน่วยขาย) /
+  //               { channelId } = หน้า Sub-channel Allocation (แถวหน่วยขายของ Channel นั้น + คงเหลือใน Channel)
   // → [{ kind: 'channel' | 'unit' | 'total' | 'remaining', scope, channelId, channel, unitId, unit, allocationUnit,
   //      prior, pctOfTotal, pctInChannel, amount, growth, growthAmount, status }]
-  function topDownRows(tree) {
+  function topDownRows(tree, opts) {
+    opts = opts || {};
+    function unitRow(ch, u) {
+      return { kind: 'unit', channelId: ch.id, channel: ch.name, allocationUnit: ch.allocationUnit, unitId: u.id, unit: u.name,
+        prior: u.prior, pctOfTotal: u.pctOfTotal, pctInChannel: u.pct, amount: u.amount, growth: u.growth, growthAmount: u.growthAmount };
+    }
+    function channelRem(ch) {
+      return { kind: 'remaining', scope: 'channel', channelId: ch.id, channel: ch.name, pctOfTotal: null, pctInChannel: ch.unallocatedPct,
+        amount: ch.remaining.amount, status: ch.remaining.status };
+    }
+    if (opts.channelId) {
+      var one = findById(tree.children, opts.channelId);
+      if (!one) return [];
+      return one.children.map(function (u) { return unitRow(one, u); }).concat([channelRem(one)]);
+    }
+    var withUnits = opts.level !== 'channel';
     var rows = [];
     tree.children.forEach(function (ch) {
       rows.push({ kind: 'channel', channelId: ch.id, channel: ch.name, allocationUnit: ch.allocationUnit, unitId: null, unit: null,
-        prior: ch.prior, pctOfTotal: ch.pct, pctInChannel: 1, amount: ch.amount, growth: ch.growth, growthAmount: ch.growthAmount });
-      ch.children.forEach(function (u) {
-        rows.push({ kind: 'unit', channelId: ch.id, channel: ch.name, allocationUnit: ch.allocationUnit, unitId: u.id, unit: u.name,
-          prior: u.prior, pctOfTotal: u.pctOfTotal, pctInChannel: u.pct, amount: u.amount, growth: u.growth, growthAmount: u.growthAmount });
-      });
+        prior: ch.prior, pctOfTotal: ch.pct, pctInChannel: 1, amount: ch.amount, growth: ch.growth, growthAmount: ch.growthAmount, units: ch.children.length });
+      if (withUnits) ch.children.forEach(function (u) { rows.push(unitRow(ch, u)); });
     });
     rows.push({ kind: 'total', prior: tree.prior, pctOfTotal: 1, pctInChannel: null, amount: tree.amount, growth: tree.growth, growthAmount: tree.growthAmount });
     rows.push({ kind: 'remaining', scope: 'total', pctOfTotal: tree.unallocatedPct, pctInChannel: null, amount: tree.remaining.amount, status: tree.remaining.status });
-    tree.children.forEach(function (ch) {
-      rows.push({ kind: 'remaining', scope: 'channel', channelId: ch.id, channel: ch.name, pctOfTotal: null, pctInChannel: ch.unallocatedPct,
-        amount: ch.remaining.amount, status: ch.remaining.status });
-    });
+    if (withUnits) tree.children.forEach(function (ch) { rows.push(channelRem(ch)); });
     return rows;
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-23: ยอดขายย้อนหลัง 3 ปี · Annual Target / Sub-channel Allocation
+  // ---------------------------------------------------------------------
+
+  // ปีของยอดขายย้อนหลังที่แสดง = count ปีก่อนปีแผน (ค่าตั้งต้น 3) — ปีแผน 2027 → [2024, 2025, 2026] · 2028 → [2025, 2026, 2027]
+  function historyYears(planYear, count) {
+    var n = count || 3, out = [];
+    for (var y = planYear - n; y < planYear; y++) out.push(y);
+    return out;
+  }
+
+  // ยอดขายทั้งปีของ Channel (รวมทุกหน่วยใน Master) หรือหน่วยขาย ในแต่ละปีของ years → [บาท | null] ตามลำดับ (null = ไม่มีข้อมูลปีนั้น)
+  //   ปีล่าสุด = ยอดจริงบางเดือน + ประมาณการ (history.years[ปี].actualMonths)
+  function salesHistory(data, id, years) {
+    var isChannel = !!findById(data.channels, id);
+    return (years || []).map(function (y) { return isChannel ? channelHistory(data, y, id) : unitHistory(data.history, y, id); });
+  }
+
+  // Sub-channel Allocation แก้ไขได้เมื่อ Management กำหนดเป้าหมายของ Channel แล้ว → null (แก้ได้) | 'noTarget' (เป้าหมาย 0) | 'noChannel'
+  function unitAllocationBlock(tree, channelId) {
+    var ch = findById(tree.children, channelId);
+    if (!ch) return 'noChannel';
+    return ch.amount > 0 ? null : 'noTarget';
+  }
+
+  // รายการ Audit เมื่อเป้าหมายของ Channel เปลี่ยนเกิน 1 บาท (บันทึกหน้า Annual Target) before / after = calc.topDown(...) ของปีเดียวกัน
+  //   meta = { by, at, year } → [{ entity: 'channelTarget', key: channelId, field: 'amount', oldValue, newValue, year, by, at }]
+  function channelTargetAudit(before, after, meta) {
+    meta = meta || {};
+    return after.children.map(function (ch) {
+      var old = findById(before.children, ch.id);
+      var from = old ? old.amount : 0;
+      if (Math.abs(ch.amount - from) <= 1) return null;
+      return { entity: 'channelTarget', key: ch.id, field: 'amount', oldValue: Math.round(from), newValue: Math.round(ch.amount), year: meta.year || after.year, by: meta.by || '', at: meta.at || '' };
+    }).filter(Boolean);
+  }
+
+  // การเปลี่ยนเป้าหมายของ Channel ล่าสุดของปีแผน year ที่เกิดหลัง dismissedAt (ผู้ใช้กดปิดบรรทัดแจ้ง) → รายการ Audit | null
+  function channelTargetChange(audit, channelId, year, dismissedAt) {
+    var list = (audit || []).filter(function (e) {
+      return e.entity === 'channelTarget' && e.key === channelId && Number(e.year) === Number(year) && (!dismissedAt || (e.at || '') > dismissedAt);
+    });
+    return list.length ? list[list.length - 1] : null;
   }
 
   // =====================================================================
@@ -1684,6 +1978,25 @@
     return (u && u[key]) || null;
   }
 
+  // CR-24: ยอดอ้างอิงราย SKU (ชิ้น) ในหน่วยขาย → { monthly: [12], sourceYears: [12], estimated: [12 bool] } | null (ไม่มีข้อมูลทั้ง 2 ปี)
+  //   เดือน ≤ เดือนปิดล่าสุด = ยอดจริงปีล่าสุด · หลังจากนั้น = ยอดจริงปีก่อนหน้า / ไม่มียอดจริงรายเดือนของปีนั้น (ข้อมูล SKU ใน seed มีแค่ปี 2026)
+  //   → ใช้ค่าปีล่าสุดของเดือนนั้น (ประมาณการ) และ estimated = true (ไม่ใช้เป็นฐานของเป้าหมายรายเดือน)
+  function skuReference(history, unitId, key) {
+    var lc = clock().parse(clock().lastClosedMonth());
+    var latest = skuHistory(history, lc.year, unitId, key);
+    var older = skuHistory(history, lc.year - 1, unitId, key);
+    if (!latest && !older) return null;
+    var out = { monthly: [], sourceYears: [], estimated: [] };
+    for (var m = 0; m < 12; m++) {
+      var y = clock().referenceYear(m);
+      var src = y === lc.year ? latest : older;
+      if (src) { out.monthly.push(src[m] || 0); out.sourceYears.push(y); out.estimated.push(false); }
+      else if (latest && y !== lc.year) { out.monthly.push(latest[m] || 0); out.sourceYears.push(lc.year); out.estimated.push(true); }
+      else { out.monthly.push(0); out.sourceYears.push(y); out.estimated.push(false); }
+    }
+    return out;
+  }
+
   // Run-rate = ยอดเฉลี่ย (ชิ้น/เดือน) ของ n เดือนจริงล่าสุด (actualMonths = จำนวนเดือนที่เป็นยอดจริงของปีนั้น) → ค่า > 0 | null
   function runRateFrom(monthly, actualMonths, n) {
     if (!monthly) return null;
@@ -1701,12 +2014,17 @@
   }
 
   // ค่าตั้งต้นของช่อง "ระบบเติม" 12 เดือน → [12] จำนวนเต็ม | null (ไม่มีข้อมูล → ช่องเป็น "กรอกเอง")
-  //   'lastYear' (ค่าเริ่มต้น): ค่าเดือน m = ยอดเดือน m ปีก่อนของ SKU × g (ปัดเป็นจำนวนเต็ม) — คงรูปแบบรายเดือนและสัดส่วน SKU ของปีก่อน
+  //   'priorYear' (ค่าเริ่มต้น CR-20): ค่าเดือน m = ยอดขายเดือน m ปีก่อนของ SKU ในหน่วยขายนั้นตรงๆ (15,970 → 15,970) / ไม่มียอดปีก่อน → null
+  //   'lastYear' (CR-11 ไม่ใช้ในหน้าจอแล้ว): ค่าเดือน m = ยอดเดือน m ปีก่อนของ SKU × g (ปัดเป็นจำนวนเต็ม) — คงรูปแบบรายเดือนและสัดส่วน SKU ของปีก่อน
   //              เป้าหมาย 22,140,000 · ยอดปีก่อน 19,800,000 · SKU ม.ค. ปีก่อน 14,925 → 16,689 / SKU ไม่มียอดปีก่อน → null
-  //   'runRate': ค่าเดือน m = Run-rate × Seasonality Index ของเดือน m (ปัด) / ไม่มี Run-rate → null
+  //   'runRate' (CR-11 ไม่ใช้ในหน้าจอแล้ว): ค่าเดือน m = Run-rate × Seasonality Index ของเดือน m (ปัด) / ไม่มี Run-rate → null
   //   skuHistoryValue = { monthly: [12] ชิ้นปีก่อน, runRate } หรือ [12] / unitHistoryValue = ยอดขายปีก่อนของหน่วย (บาท) ตัวเลขหรือ [12]
   function defaultPlanQty(method, skuHistoryValue, unitTarget, unitHistoryValue, seasonality) {
     var hv = Array.isArray(skuHistoryValue) ? { monthly: skuHistoryValue } : (skuHistoryValue || {});
+    if (method === 'priorYear') {
+      if (!hv.monthly || !(sum(hv.monthly) > 0)) return null;
+      return hv.monthly.map(function (q) { return Math.round(q || 0); });
+    }
     if (method === 'runRate') {
       if (!(hv.runRate > 0)) return null;
       return (seasonality || fill(12, 1)).map(function (x) { return Math.round(hv.runRate * x); });
@@ -1878,8 +2196,8 @@
       before += gap;
       var rows = grid.rows.filter(function (r) { return keys.indexOf(r.key) >= 0 && r.cells[m].state.editable; }).map(function (r) {
         var c = r.cells[m];
-        return { key: r.key, net: c.net, units: c.units, unitNet: chain({ units: 1, price: c.price, gp: c.gp, includesVat: grid.includesVat }).netSales };
-      });
+        return { key: r.key, net: c.net || 0, units: c.units, unitNet: chain({ units: 1, price: c.price, gp: c.gp, hasGP: grid.hasGP, includesVat: grid.includesVat }).netSales };
+      }).filter(function (x) { return x.unitNet != null; });   // CR-18: ยังไม่มี GP = คำนวณไม่ได้
       var res = closeGap(gap, rows);
       after += res.residual;
       res.rows.forEach(function (x) {
@@ -1891,6 +2209,52 @@
       });
     });
     return { writes: writes, rows: Object.keys(per).map(function (k) { return per[k]; }), before: before, after: after };
+  }
+
+  // CR-20 ปรับให้ครบตามเป้าหมาย = closeGapWrites ของทุกเดือนที่เลือก แล้วถ้าทั้งปียังขาดเกิน tolerance (จำนวนชิ้นเป็นจำนวนเต็ม)
+  //   เติมทีละ 1 ชิ้นที่ SKU ที่ Net Sales ต่อชิ้นต่ำสุด ในเดือนที่ยังขาดมากที่สุด จนทั้งปีไม่ขาด (เกินได้ไม่เกิน 1 ชิ้น · คงเหลือรายเดือนไม่เกิน ±1 ชิ้น × ราคาต่อชิ้นสูงสุด)
+  //   → รูปแบบเดียวกับ closeGapWrites { writes, rows, before, after }
+  function fillToTargetWrites(grid, targets, months, keys, tolerance) {
+    if (tolerance == null) tolerance = settings().ALERT_TOLERANCE_BAHT;
+    months = months || [];
+    var res = closeGapWrites(grid, targets, months, keys);
+    var rowOf = {};
+    grid.rows.forEach(function (r) { rowOf[r.key] = r; });
+    function unitNet(c) { return chain({ units: 1, price: c.price, gp: c.gp, hasGP: grid.hasGP, includesVat: grid.includesVat }).netSales; }
+    var qty = {}, resid = {};
+    months.forEach(function (m) { resid[m] = (targets[m] || 0) - grid.totals.net[m]; });
+    res.writes.forEach(function (w) {
+      var c = rowOf[w.key].cells[w.m];
+      qty[w.key + "|" + w.m] = w.qty;
+      resid[w.m] -= (w.qty - c.units) * (unitNet(c) || 0);
+    });
+    var total = sum(months.map(function (m) { return resid[m]; }));
+    var guard = 0;
+    while (total > tolerance && guard++ < 500) {
+      var m = months.slice().sort(function (x, y) { return resid[y] - resid[x]; })[0];
+      var best = null;
+      grid.rows.forEach(function (r) {
+        var c = r.cells[m];
+        if (keys.indexOf(r.key) < 0 || !c.state.editable) return;
+        var u = unitNet(c);
+        if (u > 0 && (!best || u < best.unit)) best = { key: r.key, unit: u, base: c.units };
+      });
+      if (!best) break;
+      var k = best.key + "|" + m;
+      qty[k] = (qty[k] == null ? best.base : qty[k]) + 1;
+      resid[m] -= best.unit;
+      total -= best.unit;
+    }
+    var writes = [], per = {};
+    Object.keys(qty).forEach(function (k) {
+      var p = k.split("|"), key = p[0], mm = Number(p[1]);
+      var c = rowOf[key].cells[mm];
+      writes.push({ key: key, m: mm, qty: qty[k] });
+      var x = per[key] = per[key] || { key: key, before: 0, after: 0 };
+      x.before += c.units;
+      x.after += qty[k];
+    });
+    return { writes: writes, rows: Object.keys(per).map(function (k) { return per[k]; }), before: res.before, after: total };
   }
 
   // แยกข้อความที่คัดลอกจาก Excel (แยกคอลัมน์ด้วย Tab แยกแถวด้วยบรรทัดใหม่) → [[ข้อความ]] (ตัดบรรทัดว่างท้ายสุด)
@@ -1945,9 +2309,14 @@
   // SKU ที่มียอดขายปีก่อนในหน่วยขายแต่ไม่อยู่ในแผน (ที่มาของส่วนต่าง)
   //   → { discontinued, incomplete, other } แต่ละชุด = { keys, net (Net Sales ปีก่อน ราคาปีก่อน) }
   //   discontinued = ไม่ได้ขายในปีแผน (เลิกขายก่อนปีแผน) / incomplete = ขาดข้อมูลจำเป็น / other = ขายได้แต่ไม่อยู่ในแผน
+  //   CR-24: ยอดขายปีก่อน = ยอดอ้างอิงราย SKU 12 เดือน (skuReference · ราคาของปีที่ใช้)
   function priorOutsidePlan(data, master, unitId, plan, year) {
-    var y = data.history && data.history.years[year - 1];
-    var q = (y && y.skuQty && y.skuQty[unitId]) || {};
+    var lc = clock().parse(clock().lastClosedMonth());
+    var q = {};
+    [lc.year, lc.year - 1].forEach(function (yy) {
+      var yq = data.history && data.history.years[yy] && data.history.years[yy].skuQty && data.history.years[yy].skuQty[unitId];
+      Object.keys(yq || {}).forEach(function (k) { q[k] = true; });
+    });
     var items = (plan && plan.items) || {};
     var pricing = pricingOf(data, null), ctx = unitPricing(data, pricing, unitId);
     var out = { discontinued: { keys: [], net: 0 }, incomplete: { keys: [], net: 0 }, other: { keys: [], net: 0 } };
@@ -1956,10 +2325,11 @@
       var p = findProduct(master.products, key);
       var kind = !p || !soldInYear(p, year) ? 'discontinued' : planBlockReason(p, master.priceList) ? 'incomplete' : 'other';
       var net = 0;
+      var ref = skuReference(data.history, unitId, key);
       for (var m = 0; m < 12; m++) {
-        if (!q[key][m]) continue;
-        var pm = monthPricing(pricing, key, unitId, ctx, year - 1, m);
-        net += chain({ units: q[key][m], price: pm.price, gp: pm.gp }).netSales;
+        if (!ref || !ref.monthly[m]) continue;
+        var pm = monthPricing(pricing, key, unitId, ctx, ref.sourceYears[m], m);
+        net += chain({ units: ref.monthly[m], price: pm.price, gp: pm.gp, hasGP: ctx.hasGP }).netSales || 0;
       }
       out[kind].keys.push(key);
       out[kind].net += net;
@@ -2030,6 +2400,8 @@
   // units = [{ id, target, plan, phasing, sku (สถานะ Workflow), vacant }] / ctx = { topDown (สถานะ Top-down), locked, all }
   //   ล็อก Baseline แล้ว = แผนครั้งแรกแก้ไม่ได้ → เหลือเฉพาะเรื่องผู้รับผิดชอบ
   //   ctx.all (CR-13 ตารางติดตามสถานะ) = แสดงทุกหน่วยขาย หน่วยที่ไม่มีประเด็นอยู่ท้ายตาราง (rank 5 · issue false · next null)
+  //   ctx.approval === false (CR-17 ไม่มีขั้นอนุมัติ) = ประเด็นเหลือ 2 เรื่อง: ไม่มีผู้รับผิดชอบ (next assignOwner) · ส่วนต่างไม่เป็น 0
+  //     (ขาดหรือเกิน next closeGap) ไม่ดูสถานะ Workflow
   // → [{ id, unit, rem, rank, issue, gap (|ส่วนต่าง|), next, entry }]
   //   next = การดำเนินการถัดไป (Key ของข้อความ) / entry = id ของหน้าที่ต้องไป
   function planActions(units, ctx) {
@@ -2039,6 +2411,13 @@
     (units || []).forEach(function (u, i) {
       var rem = remaining(u.target || 0, u.plan || 0);
       var gapIssue = !ctx.locked && (rem.status === 'short' || rem.status === 'over');
+      if (ctx.approval === false) {
+        var r = u.vacant ? 0 : gapIssue ? 2 : -1;
+        if (r < 0) { if (ctx.all) rows.push({ id: u.id, unit: u, rem: rem, rank: 5, issue: false, gap: Math.abs(rem.amount), next: null, entry: null, order: i }); return; }
+        rows.push({ id: u.id, unit: u, rem: rem, rank: r, issue: true, gap: Math.abs(rem.amount), next: u.vacant ? 'assignOwner' : 'closeGap',
+          entry: u.vacant ? 'salespeople' : 'skuPlanning', order: i });
+        return;
+      }
       var st = [u.phasing, u.sku];
       var rank = u.vacant ? 0
         : ctx.locked ? -1
@@ -2122,12 +2501,26 @@
     gpOf: gpOf,
     availableUnits: availableUnits,
     availableChannels: availableChannels,
+    // CR-23: ยอดขายย้อนหลัง · Annual Target / Sub-channel Allocation
+    historyYears: historyYears,
+    salesHistory: salesHistory,
+    // CR-24: ยอดอ้างอิงรายเดือน · L12M
+    referenceMonthly: referenceMonthly,
+    referenceValues: referenceValues,
+    l12m: l12m,
+    skuReference: skuReference,
+    unitAllocationBlock: unitAllocationBlock,
+    channelTargetAudit: channelTargetAudit,
+    channelTargetChange: channelTargetChange,
     // Measure chain
-    sellOutExVat: sellOutExVat,
+    exVat: exVat,
     netSales: netSales,
-    sellOutIncVat: sellOutIncVat,
-    sellOutFromNet: sellOutFromNet,
+    saleFromNet: saleFromNet,
     chain: chain,
+    accountPriceOf: accountPriceOf,
+    setAccountPrice: setAccountPrice,
+    basePriceOn: basePriceOn,
+    checkAccountPrice: checkAccountPrice,
     reverseChain: reverseChain,
     cellBreakdown: cellBreakdown,
     moneySplit: moneySplit,
@@ -2209,6 +2602,11 @@
     newPlanItem: newPlanItem,
     defaultSkuPlan: defaultSkuPlan,
     availableSkus: availableSkus,
+    addableSkus: addableSkus,
+    addSalesListings: addSalesListings,
+    createSalesNpd: createSalesNpd,
+    salesRequestChanges: salesRequestChanges,
+    planProduct: planProduct,
     stopPlanItem: stopPlanItem,
     actualUnits: actualUnits,
     skuPlanGrid: skuPlanGrid,
@@ -2233,6 +2631,7 @@
     resetRows: resetRows,
     closeGap: closeGap,
     closeGapWrites: closeGapWrites,
+    fillToTargetWrites: fillToTargetWrites,
     parseTsv: parseTsv,
     toTsv: toTsv,
     pasteCells: pasteCells,

@@ -5,8 +5,9 @@
  *   downloadCsv(filename, rows, columns)
  *   toXlsx(sheets, meta)            → Promise ดาวน์โหลดไฟล์ .xlsx (โหลด SheetJS จาก cdnjs เมื่อเรียกครั้งแรกเท่านั้น)
  *   loadXlsx()                      → Promise<XLSX> / XLSX_URL
- *   columns = [{ key, label, value(row) → ค่า, type: 'text' | 'money' | 'pct' | 'number', width }]
- *             ตัวเลขส่งออกเป็นชนิดตัวเลขจริง: pct เก็บเป็นทศนิยม (0.25) จัดรูปแบบ 0.00% / money และ number จัดรูปแบบ #,##0
+ *   columns = [{ key, label, value(row) → ค่า, type: 'text' | 'money' | 'pct' | 'number' | 'price', width }]
+ *             ตัวเลขส่งออกเป็นชนิดตัวเลขจริง: pct เก็บเป็นทศนิยม (0.25) จัดรูปแบบ 0.00% / money และ number จัดรูปแบบ #,##0 /
+ *             price (ราคาต่อชิ้น CR-18) จัดรูปแบบ #,##0.00
  *   sheets  = [{ name, header: [[ป้าย, ค่า], …] (แถวบนสุดของ Excel เท่านั้น), columns, rows }] — ไม่ใช้ Merge cell
  *             ตรึงแถวหัวตาราง (แถวชื่อคอลัมน์) และตั้งความกว้างคอลัมน์
  * ใช้ Blob + <a download> ทำงานได้เมื่อเปิดจากไฟล์ในเครื่อง / ไม่อ่าน store ไม่มีข้อความ (ข้อความอยู่ใน Module ผ่าน content.js)
@@ -16,7 +17,7 @@
 
   var BOM = '﻿';
   var XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-  var FORMATS = { pct: '0.00%', money: '#,##0', number: '#,##0' };
+  var FORMATS = { pct: '0.00%', money: '#,##0', number: '#,##0', price: '#,##0.00' };
 
   function valueOf(col, row) {
     var v = col.value ? col.value(row) : row[col.key];

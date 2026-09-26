@@ -5,6 +5,8 @@
  *                 เปิดด้วย #open-questions (เช่น ลิงก์จาก ⓘ ในหน้าวางแผนราย SKU) = เปิดแท็บคำถามที่ค้าง
  *                 จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ เนื้อหาแท็บเลื่อนภายในการ์ด / พิมพ์ = แสดงทุกแท็บต่อกัน
  *                 กล่องสิ่งที่ขออนุมัติ (page.approve) สร้างโดย core/layout.js
+ *                 CR-17: รายการที่มี feature (ขอบเขต · Decision log · คำถามที่ค้าง · ขั้นต่อไป) แสดงเมื่อ Flag นั้นเปิด / '!ชื่อ' = แสดงเมื่อปิด
+ *                 (ข้อความของ Phase 2 ยังอยู่ใน content.js แสดงกลับเมื่อเปิด Flag)
  * อ่านจาก data/:  content (pages.aboutPrototype)
  * store อ่าน:     – / store เขียน: –
  */
@@ -16,7 +18,14 @@
 
   var TABS = ['scope', 'decisions', 'questions', 'next'];
 
-  function list(items, ordered) { return h(ordered ? 'ol' : 'ul', { class: 'ab-list' }, items.map(function (t) { return h('li', null, t); })); }
+  // CR-17: item = ข้อความ หรือ { text | topic, feature } (feature '!ชื่อ' = แสดงเมื่อ Flag ปิด)
+  function shown(item) {
+    var f = item && typeof item === 'object' ? item.feature : null;
+    if (!f) return true;
+    return f.charAt(0) === '!' ? !SP.core.features.isOn(f.slice(1)) : SP.core.features.isOn(f);
+  }
+  function textOf(item) { return item && typeof item === 'object' ? item.text : item; }
+  function list(items, ordered) { return h(ordered ? 'ol' : 'ul', { class: 'ab-list' }, items.filter(shown).map(function (t) { return h('li', null, textOf(t)); })); }
 
   function render(root, ctx) {
     var page = ctx.page;
@@ -30,7 +39,7 @@
         { label: '#', className: 'num', render: function (r, i) { return String(i + 1); } },
         { label: page.decisionColumns.topic, render: function (r) { return h('strong', null, r.topic); } },
         { label: page.decisionColumns.decision, key: 'decision' }
-      ], page.decisions, { className: 'ab-decisions' })),
+      ], page.decisions.filter(shown), { className: 'ab-decisions' })),
       questions: h('div', { class: 'callout callout-question', id: 'open-questions' }, h('h2', null, page.tabs.questions), list(page.openQuestions, true)),
       next: h('div', null, h('h2', null, page.tabs.next), list(page.nextSteps, true))
     };

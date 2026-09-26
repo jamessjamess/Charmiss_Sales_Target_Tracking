@@ -390,7 +390,101 @@
     return wrap;
   }
 
+  // ---------------------------------------------------------------------
+  // CR-24: แท่งแนวตั้งซ้อน (Stacked columns) — ยอดขายและเป้าหมายราย Channel (หน้า Annual Target) · HTML + CSS
+  //   (สไตล์ .scol-* อยู่ที่ modules/top-down/top-down.css เพราะใช้หน้าเดียว)
+  //   o = { columns: [{ id, label, sub, emphasize (แท่งเป้าหมาย = ขอบเน้น), parts: [{ id, value, colorToken, title }] }],
+  //         legend: [{ id, label, colorToken }], tick(v, step) (ป้ายแกน), total(v) (ป้ายรวมเหนือแท่ง), growth(prev, cur) → ข้อความ | null
+  //         (ป้ายระหว่างแท่ง), share(v, total) → ข้อความ (ป้ายในช่วงเมื่อสูงพอ), minLabel (px ค่าตั้งต้น 14), headroom, onHover(partId | null) }
+  //   แกน Y เริ่มที่ 0 · ค่าสูงสุด = niceScaleMax(ยอดรวมทุกแท่ง, { headroom }) เส้นแบ่งจาก calc.niceAxis
+  //   → element + .info = { top, step, ticks, totals } · .update(o) · .highlight(partId | null)
+  function stackedColumns(o) {
+    var wrap = h('div', { class: 'scol' });
+    var current = o;
+    var segs = [], ticks = [], plotEl = null;
+    function hover(id) { highlight(id); if (current.onHover) current.onHover(id); }
+    function highlight(id) {
+      segs.forEach(function (s) { s.el.classList.toggle('is-hl', !!id && s.id === id); s.el.classList.toggle('is-dim', !!id && s.id !== id); });
+      Array.prototype.forEach.call(wrap.querySelectorAll('.scol-legend-item'), function (li) { li.classList.toggle('is-dim', !!id && li.dataset.id !== id); });
+    }
+    // ซ่อนป้ายสัดส่วนในช่วงที่เตี้ยกว่า minLabel px และป้ายแกน Y ที่ห่างกันน้อยกว่า 16px (เว้นทีละช่อง) — วัดหลังวางลงหน้า และเมื่อขนาดเปลี่ยน
+    function fitLabels() {
+      var min = current.minLabel || 14;
+      segs.forEach(function (s) { if (s.label) s.label.classList.toggle('is-hidden', s.el.getBoundingClientRect().height < min); });
+      var gap = plotEl && ticks.length > 1 ? plotEl.getBoundingClientRect().height / (ticks.length - 1) : 0;
+      var every = gap > 0 ? Math.max(1, Math.ceil(16 / gap)) : 1;
+      ticks.forEach(function (t, i) { t.classList.toggle('is-hidden', i % every !== 0); });
+    }
+    function build() {
+      clearNode(wrap);
+      segs = []; ticks = [];
+      var calc = SP.core.calc;
+      var totals = current.columns.map(function (c) { return c.parts.reduce(function (s, p) { return s + Math.max(0, p.value || 0); }, 0); });
+      var headroom = current.headroom != null ? current.headroom : SP.data.settings.CHART_HEADROOM;
+      var axis = calc.niceAxis(0, calc.niceScaleMax(totals, { headroom: headroom }) || 1);
+      var top = axis.end;
+      wrap.info = { top: top, step: axis.step, ticks: axis.ticks, totals: totals };
+      var tick = current.tick || function (v) { return F.number(v); };
+      function pos(v) { return Math.max(0, Math.min(1, (v || 0) / top)); }
+      var plot = plotEl = h('div', { class: 'scol-plot' });
+      var yAxis = h('div', { class: 'scol-yaxis', 'aria-hidden': 'true' });
+      axis.ticks.forEach(function (v) {
+        plot.appendChild(h('span', { class: 'scol-grid' + (v === 0 ? ' is-base' : ''), style: { bottom: pctStyle(pos(v)) } }));
+        var tk = h('span', { class: 'scol-tick', style: { bottom: pctStyle(pos(v)) } }, tick(v, axis.step));
+        ticks.push(tk);
+        yAxis.appendChild(tk);
+      });
+      var cols = h('div', { class: 'scol-cols' });
+      var xlabels = h('div', { class: 'scol-xlabels', 'aria-hidden': 'true' });
+      current.columns.forEach(function (c, i) {
+        if (i > 0) {
+          var g = current.growth ? current.growth(totals[i - 1], totals[i]) : null;
+          cols.appendChild(h('div', { class: 'scol-gap' }, g ? h('span', { class: 'scol-growth', style: { bottom: pctStyle((pos(totals[i - 1]) + pos(totals[i])) / 2) } }, g) : null));
+          xlabels.appendChild(h('span', { class: 'scol-gap' }));
+        }
+        var stack = h('div', { class: 'scol-stack' + (c.emphasize ? ' is-target' : ''), style: { height: pctStyle(pos(totals[i])) } });
+        c.parts.forEach(function (p) {
+          var v = Math.max(0, p.value || 0);
+          if (!v) return;
+          var label = current.share ? h('span', { class: 'scol-share' }, current.share(v, totals[i])) : null;
+          var el = h('span', {
+            class: 'scol-seg', title: p.title || null, tabindex: '0', dataset: { id: p.id },
+            style: { '--c': 'var(' + p.colorToken + ')', height: pctStyle(totals[i] ? v / totals[i] : 0) }
+          }, label);
+          el.addEventListener('mouseenter', function () { hover(p.id); });
+          el.addEventListener('mouseleave', function () { hover(null); });
+          el.addEventListener('focus', function () { hover(p.id); });
+          el.addEventListener('blur', function () { hover(null); });
+          segs.push({ id: p.id, el: el, label: label });
+          stack.appendChild(el);
+        });
+        cols.appendChild(h('div', { class: 'scol-col', dataset: { id: c.id } },
+          h('span', { class: 'scol-total', style: { bottom: pctStyle(pos(totals[i])) } }, current.total ? current.total(totals[i]) : tick(totals[i], axis.step)),
+          stack));
+        xlabels.appendChild(h('span', { class: 'scol-xlabel' + (c.emphasize ? ' is-target' : '') }, c.label, c.sub ? h('small', null, c.sub) : null));
+      });
+      plot.appendChild(cols);
+      wrap.appendChild(h('div', { class: 'scol-body' }, yAxis, plot));
+      wrap.appendChild(h('div', { class: 'scol-xrow' }, h('span', { class: 'scol-yaxis-spacer' }), xlabels));
+      if (current.legend && current.legend.length) {
+        wrap.appendChild(h('div', { class: 'legend scol-legend' }, current.legend.map(function (l) {
+          var li = h('span', { class: 'legend-item scol-legend-item', dataset: { id: l.id }, style: { '--c': 'var(' + l.colorToken + ')' } },
+            h('span', { class: 'scol-swatch', 'aria-hidden': 'true' }), l.label);
+          li.addEventListener('mouseenter', function () { hover(l.id); });
+          li.addEventListener('mouseleave', function () { hover(null); });
+          return li;
+        })));
+      }
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fitLabels);
+    }
+    build();
+    if (typeof ResizeObserver === 'function') new ResizeObserver(fitLabels).observe(wrap);
+    wrap.update = function (next) { current = next || current; build(); };
+    wrap.highlight = highlight;
+    return wrap;
+  }
+
   function clearNode(el) { while (el.firstChild) el.removeChild(el.firstChild); return el; }
 
-  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, splitBar: splitBar, waterfall: waterfall, stackedShare: stackedShare };
+  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, splitBar: splitBar, waterfall: waterfall, stackedShare: stackedShare, stackedColumns: stackedColumns };
 })(window.SP);

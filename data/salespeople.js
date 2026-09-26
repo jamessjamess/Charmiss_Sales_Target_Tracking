@@ -6,6 +6,9 @@
  * เป้าและยอดขายไม่ผูกกับคน: ใครรับผิดชอบหน่วยไหนเดือนไหนอยู่ใน data/assignments.js
  * หลัง endMonth ถ้ายังผูกกับหน่วยอยู่ ระบบนับเดือนนั้นเป็น "ว่าง" และแสดง Alert
  * ค่าที่แก้ในหน้า Sales Person เก็บที่ store: master.salespeople
+ * CR-16: Sales Person ของ TT (4 คน + อัมพร สีดาเสถียร ลาออก ก.ค. 2026) มาจาก data/seed/seed-tt-stores.js (core/stores.js นำเข้าตอนโหลด)
+ *   แทน Sales Person TT สมมติเดิม
+ * CR-19: เพิ่ม Sales Manager ของ ECOM (ณัฐวุฒิ) และ TT (ประเสริฐ) ชื่อสมมติ / ทีมขายต่อ Channel อยู่ใน data/teams.js
  */
 (function (SP) {
   'use strict';
@@ -14,12 +17,10 @@
     { id: 'sp-anan',  name: 'อนันต์ ศรีสว่าง',   channelId: 'mt',   startMonth: '2022-03', endMonth: null },
     { id: 'sp-pim',   name: 'พิมพ์ลดา ใจดี',     channelId: 'mt',   startMonth: '2023-01', endMonth: null },
     { id: 'sp-wit',   name: 'วิทยา สมใจ',       channelId: 'mt',   startMonth: '2021-05', endMonth: '2027-02' },
-    { id: 'sp-korn',  name: 'กรวิชญ์ ทองคำ',    channelId: 'tt',   startMonth: '2020-08', endMonth: null },
-    { id: 'sp-nuch',  name: 'นุชนาฏ บุญมา',     channelId: 'tt',   startMonth: '2024-02', endMonth: null },
-    { id: 'sp-thana', name: 'ธนพล ใจเย็น',      channelId: 'tt',   startMonth: '2026-06', endMonth: null },
-    { id: 'sp-ploy',  name: 'พลอยไพลิน ดีงาม',  channelId: 'tt',   startMonth: '2027-04', endMonth: null },
     { id: 'sp-mild',  name: 'มิลิน แก้วใส',      channelId: 'ecom', startMonth: '2023-09', endMonth: null },
     { id: 'sp-ton',   name: 'ต้นกล้า รักเรียน',   channelId: 'ecom', startMonth: '2025-01', endMonth: null },
+    { id: 'sp-nat',   name: 'ณัฐวุฒิ ปัญญาดี',    channelId: 'ecom', startMonth: '2024-06', endMonth: null },
+    { id: 'sp-pra',   name: 'ประเสริฐ วงศ์ไทย',   channelId: 'tt',   startMonth: '2023-04', endMonth: null },
     { id: 'sp-kam',   name: 'ทีม KAM กลาง',      channelId: null,   startMonth: '2020-01', endMonth: null }
   ];
 })(window.SP);

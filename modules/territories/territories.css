@@ -1,0 +1,149 @@
+/* modules/territories/territories.css — เขตการขายและร้านค้า (CR-16)
+ * หน้า fit: การ์ดสูงเท่าพื้นที่ที่เหลือ / แผงเขต (ซ้าย ~28%) และตารางร้านค้า (ขวา) เลื่อนภายในตัวเอง หน้าไม่เลื่อน */
+.page-territories .module-body > * + * { margin-top: var(--sp-2); }
+
+/* ---------- บรรทัดสรุป ---------- */
+.tr-summary { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--sp-2); font-size: var(--fs-sm); }
+.tr-sum-item { font-variant-numeric: tabular-nums; }
+.tr-sum-item.link-btn { color: inherit; text-decoration-color: var(--c-border-strong); }
+.tr-sum-item.link-btn.text-short { color: var(--status-short-fg); font-weight: var(--fw-bold); }
+.tr-sum-item.link-btn.text-over { color: var(--status-over-fg); }
+.tr-sum-sep { color: var(--c-text-muted); }
+
+/* ---------- โครง 2 ส่วน ---------- */
+.card.tr-card { display: flex; flex-direction: column; }
+.tr-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(250px, 28fr) 72fr; }
+.tr-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--c-border); background: var(--c-surface); }
+.tr-panel-title, .tr-main-title { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+.tr-panel-title { flex: 0 0 auto; padding: var(--sp-2) var(--sp-3); background: var(--c-surface-2); border-bottom: 1px solid var(--c-border); }
+.tr-panel-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.tr-panel-foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 2px; padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--c-border); }
+.tr-panel-note { flex: 0 0 auto; margin: 0; padding: var(--sp-2) var(--sp-3); border-top: 1px solid var(--c-border); }
+.tr-hint { font-size: var(--fs-xs); color: var(--c-text-muted); margin: 0; }
+.tr-add { align-self: flex-start; }
+
+.tr-list { list-style: none; margin: 0; padding: 4px 0; }
+.tr-sep { height: 1px; margin: 4px var(--sp-3); background: var(--c-border); }
+.tr-item { position: relative; display: flex; align-items: flex-start; border-left: 3px solid transparent; }
+.tr-item:hover { background: var(--c-surface-2); }
+.tr-item.is-selected { background: var(--c-primary-soft); border-left-color: var(--c-primary); }
+.tr-item.is-drop { outline: 2px dashed var(--c-primary); outline-offset: -3px; background: var(--c-primary-soft); }
+.tr-item.is-inactive .tr-item-name { color: var(--c-text-muted); }
+.tr-item-main { font: inherit; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 5px var(--sp-2) 5px var(--sp-3);
+  border: 0; background: transparent; text-align: left; cursor: pointer; color: inherit; }
+.tr-item-main:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.tr-item-simple .tr-item-main { flex-direction: row; justify-content: space-between; align-items: baseline; }
+.tr-item-name { font-size: var(--fs-sm); font-weight: var(--fw-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-item-simple .tr-item-name { font-weight: var(--fw-medium); }
+.tr-item.is-selected .tr-item-name { color: var(--c-primary-strong); }
+.tr-item-simple.is-danger .tr-item-name, .tr-item-simple.is-danger .tr-item-count { color: var(--status-short-fg); font-weight: var(--fw-bold); }
+.tr-item-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); font-size: var(--fs-xs); }
+.tr-item-owner { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-item-owner.text-short { color: var(--status-short-fg); font-weight: var(--fw-bold); }
+.tr-item-count, .tr-item-share { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--c-text-muted); }
+.tr-item-simple .tr-item-count { font-size: var(--fs-sm); }
+.tr-item-note { font-size: 11px; color: var(--c-text-muted); }
+.tr-inactive { margin-left: var(--sp-1); font-size: 11px; padding: 0 6px; font-weight: var(--fw-medium); }
+.tr-more { flex: 0 0 auto; margin: 4px var(--sp-1) 0 0; }
+
+/* ---------- ตารางร้านค้า ---------- */
+.tr-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.tr-main-head { flex: 0 0 auto; padding: var(--sp-2) var(--sp-3) 0; }
+.tr-main-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-toolbar { flex: 0 0 auto; padding: var(--sp-2) var(--sp-3) 0; gap: var(--sp-2); }
+.tr-search { min-width: 15em; }
+.tr-status { min-width: 0 !important; width: auto; }
+.tr-main > .filter-chips { flex: 0 0 auto; padding: var(--sp-1) var(--sp-3) 0; }
+.tr-scroll { flex: 1 1 auto; min-height: 0; margin-top: var(--sp-2); border-top: 1px solid var(--c-border); }
+.tr-table { font-size: 14px; }
+.tr-table th { padding: 0; }
+.tr-table td { padding: 3px 6px; }
+.tr-table .badge { font-size: 12px; padding: 0 7px; line-height: 1.5; }
+.tr-sort { font: inherit; width: 100%; display: inline-flex; align-items: baseline; gap: 2px; padding: 5px 6px; border: 0; background: transparent;
+  color: inherit; font-weight: inherit; cursor: pointer; text-align: left; white-space: nowrap; }
+.tr-table th.num .tr-sort { justify-content: flex-end; }
+.tr-table th.tr-mark-col .tr-sort { justify-content: center; }
+.tr-sort:hover { color: var(--c-primary-strong); }
+.tr-sort:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.tr-sort-mark { font-size: 9px; min-width: 9px; }
+.tr-table th.is-sorted { color: var(--c-primary-strong); }
+.tr-table td { height: 32px; }
+.tr-table tr.is-selected > td { background: var(--c-primary-soft); }
+.tr-check { width: 28px; text-align: center !important; }
+.tr-table th.tr-check { padding: 0 var(--sp-2); }
+.tr-id { font-variant-numeric: tabular-nums; }
+.tr-dup, .tr-outside { margin-left: 4px; font-size: 11px; padding: 0 6px; }
+.tr-name { max-width: 14em; }
+.tr-type { display: inline-block; max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.tr-name-text { display: inline-block; max-width: calc(100% - 22px); overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.tr-province-text { display: inline-block; max-width: 6.5em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.tr-mark-col { text-align: center !important; width: 1%; }
+.tr-mark { color: var(--c-primary-strong); font-size: 12px; }
+.tr-sug { color: var(--c-primary-strong); }
+.tr-table tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--c-surface-2); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; border-top: 1px solid var(--c-border-strong); }
+.tr-table.is-editing tbody tr { cursor: grab; }
+.is-dragging .tr-table tbody tr { cursor: grabbing; }
+
+/* แถบแถวที่เลือก */
+.tr-selection { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
+  border-top: 1px solid var(--c-primary); background: var(--c-primary-soft); font-size: var(--fs-sm); }
+.tr-selection-text { font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; margin-right: var(--sp-2); }
+
+/* ---------- กล่องยืนยัน ---------- */
+.tr-dlg { display: grid; gap: var(--sp-2); }
+.tr-dlg-fields { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); }
+.tr-dlg-field { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tr-dlg-field .select { max-width: 100%; }
+.tr-dlg-target { min-width: 22em; }
+.tr-dlg-lines { margin: 0; }
+.tr-dlg-warn { color: var(--c-warn-fg); background: var(--c-warn-bg); border-left: 3px solid var(--c-warn-bd); padding: 2px var(--sp-2); list-style: none; margin-left: calc(-1 * var(--sp-4)); }
+p.tr-dlg-warn { margin: 0; margin-left: 0; }
+.tr-dlg-info { color: var(--c-text-muted); }
+.tr-dlg-check { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.tr-prov-list { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; columns: 2; column-gap: var(--sp-4); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.tr-prov-list li { break-inside: avoid; padding: 1px var(--sp-2); }
+.tr-prov-also { margin-left: var(--sp-1); font-size: 11px; color: var(--c-text-muted); }
+
+/* ---------- Drawer ---------- */
+.tr-d-title { margin: 0; font-size: var(--fs-lg); display: flex; align-items: center; gap: var(--sp-1); }
+.tr-d-meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--c-text-muted); margin-top: 2px; }
+.tr-d-section h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-sm); }
+.tr-d-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2) var(--sp-4); }
+.tr-d-field { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.tr-d-label { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.tr-d-value { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.tr-d-hist-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.tr-d-hist-head h3 { margin: 0; }
+.tr-d-years { display: inline-flex; gap: 4px; }
+.tr-tl { display: grid; grid-template-columns: 7.5em repeat(12, minmax(0, 1fr)); gap: 3px 1px; align-items: center; margin-top: var(--sp-2); font-size: 11px; }
+.tr-tl-label { font-size: 11px; color: var(--c-text-muted); line-height: 1.2; }
+.tr-tl-month { text-align: center; color: var(--c-text-muted); }
+.tr-tl-month.is-current { color: var(--c-primary-strong); font-weight: var(--fw-bold); text-decoration: underline; text-underline-offset: 2px; }
+.tr-tl-row { grid-column: span 12; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1px; }
+.tr-tl-seg { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 3px 4px; border-radius: 3px; line-height: 1.2; text-align: center; }
+.tr-tl-seg > span { overflow: hidden; text-overflow: ellipsis; display: block; }
+.tr-tl-seg.is-territory { background: var(--c-surface-2); border: 1px solid var(--c-border); }
+.tr-tl-seg.is-empty { color: var(--c-text-muted); background: transparent; border: 1px dashed var(--c-border-strong); }
+.tr-tl-ref { text-align: right; font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--c-text-muted); padding-right: 2px; }
+
+/* ---------- ขนาดจอ ---------- */
+@media (max-width: 1600px) {
+  .tr-name { max-width: 12em; }
+  .tr-type { max-width: 8em; }
+}
+@media (max-width: 1440px) {
+  .tr-search { min-width: 11em; }
+}
+@media (max-width: 1023px) {
+  .tr-layout { grid-template-columns: 1fr; }
+  .tr-panel { border-right: 0; border-bottom: 1px solid var(--c-border); }
+  .tr-panel-scroll { max-height: 280px; }
+  .tr-scroll { max-height: 70vh; }
+}
+@media (max-width: 600px) {
+  .tr-d-grid { grid-template-columns: 1fr; }
+  .tr-tl { grid-template-columns: 5.5em repeat(12, minmax(0, 1fr)); font-size: 9px; }
+  .tr-tl-ref { font-size: 8px; }
+  .tr-dlg-target { min-width: 0; }
+  .tr-prov-list { columns: 1; }
+}

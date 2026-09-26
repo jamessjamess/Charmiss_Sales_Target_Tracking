@@ -1,7 +1,10 @@
 /*
- * modules/promotions/promotions.js — Product Master · Promotion Price
+ * modules/promotions/promotions.js — Product Master · ราคาขายต่อ Account (CR-18) / Promotion Price (Flag promotionCalendar)
  *
- * หน้าที่:        แถบตัวกรอง: Channel (Segmented ตามแผนของปี) · หน่วยขาย (หลายค่า) · Series · ค้นหา SKU · มุมมอง ปฏิทินรายเดือน | รายการ
+ * หน้าที่:        CR-18 (promotionCalendar ปิด = ค่าตั้งต้น): ราคาขายต่อ Account — renderAccountPrices (ดูคำอธิบายที่ฟังก์ชัน)
+ *                 ราคารวม VAT ราคาเดียวทั้งปี ช่องว่าง = ใช้ RSP / ผู้แก้ไข: ทีม Product / เขียน master.accountPrices
+ *                 Flag promotionCalendar เปิด = ปฏิทิน Promotion รายเดือนเดิม (renderCalendar) ด้านล่าง:
+ *                 แถบตัวกรอง: Channel (Segmented ตามแผนของปี) · หน่วยขาย (หลายค่า) · Series · ค้นหา SKU · มุมมอง ปฏิทินรายเดือน | รายการ
  *                 ปฏิทิน: แถว = SKU (จัดกลุ่มตาม Series) × 12 เดือน ช่อง = ราคาที่มีผลเฉลี่ยของเดือน (calc.pricingDetail ถ่วงตามจำนวนวัน
  *                 ฟังก์ชันเดียวกับหน้าวางแผน SKU) + ป้าย −x% เทียบ RSP / ไม่มี Promotion = RSP สีจาง / Promotion บางวัน = P มุมซ้ายบน /
  *                 ฉบับร่าง = เส้นประ (ไม่นับในราคา) / หลายหน่วยราคาไม่เท่ากัน = "หลายราคา" + Tooltip แยกรายหน่วย
@@ -10,15 +13,16 @@
  *                 GP ช่วง Promotion (ไม่บังคับ) / ตัวอย่างราคา / คัดลอกไปเดือนถัดไป · หน่วยขายอื่น / ตรวจซ้อนกันด้วย calc.validatePromotion
  *                 ค่าที่แก้อยู่ใน draft จนกด บันทึก (workflowBar แบบง่าย) / ล็อก Baseline แล้ว → Promotion มีผลกับ Forecast เท่านั้น
  * อ่านจาก data/:  channels, settings, content (pages.promotionPrice, labels) + Master ผ่าน store.data()
- * store อ่าน:     app.planYear, plan.<ปี>.topDown (.channels), plan.<ปี>.workflow (ล็อก Baseline), master.promotions, master.products,
+ * store อ่าน:     app.planYear, plan.<ปี>.topDown (.channels), plan.<ปี>.workflow (ล็อก Baseline), master.accountPrices, master.promotions, master.products,
  *                 master.listings, master.priceList, master.taxonomy, master.accounts, master.territories,
  *                 ui.productMaster.channel (ร่วมกับหน้า Listing), ui.seriesFilter, ui.role
- * store เขียน:    master.promotions และ master.audit (ตอนกด บันทึก), ui.productMaster.channel, ui.seriesFilter
+ * store เขียน:    master.accountPrices (CR-18) / master.promotions (ปฏิทิน) และ master.audit (ตอนกด บันทึก), ui.productMaster.channel, ui.seriesFilter
  */
 (function (SP) {
   'use strict';
 
   var C = SP.core.components;
+  var Perm = SP.core.permissions;
   var F = SP.core.format;
   var calc = SP.core.calc;
   var W = SP.core.workflow;
@@ -38,7 +42,7 @@
   }
   function newId() { seq += 1; return 'promo-' + Date.now().toString(36) + seq; }
 
-  function render(root, ctx) {
+  function renderCalendar(root, ctx) {
     var page = ctx.page;
     var P = page;
     var FM = page.form;
@@ -47,11 +51,12 @@
     var editing = false;
     var saved = store.get('master.promotions');
     var draft = clone(saved);
-    var locked = W.isLocked(store.workflowStates());
+    var locked = SP.core.features.locked(W.isLocked(store.workflowStates()));   // CR-17: ปิด baseline = ไม่ล็อก
 
     function cur() { return editing ? draft : saved; }
-    function role() { return store.role().type; }
-    function canEdit() { return editing && W.canEditMaster(store.role(), ['trade']); }
+    // CR-21: สิทธิ์จากตารางสิทธิ์ (หน้า Promotion Price)
+    function byName() { return C.roleName(store.role()); }
+    function canEdit() { return editing && Perm.can(Perm.user(), 'promotionPrice'); }
     function dataNow() { var d = store.data(); d.promotions = cur(); return d; }
     function unitName(id) { var i = calc.unitInfo(store.data(), id); return i ? i.unit.name : id; }
 
@@ -65,11 +70,11 @@
     C.guardUnsaved(dirty);
 
     var bar = C.workflowBar({
-      simple: true, editRoles: ['trade'],
+      simple: true,
       editing: function () { return editing; },
       onEdit: function () { editing = true; draft = clone(saved); draw(); },
       onSave: function () {
-        var by = L.roles[role()] || '', at = new Date().toISOString();
+        var by = byName(), at = new Date().toISOString();
         var entries = [];
         draft.forEach(function (d) {
           var o = calc.findById(saved, d.id);
@@ -381,7 +386,7 @@
         var made = [], errors = [], warnings = [];
         keys.forEach(function (k) {
           var promo = { id: existing ? existing.id : newId(), name: String(f.name).trim(), productKey: k, accountIds: accounts.slice(), startDate: f.startDate, endDate: f.endDate,
-            mode: f.mode, value: f.value, promoGpPct: f.promoGpPct, status: f.status, createdBy: existing ? existing.createdBy : (L.roles[role()] || '') };
+            mode: f.mode, value: f.value, promoGpPct: f.promoGpPct, status: f.status, createdBy: existing ? existing.createdBy : (byName()) };
           var res = calc.validatePromotion(others.concat(made), promo, rspOf(k));
           res.errors.forEach(function (e) { errors.push(e.code === 'overlap' ? fill(FM.errors.overlap, { sku: k, names: e.names.join(', ') }) : FM.errors[e.code]); });
           res.warnings.forEach(function () { warnings.push(fill(FM.warnAboveRsp, { sku: k })); });
@@ -521,5 +526,394 @@
     draw();
   }
 
-  SP.modules.promotionPrice = { render: render };
+  // ====================================================================== ราคาขายต่อ Account (CR-18 · Flag promotionCalendar ปิด)
+  // ตาราง: แถว = SKU (จัดกลุ่มตาม Series) · คอลัมน์ = RSP + 1 คอลัมน์ต่อ Account ของ Channel ที่เลือก (เฉพาะ Channel ที่แบ่งตาม Account)
+  //   ช่องว่าง = ใช้ RSP (ตัวจาง) / ราคาต่างจาก RSP = ตัวหนา พื้นสีอ่อน ป้าย −x% / ไม่ได้ Listing = สีเทา แก้ไม่ได้ / ! = ควรตรวจสอบ (เตือน ไม่บล็อก)
+  //   โหมดแก้ไข (ทีม Product): กรอกราคา · ลบค่า = ใช้ RSP · เลือกหลายช่อง → ตั้งราคา… / ลด x% จาก RSP / ใช้ RSP ·
+  //   คีย์บอร์ดและ Excel ด้วย components.gridKeys (Grid กลางเดียวกับหน้าวางแผน SKU: วาง/เติมปัดเป็นบาทเต็ม) · Ctrl+Z
+  // store อ่าน/เขียน: master.accountPrices (+ master.audit ตอนกด บันทึก) / อ่าน ui.productMaster.channel, ui.seriesFilter
+  function renderAccountPrices(root, ctx) {
+    var P = ctx.page.accountPrices;
+    var L = SP.data.content.labels;
+    var S = SP.data.settings;
+    var year = store.year();
+    var start = calc.dateKey(year, 0, 1);
+    var editing = false;
+    var saved = store.get('master.accountPrices') || [];
+    var draft = clone(saved);
+    var undo = C.undoStack(S.UNDO_LIMIT);
+    var locked = SP.core.features.locked(W.isLocked(store.workflowStates()));
+    var tip = null, keys = null, lastCell = null, refs = null;
+
+    function cur() { return editing ? draft : saved; }
+    function byName() { return C.roleName(store.role()); }
+    function canEdit() { return editing && Perm.can(Perm.user(), 'promotionPrice'); }
+    function pairs(list) { var o = {}; list.forEach(function (r) { o[r.productKey + '|' + r.accountId] = r.price; }); return o; }
+    function changedPairs() {
+      var a = pairs(saved), b = pairs(draft), out = [];
+      Object.keys(a).forEach(function (k) { if (a[k] !== b[k]) out.push(k); });
+      Object.keys(b).forEach(function (k) { if (!(k in a)) out.push(k); });
+      return out;
+    }
+    function dirty() { return editing ? changedPairs().length : 0; }
+    C.guardUnsaved(dirty);
+
+    var bar = C.workflowBar({
+      simple: true,
+      editing: function () { return editing; },
+      onEdit: function () { editing = true; draft = clone(saved); undo.clear(); draw(); },
+      onSave: function () {
+        var by = byName(), at = new Date().toISOString();
+        var a = pairs(saved), b = pairs(draft), entries = [];
+        changedPairs().forEach(function (k) {
+          var parts = k.split('|');
+          entries = entries.concat(calc.auditDiff('accountPrice', parts[0] + ' · ' + unitName(parts[1]),
+            k in a ? { price: a[k] } : null, k in b ? { price: b[k] } : null, { by: by, at: at }));
+        });
+        store.set('master.accountPrices', draft);
+        store.appendAudit(entries);
+        saved = clone(draft);
+        editing = false;
+        undo.clear();
+        draw();
+      },
+      onCancel: function () { editing = false; draft = clone(saved); undo.clear(); draw(); }
+    });
+    if (ctx.intro) ctx.intro.appendChild(bar);
+
+    function unitName(id) { var i = calc.unitInfo(store.data(), id); return i ? i.unit.name : id; }
+    function pctText(diff) { return (diff < 0 ? '−' : '+') + F.pct(Math.abs(diff), 0); }
+
+    // Channel ที่แบ่งตาม Account ในแผนของปี (TT แบ่งตามเขต ใช้ราคา Dealer ไม่อยู่ในหน้านี้)
+    function state() {
+      var data = store.data();
+      data.accountPrices = cur();
+      var chs = (store.get(store.planKey('topDown')).channels || []).map(function (id) { return calc.findById(data.channels, id); })
+        .filter(function (c) { return c && c.allocationUnit === 'ACCOUNT'; });
+      var ch = calc.findById(chs, store.get('ui.productMaster.channel')) || chs[0] || null;
+      var units = ch ? calc.unitsOfChannel(data, ch.id, true) : [];
+      var tax = store.get('master.taxonomy');
+      var seriesOptions = calc.seriesList(tax, data.products);
+      var series = (store.get('ui.seriesFilter') || []).filter(function (s) { return seriesOptions.some(function (o) { return o.value === s; }); });
+      var q = query.trim().toLowerCase();
+      var products = data.products.filter(function (p) {
+        var key = calc.productKey(p);
+        if ((p.itemType || 'SALE') !== 'SALE' || !calc.soldInYear(p, year) || !calc.inSeries(p, series)) return false;
+        if (q && (key + ' ' + p.name + ' ' + (p.shortName || '')).toLowerCase().indexOf(q) < 0) return false;
+        return units.some(function (u) { return calc.isListed(data.listings, key, u.id); });
+      });
+      return { data: data, chs: chs, ch: ch, units: units, tax: tax, seriesOptions: seriesOptions, series: series, products: products };
+    }
+
+    // RSP ของ SKU ใน Channel ณ ต้นปีแผน + ราคาที่เปลี่ยนระหว่างปี (แสดงใน Tooltip)
+    function rspInfo(s, key) {
+      var rsp = calc.priceOn(s.data.priceList, key, 'RSP', s.ch.id, start);
+      var change = null;
+      for (var m = 1; m < 12 && !change; m++) {
+        var v = calc.priceOn(s.data.priceList, key, 'RSP', s.ch.id, calc.dateKey(year, m, 1));
+        if (v != null && rsp != null && Math.abs(v - rsp) > 0.005) change = { m: m, price: v };
+      }
+      return { rsp: rsp, change: change };
+    }
+
+    // สถานะของช่อง SKU × Account → { listed, price (null = ใช้ RSP), rsp, diff, custom, warnings }
+    function cellOf(s, key, unit, rsp) {
+      var listed = calc.isListed(s.data.listings, key, unit.id);
+      var price = calc.accountPriceOf(cur(), key, unit.id);
+      var chk = price != null ? calc.checkAccountPrice(price, rsp) : { warnings: [], diff: null };
+      return { listed: listed, price: price, rsp: rsp, diff: chk.diff, custom: price != null && rsp != null && Math.abs(price - rsp) > 0.005,
+        warnings: listed ? chk.warnings : [] };
+    }
+
+    function groups(s) {
+      var out = [];
+      s.products.forEach(function (p) {
+        var g = out.filter(function (x) { return x.id === (p.seriesId || ''); })[0];
+        if (!g) { g = { id: p.seriesId || '', name: calc.productTaxonomy(s.tax, p).series || SP.data.content.pages.productList.noSeries, items: [] }; out.push(g); }
+        g.items.push(p);
+      });
+      var order = calc.taxonomyChildren(s.tax, 'series', null).map(function (n) { return n.id; });
+      out.sort(function (a, b) { return (order.indexOf(a.id) + 1 || 999) - (order.indexOf(b.id) + 1 || 999); });
+      return out;
+    }
+
+    function draw() {
+      if (tip) tip.hide();
+      C.clear(root);
+      bar.update();
+      var s = state();
+      refs = { s: s, cells: {} };
+      var search = h('input', { type: 'search', class: 'search-input pr-search', placeholder: P.search, 'aria-label': P.search, value: query });
+      search.addEventListener('change', function () { query = search.value; draw(); });
+      search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { query = search.value; draw(); } });
+      root.appendChild(h('div', { class: 'tool-row pr-toolbar' },
+        s.ch ? C.segmented({ label: L.picker.channel, value: s.ch.id, options: s.chs.map(function (c) { return { value: c.id, label: c.name, title: c.fullName }; }),
+          onChange: function (v) { store.set('ui.productMaster.channel', v); draw(); } }) : null,   // draft ครอบทุก Channel: เปลี่ยน Channel ไม่ทิ้งค่า
+        C.seriesFilter({ options: s.seriesOptions, value: s.series, onChange: function (v) { store.set('ui.seriesFilter', v); draw(); } }),
+        search,
+        h('span', { class: 'tool-right' }, legend())));
+      if (editing) {
+        var banner = C.editBanner();
+        banner.update(dirty());
+        refs.banner = banner;
+        refs.selText = h('span', { class: 'ap-sel-text' });
+        refs.tools = [
+          h('button', { type: 'button', class: 'btn btn-ghost btn-sm ap-set', onClick: setPrice }, P.tools.set),
+          h('button', { type: 'button', class: 'btn btn-ghost btn-sm ap-discount', onClick: discount }, P.tools.discount),
+          h('button', { type: 'button', class: 'btn btn-ghost btn-sm ap-rsp', onClick: useRsp }, P.tools.rsp)
+        ];
+        root.appendChild(h('div', { class: 'tool-row ap-edit-row' }, banner, h('span', { class: 'ap-tools' }, refs.selText, refs.tools)));
+        root.appendChild(h('p', { class: 'master-hint pr-hint' }, P.editHint));
+      }
+      refs.warnNote = h('p', { class: 'ap-warn-note', role: 'status' });
+      root.appendChild(refs.warnNote);
+      if (locked) root.appendChild(h('p', { class: 'callout callout-info pr-locked' }, P.baselineNote));
+      var card = h('div', { class: 'card fit-card pr-card' });
+      root.appendChild(card);
+      card.appendChild(table(s));
+      updateSelection();
+      updateWarnNote();
+    }
+
+    function legend() {
+      var G = P.legend;
+      return h('span', { class: 'legend pr-legend' },
+        h('span', { class: 'legend-item' }, h('span', { class: 'ap-sw' }, h('span', { class: 'ap-faint' }, '199')), G.rsp),
+        h('span', { class: 'legend-item' }, h('span', { class: 'ap-sw is-custom' }, '149'), G.custom),
+        h('span', { class: 'legend-item' }, h('span', { class: 'ap-sw is-unlisted' }, '–'), G.unlisted),
+        h('span', { class: 'legend-item' }, h('span', { class: 'ap-sw' }, h('span', { class: 'ap-warn' }, '!')), G.warn));
+    }
+
+    function table(s) {
+      if (!s.ch) return h('p', { class: 'grid-empty' }, P.noChannels);
+      if (!s.units.length) return h('p', { class: 'grid-empty' }, fill(P.noUnits, { unit: s.ch.unitLabel }));
+      if (!s.products.length) return h('p', { class: 'grid-empty' }, P.noSkus);
+      var n = s.units.length;
+      var thead = h('thead', null, h('tr', null,
+        h('th', { class: 'pr-sku', scope: 'col' }, P.columns.sku),
+        h('th', { class: 'num ap-rsp-col', scope: 'col', 'data-col': '0', title: fill(P.columns.rspTitle, { year: year }) }, P.columns.rsp),
+        s.units.map(function (u, i) { return h('th', { class: 'num ap-unit-col', scope: 'col', 'data-col': String(i + 1), title: u.name }, u.name); })));
+      var tbody = h('tbody');
+      groups(s).forEach(function (g) {
+        tbody.appendChild(h('tr', { class: 'pr-group' }, h('th', { colspan: String(n + 2), scope: 'rowgroup' }, g.name + ' · ' + g.items.length)));
+        g.items.forEach(function (p) {
+          var key = calc.productKey(p);
+          var ri = rspInfo(s, key);
+          var row = { key: key, product: p, rsp: ri.rsp, change: ri.change, tds: [] };
+          refs.cells[key] = row;
+          var cells = s.units.map(function (u, i) {
+            var td = h('td', { class: 'num ap-cell', 'data-col': String(i + 1), dataset: { cell: key + '|' + u.id } });
+            row.tds.push({ td: td, unit: u });
+            paintCell(td, key, u, row);
+            return td;
+          });
+          tbody.appendChild(h('tr', { 'data-row': key },
+            h('th', { class: 'pr-sku', scope: 'row' }, h('span', { class: 'pr-sku-line' }, C.productThumb(p, s.tax, { size: 'sm' }),
+              h('span', { class: 'pr-sku-text' }, h('span', { class: 'pr-code' }, key), h('span', { class: 'pr-name', title: p.name }, calc.displayName(p))))),
+            h('td', { class: 'num ap-cell ap-rsp-cell', 'data-col': '0', tabindex: '0', dataset: { cell: key + '|' } },
+              h('span', { class: 'ap-rsp-value' }, priceText(ri.rsp)),
+              ri.change ? h('span', { class: 'ap-sub' }, fill(P.rspChange, { price: priceText(ri.change.price), month: F.MONTHS[ri.change.m] })) : null),
+            cells));
+        });
+      });
+      var tbl = h('table', { class: 'data-grid pr-table ap-table', style: { '--ap-cols': String(n) } }, thead, tbody);
+      var scroll = h('div', { class: 'fit-scroll pr-scroll' }, tbl);
+      tip = C.hoverTip(scroll, '[data-cell]', function (el) { return cellTip(s, el.dataset.cell); });
+      keys = C.gridKeys(tbl, {
+        editing: canEdit(), cols: n + 1, pasteCols: n + 1,
+        valueAt: function (key, col) {
+          var row = refs.cells[key];
+          if (!row) return null;
+          if (col === 0) return row.rsp;
+          var u = s.units[col - 1];
+          return u ? calc.accountPriceOf(cur(), key, u.id) : null;
+        },
+        apply: writeCells,
+        undo: undoLast
+      });
+      tbl.addEventListener('focusin', function (e) { var td = e.target.closest && e.target.closest('td[data-col]'); if (td) lastCell = td; updateSelection(); });
+      tbl.addEventListener('mouseup', function () { setTimeout(updateSelection, 0); });
+      tbl.addEventListener('keyup', updateSelection);
+      return scroll;
+    }
+
+    // วาดช่อง SKU × Account ตามค่าปัจจุบัน (ช่องกรอกเดิมคงไว้ ไม่เสียโฟกัส)
+    function paintCell(td, key, unit, row) {
+      var c = cellOf(refs.s, key, unit, row.rsp);
+      var dirtyCell = editing && calc.accountPriceOf(saved, key, unit.id) !== calc.accountPriceOf(draft, key, unit.id);
+      td.className = 'num ap-cell' + (!c.listed ? ' is-unlisted' : c.custom ? ' is-custom' : c.price != null ? ' is-set' : ' is-rsp') +
+        (c.warnings.length ? ' has-warn' : '') + (dirtyCell ? ' is-dirty-cell' : '');
+      var input = td.querySelector('input');
+      if (!c.listed) {
+        C.clear(td);
+        td.setAttribute('tabindex', '0');
+        td.appendChild(h('span', { class: 'ap-price', 'aria-label': fill(P.tip.unlisted, { unit: unit.name }) }, '–'));
+        return;
+      }
+      var meta = [c.custom ? h('span', { class: 'ap-off' }, pctText(c.diff)) : null,
+        c.warnings.length ? h('span', { class: 'ap-warn', 'aria-label': c.warnings.map(function (w) { return P.warnings[w]; }).join(' · ') }, '!') : null];
+      if (canEdit()) {
+        td.removeAttribute('tabindex');
+        if (!input) {
+          C.clear(td);
+          input = h('input', { type: 'text', inputmode: 'decimal', class: 'num ap-input', 'aria-label': key + ' · ' + unit.name + ' (' + L.baht + ')' });
+          input.addEventListener('change', function () { commitInput(input, key, unit); });
+          td.appendChild(input);
+          td.appendChild(h('span', { class: 'ap-meta' }));
+        }
+        if (document.activeElement !== input || input.dataset.force) input.value = c.price != null ? priceText(c.price) : '';
+        delete input.dataset.force;
+        input.placeholder = priceText(c.rsp);
+        var box = td.querySelector('.ap-meta');
+        C.clear(box);
+        meta.forEach(function (m) { if (m) box.appendChild(m); });
+        return;
+      }
+      C.clear(td);
+      td.setAttribute('tabindex', '0');
+      td.appendChild(h('span', { class: 'ap-price' + (c.price == null ? ' ap-faint' : '') }, priceText(c.price != null ? c.price : c.rsp)));
+      meta.forEach(function (m) { if (m) td.appendChild(m); });
+    }
+
+    function commitInput(input, key, unit) {
+      var raw = String(input.value).replace(/[,\s฿]/g, '');
+      if (raw === '') { writeCells([{ key: key, m: colOf(unit), qty: 0 }]); return; }
+      var v = Number(raw);
+      if (!isFinite(v) || v <= 0) { input.dataset.force = '1'; repaint(key, unit.id); return; }
+      writeCells([{ key: key, m: colOf(unit), qty: v }]);
+    }
+    function colOf(unit) { return refs.s.units.indexOf(unit) + 1; }
+
+    // writes = [{ key, m (คอลัมน์ 1..n), qty (ราคา · 0 = ใช้ RSP) }] จาก gridKeys หรือเครื่องมือ
+    function writeCells(writes) {
+      if (!canEdit() || !writes || !writes.length) return;
+      var next = draft, touched = [];
+      writes.forEach(function (w) {
+        var u = refs.s.units[w.m - 1];
+        if (!u || !calc.isListed(refs.s.data.listings, w.key, u.id)) return;
+        next = calc.setAccountPrice(next, w.key, u.id, w.qty > 0 ? w.qty : null);
+        touched.push([w.key, u.id]);
+      });
+      if (!touched.length) return;
+      undo.push(draft);
+      draft = next;
+      touched.forEach(function (t) { repaint(t[0], t[1], true); });
+      afterChange();
+    }
+    function repaint(key, unitId, force) {
+      var row = refs.cells[key];
+      if (!row) return;
+      row.tds.forEach(function (x) {
+        if (x.unit.id !== unitId) return;
+        var inp = x.td.querySelector('input');
+        if (inp && force) inp.dataset.force = '1';
+        paintCell(x.td, key, x.unit, row);
+      });
+    }
+    function afterChange() {
+      if (refs.banner) refs.banner.update(dirty());
+      if (keys) keys.refresh();
+      updateWarnNote();
+    }
+    function undoLast() {
+      var prev = undo.pop();
+      if (!prev) return;
+      draft = prev;
+      Object.keys(refs.cells).forEach(function (key) { refs.cells[key].tds.forEach(function (x) { var inp = x.td.querySelector('input'); if (inp) inp.dataset.force = '1'; paintCell(x.td, key, x.unit, refs.cells[key]); }); });
+      afterChange();
+    }
+
+    // ช่องที่เลือก: ช่วงที่ลาก / Shift (is-sel) หรือช่องที่โฟกัสล่าสุด → เฉพาะช่องที่แก้ได้
+    function selectedCells() {
+      if (!refs || !refs.cells) return [];
+      var tds = Array.prototype.slice.call(root.querySelectorAll('td.ap-cell.is-sel[data-col]'));
+      if (!tds.length && lastCell && root.contains(lastCell)) tds = [lastCell];
+      var out = [];
+      tds.forEach(function (td) {
+        var col = Number(td.dataset.col);
+        var tr = td.closest('tr[data-row]');
+        if (!tr || col < 1 || !td.querySelector('input')) return;
+        var row = refs.cells[tr.dataset.row];
+        if (row) out.push({ key: row.key, m: col, rsp: row.rsp });
+      });
+      return out;
+    }
+    function updateSelection() {
+      if (!refs || !refs.selText) return;
+      var n = selectedCells().length;
+      refs.selText.textContent = n ? fill(P.tools.selected, { n: n }) : P.tools.none;
+      refs.tools.forEach(function (b) { b.disabled = !n; });
+    }
+    function setPrice() {
+      var sel = selectedCells();
+      if (!sel.length) return;
+      C.promptNumber({ title: P.tools.setTitle, label: P.tools.setLabel, suffix: L.baht, hint: fill(P.tools.hint, { n: sel.length }), invalidText: P.tools.invalid })
+        .then(function (r) {
+          if (!r.ok || !(r.value > 0)) return;
+          writeCells(sel.map(function (c) { return { key: c.key, m: c.m, qty: r.value }; }));
+        });
+    }
+    function discount() {
+      var sel = selectedCells();
+      if (!sel.length) return;
+      C.promptNumber({ title: P.tools.discountTitle, label: P.tools.discountLabel, suffix: '%', hint: fill(P.tools.hint, { n: sel.length }), invalidText: P.tools.invalid })
+        .then(function (r) {
+          if (!r.ok || !(r.value > 0) || r.value >= 100) return;
+          writeCells(sel.filter(function (c) { return c.rsp > 0; }).map(function (c) { return { key: c.key, m: c.m, qty: Math.round(c.rsp * (1 - r.value / 100) * 100) / 100 }; }));
+        });
+    }
+    function useRsp() {
+      var sel = selectedCells();
+      writeCells(sel.map(function (c) { return { key: c.key, m: c.m, qty: 0 }; }));
+    }
+
+    // ราคาที่ควรตรวจสอบ (ทุก SKU × Account ของ Channel ที่เลือก ตามตัวกรอง)
+    function updateWarnNote() {
+      if (!refs || !refs.warnNote) return;
+      var n = 0;
+      Object.keys(refs.cells).forEach(function (key) {
+        var row = refs.cells[key];
+        row.tds.forEach(function (x) { if (cellOf(refs.s, key, x.unit, row.rsp).warnings.length) n++; });
+      });
+      refs.warnNote.textContent = n ? fill(P.warnNote, { n: n, pct: F.pct(S.ACCOUNT_PRICE_WARN_BELOW, 0) }) : '';
+      refs.warnNote.hidden = !n;
+    }
+
+    function cellTip(s, ref) {
+      var parts = ref.split('|');
+      var key = parts[0], unitId = parts[1];
+      var row = refs.cells[key];
+      if (!row) return null;
+      var T = P.tip, lines = [];
+      var head = key + ' ' + calc.displayName(row.product);
+      if (!unitId) {
+        lines.push(h('li', null, fill(T.rsp, { price: priceText(row.rsp), year: year })));
+        if (row.change) lines.push(h('li', null, fill(T.rspChange, { price: priceText(row.change.price), month: F.monthYear(row.change.m, year) })));
+        return [h('div', { class: 'tip-head' }, head), h('ul', { class: 'tip-lines' }, lines)];
+      }
+      var u = s.units.filter(function (x) { return x.id === unitId; })[0];
+      if (!u) return null;
+      var c = cellOf(s, key, u, row.rsp);
+      head += ' · ' + u.name;
+      if (!c.listed) lines.push(h('li', null, fill(T.unlisted, { unit: u.name })));
+      else if (c.price != null) {
+        lines.push(h('li', null, h('strong', null, fill(T.account, { price: priceText(c.price) }))));
+        if (c.diff != null) lines.push(h('li', null, fill(T.vsRsp, { pct: pctText(c.diff), rsp: priceText(c.rsp) })));
+        c.warnings.forEach(function (w) { lines.push(h('li', { class: 'text-over' }, P.warnings[w])); });
+      } else {
+        lines.push(h('li', null, fill(T.useRsp, { price: priceText(c.rsp) })));
+        if (row.change) lines.push(h('li', null, fill(T.rspChange, { price: priceText(row.change.price), month: F.monthYear(row.change.m, year) })));
+      }
+      if (c.listed) lines.push(h('li', { class: 'muted' }, fill(T.year, { year: year })));
+      return [h('div', { class: 'tip-head' }, head), h('ul', { class: 'tip-lines' }, lines)];
+    }
+
+    draw();
+  }
+
+  SP.modules.promotionPrice = {
+    render: function (root, ctx) {
+      return SP.core.features.isOn('promotionCalendar') ? renderCalendar(root, ctx) : renderAccountPrices(root, ctx);
+    }
+  };
 })(window.SP);

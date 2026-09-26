@@ -5,8 +5,9 @@
  *   id        = ใช้เป็นส่วนหนึ่งของ Key ใน store เช่น plan.2027.phasing.shopee
  *   channelId = id ใน data/channels.js
  *   active    = false → ไม่แสดงในรายการ "+ เพิ่ม Account"
- *   gp        = GP ของร้านค้า หรือค่าธรรมเนียม Platform (สัดส่วน 0.45 = 45% ชื่อเรียกตาม gpLabel ของ Channel)
- *               gpFrom = วันที่ค่านี้มีผล 'YYYY-MM-DD' / เจ้าของข้อมูล: Sales/KAM + Finance (Channel ที่ hasGP = false ไม่ใช้ค่านี้)
+ *   gp        = GP ของร้านค้า หรือ Platform Fee (สัดส่วน 0.45 = 45% ชื่อเรียกตาม gpLabel ของ Channel) ค่าเดียวทั้งปี (CR-18)
+ *               null / ไม่มี = ยังไม่ได้กำหนด → calc.netSales คืน null (Net Sales แสดง –) / Channel ที่ hasGP = false ไม่ใช้ค่านี้
+ *               gpFrom = วันที่ค่านี้มีผล 'YYYY-MM-DD' (โครงเดิม คงไว้ในข้อมูล CR-18 ตัดออกจาก UI) / เจ้าของข้อมูล: Sales/KAM + Finance
  *   note      = หมายเหตุที่แสดงในหน้า Account (ไม่บังคับ)
  * CR-11: GP ของ 7-Eleven (40%) และ EVEANDBOY (45%) ตรงกับที่ใช้ปรับยอดขายราย SKU ปี 2026 ใน data/seed/
  * Platform ใหม่ของ ECOM (Website (Own), LINE Shop) ตั้ง active: false ไว้เดโมการเปิดใช้งานและเพิ่มในหน้า Top-down

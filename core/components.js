@@ -651,7 +651,8 @@
         var o = opts.ownerOf ? opts.ownerOf(u.id) : null;
         var meta = [];
         if (opts.remainingOf) meta.push(alertBadge(opts.remainingOf(u.id)));
-        if (opts.workflowOf) meta.push(wfBadge(opts.workflowOf(u.id)));
+        // CR-17: ปิด approvalWorkflow = ไม่แสดงสถานะ Workflow (คงผู้รับผิดชอบและคงเหลือ)
+        if (opts.workflowOf && SP.core.features.isOn('approvalWorkflow')) meta.push(wfBadge(opts.workflowOf(u.id)));
         return { value: u.id, label: u.name, sub: o ? o.name : null, meta: meta };
       });
       if (opts.allowAggregate) list.unshift({ value: AGG, label: fill(P.channelTotal, { channel: ch.name, n: units.length }) });
@@ -698,7 +699,8 @@
 
   // ไอคอน SVG เส้น (ไม่มีสีใน JS ใช้ currentColor)
   var ICONS = {
-    trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7'
+    trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7',
+    'person-off': 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20a7 7 0 0 1 14 0M4 4l16 16'
   };
   function icon(name) {
     var ns = 'http://www.w3.org/2000/svg';
@@ -905,6 +907,69 @@
     return wrap;
   }
 
+  // ---------------------------------------------------------------------
+  // ตัวกรองหมวดสินค้าแบบเลือกต่อเนื่อง (CR-15): Category → Sub Category → Type / kind: 'series' = Series → Sub Series
+  // opts = { tax, kind ('category' | 'series'), levels (ระดับที่แสดง ค่าตั้งต้นทุกระดับของ kind), value: { <LEVEL>: [id] }, onChange(value), guard }
+  //   แต่ละระดับ = multiSelect (เลือกหลายค่า มีช่องค้นหา) / ระดับล่างแสดงเฉพาะรายการใต้รายการที่เลือกในระดับบน
+  //   (ระดับบนไม่ได้เลือก = ทุกรายการ ชื่อมีเส้นทางกำกับ เช่น Face › Base) / เปลี่ยนระดับบน → ตัดค่าระดับล่างที่ไม่อยู่ใต้รายการที่เลือกออก
+  //   ข้อความจาก labels.taxonomy (ชื่อระดับ + ป้ายของ multiSelect) / หน้ารายการสินค้าและหน้าวางแผนราย SKU นำไปใช้ต่อได้
+  // → element (display: contents) ที่มีปุ่มหนึ่งปุ่มต่อระดับ
+  // ---------------------------------------------------------------------
+  function categoryFilter(opts) {
+    var T = SP.core.taxonomy;
+    var X = labels().taxonomy;
+    var kind = opts.kind || 'category';
+    var levels = opts.levels || T.LEVELS[kind];
+    var value = JSON.parse(JSON.stringify(opts.value || {}));
+    var wrap = h('span', { class: 'cat-filter' });
+    var flat = [];
+    T.buildTree(opts.tax, kind).forEach(function walk(t) { flat.push(t); t.children.forEach(walk); });
+    function ancestorAt(node, level) {
+      var p = T.pathOf(opts.tax, kind, node.id).filter(function (a) { return a.level === level; })[0];
+      return p ? p.id : null;
+    }
+    // ค่าระดับล่างต้องอยู่ใต้รายการที่เลือกในระดับบน (ระดับบนไม่ได้เลือก = ไม่จำกัด)
+    function prune() {
+      levels.forEach(function (level, i) {
+        if (!i) return;
+        var up = value[levels[i - 1]] || [];
+        if (!up.length || !value[level]) return;
+        value[level] = value[level].filter(function (id) {
+          var n = T.find(opts.tax, kind, id);
+          return n && up.indexOf(ancestorAt(n, levels[i - 1])) >= 0;
+        });
+      });
+    }
+    levels.forEach(function (level, i) {
+      var upLevel = i ? levels[i - 1] : null;
+      var up = upLevel ? value[upLevel] || [] : [];
+      var options = flat.filter(function (t) {
+        return t.node.level === level && (!up.length || up.indexOf(ancestorAt(t.node, upLevel)) >= 0);
+      }).map(function (t) {
+        return { value: t.node.id, label: upLevel && !up.length ? t.path.join(' › ') : t.node.name };
+      });
+      var name = X.levels[level];
+      wrap.appendChild(multiSelect({
+        label: name, allLabel: fill(X.filter.all, { level: name }), selected: X.filter.selected, clear: X.filter.clear,
+        empty: X.filter.empty, search: X.filter.search, options: options, value: value[level] || [], guard: opts.guard,
+        onChange: function (v) { value[level] = v; prune(); opts.onChange(JSON.parse(JSON.stringify(value))); }
+      }));
+    });
+    return wrap;
+  }
+
+  // Chip ตัวกรองที่ใช้อยู่ items = [{ label, onRemove }] + ลิงก์ล้างทั้งหมด (onClear) → null เมื่อไม่มีตัวกรอง
+  function filterChips(items, onClear) {
+    var X = labels().taxonomy.filter;
+    if (!items || !items.length) return null;
+    return h('div', { class: 'filter-chips', role: 'list' },
+      items.map(function (it) {
+        return h('span', { class: 'filter-chip', role: 'listitem' }, h('span', { class: 'filter-chip-label' }, it.label),
+          h('button', { type: 'button', class: 'filter-chip-x', title: fill(X.remove, { name: it.label }), 'aria-label': fill(X.remove, { name: it.label }), onClick: it.onRemove }, '×'));
+      }),
+      onClear ? h('button', { type: 'button', class: 'link-btn filter-chips-clear', onClick: onClear }, X.clearAll) : null);
+  }
+
   // Filter Series: options = calc.seriesList(taxonomy, products) [{ value, label, depth, count }]
   //   Series และ Sub Series (เยื้อง) เลือก Series = รวม Sub Series ทั้งหมด (calc.inSeries)
   function seriesFilter(opts) {
@@ -948,7 +1013,8 @@
 
   // ---------------------------------------------------------------------
   // ⓘ วิธีคำนวณ (Popover): สูตร / แถบแบ่งเงินของหน่วยทั้งปี / ค่า GP และ VAT ที่ใช้
-  // info() → { unitName, split (calc.moneySplit), gp, gpFrom, hasGP, sellOutMethod, questionsHref }
+  // info() → { unitName, split (calc.moneySplit), gp (null = ยังไม่มี), gpLabel, hasGP, priceBasis ('RSP' | 'SELL_IN'), sellOutMethod }
+  //   CR-18: สูตรตาม Channel (มี GP: ÷ VAT × (1 − {gpLabel}) · ไม่มี GP: ÷ VAT) · ลำดับราคา · ไม่มีวันที่มีผลของ GP / Promotion ตาม Flag
   // ---------------------------------------------------------------------
   function calcExplainer(info) {
     var X = labels().explain;
@@ -957,20 +1023,27 @@
     popover(btn, function () {
       var o = typeof info === 'function' ? info() : info;
       var vatFactor = F.number(1 + S.VAT, 2);
+      var gpLabel = o.gpLabel || X.gp;
+      var FX = X.formulas;
+      var rows = [FX.sale, o.hasGP ? FX.net : FX.netNoGp];
+      var split = o.split && o.split.parts && o.split.parts.length ? SP.core.charts.splitBar(o.split, { net: X.splitParts.net, gp: fill(X.splitParts.gp, { gpLabel: gpLabel }), vat: X.splitParts.vat },
+        { vatLabel: X.splitParts.vat + ' ' + F.pct(S.VAT, 0) }) : null;
       return [
         h('h3', { class: 'popover-title' }, X.title),
-        h('dl', { class: 'explain-formulas' }, X.formulas.map(function (f) { return [h('dt', null, f[0]), h('dd', null, fill(f[1], { vatFactor: vatFactor }))]; })),
-        h('p', { class: 'explain-note' }, X.promoNote),
+        h('dl', { class: 'explain-formulas' }, rows.map(function (f) { return [h('dt', null, f[0]), h('dd', null, fill(f[1], { vatFactor: vatFactor, gpLabel: gpLabel }))]; })),
+        h('p', { class: 'explain-note' }, o.priceBasis === 'SELL_IN' ? X.priceOrderDealer : X.priceOrder),
+        SP.core.features.isOn('promotionCalendar') ? h('p', { class: 'explain-note' }, X.promoNote) : null,
         h('h3', null, fill(X.splitTitle, { unit: o.unitName })),
-        SP.core.charts.splitBar(o.split, X.splitParts, { vatLabel: X.splitParts.vat + ' ' + F.pct(S.VAT, 0) }),
+        split || h('p', { class: 'explain-note text-short' }, fill(X.gpMissing, { gpLabel: gpLabel, unit: o.unitName })),
         h('h3', null, X.valuesTitle),
         h('ul', { class: 'explain-values' },
-          h('li', null, o.hasGP
-            ? [X.gp + ' ', h('strong', null, F.pct(o.gp, 0)), o.gpFrom ? ' · ' + fill(X.gpFrom, { date: F.date(o.gpFrom) }) : '']
-            : X.noGP),
+          h('li', null, !o.hasGP ? X.noGP
+            : o.gp == null ? h('span', { class: 'text-short' }, fill(X.gpMissing, { gpLabel: gpLabel, unit: o.unitName }))
+            : [gpLabel + ' ', h('strong', null, F.pct(o.gp, 0))]),
           h('li', null, X.vat + ' ', h('strong', null, F.pct(S.VAT, 0))),
-          h('li', null, S.PRICE_INCLUDES_VAT ? X.priceVat.incl : X.priceVat.excl, ' · ', h('a', { href: o.questionsHref }, X.vatQuestion)),
-          o.sellOutMethod && X.sellOutMethod[o.sellOutMethod] ? h('li', null, X.sellOutMethod[o.sellOutMethod]) : null)
+          h('li', null, S.PRICE_INCLUDES_VAT ? X.priceVat.incl : X.priceVat.excl),
+          // CR-17: ปิด sellIn = ไม่แสดงวิธีนับ Sell-out ที่อ้าง Sell-in (TT)
+          o.sellOutMethod && X.sellOutMethod[o.sellOutMethod] && (o.sellOutMethod !== 'SELL_IN_MINUS_CN' || SP.core.features.isOn('sellIn')) ? h('li', null, X.sellOutMethod[o.sellOutMethod]) : null)
       ];
     }, { className: 'explain-popover', label: X.title });
     return btn;
@@ -978,7 +1051,8 @@
 
   // ---------------------------------------------------------------------
   // Tooltip รายช่อง (Hover หรือโฟกัสด้วยคีย์บอร์ด) — root = ตาราง / ช่องที่มี data-cell
-  // resolve(el) → { heading, breakdown (calc.cellBreakdown), hasGP, lockText, sourceText, notes: [บรรทัดเพิ่มเติม] } | null
+  // resolve(el) → { heading, breakdown (calc.cellBreakdown), hasGP, priceText (ที่มาของราคา), lockText, sourceText, notes: [บรรทัดเพิ่มเติม] } | null
+  //   CR-18: 3,000 ชิ้น × 149.00 บาท (ราคาต่อ Account) = 447,000.00 (Sale Amount รวม VAT) / ÷ 1.07 × (1 − 40%) = 250,654.21 (Net Sales)
   // ---------------------------------------------------------------------
   var TIP = null;
 
@@ -1008,10 +1082,10 @@
         TIP.appendChild(h('div', { class: 'tip-lock' }, L.source.locked + ' · ' + info.lockText));
       } else {
         var b = info.breakdown;
+        var vat = b.includesVat ? '÷ ' + F.number(b.vatFactor, 2) : '';
         var rows = [
-          [F.units(b.units) + ' ' + L.units + ' × ' + F.baht(b.price, 2) + ' ' + L.baht, F.baht(b.sellOutExVat, 2), B.sellOutEx],
-          [info.hasGP === false ? B.noGP : '× (1 − ' + F.pct(b.gp, 0) + ')', F.baht(b.netSales, 2), B.net],
-          [B.incVat, F.baht(b.sellOutIncVat, 2), '']
+          [F.units(b.units) + ' ' + L.units + ' × ' + F.baht(b.price, 2) + ' ' + L.baht + (info.priceText ? ' (' + info.priceText + ')' : ''), F.baht(b.saleAmount, 2), B.saleAmount],
+          [info.hasGP === false ? vat : b.gp == null ? B.gpMissing : (vat ? vat + ' ' : '') + '× (1 − ' + F.pct(b.gp, 0) + ')', b.netSales == null ? '–' : F.baht(b.netSales, 2), B.net]
         ];
         TIP.appendChild(h('table', { class: 'tip-table' }, h('tbody', null, rows.map(function (r) {
           return h('tr', null, h('td', null, r[0]), h('td', { class: 'num' }, '= ' + r[1]), h('td', { class: 'tip-note' }, r[2] ? '(' + r[2] + ')' : ''));
@@ -1101,9 +1175,18 @@
   // คืน element (display: contents → ส่วนสถานะและปุ่มเป็น item ของแถวหัวข้อ) ที่มี .update()
   // ---------------------------------------------------------------------
   // opts เพิ่มเติม: extra = node ที่วางหน้าปุ่มเสมอ (เช่น ส่งออก ▾) / editRoles = บทบาทที่แก้หน้า Master ได้ (simple)
+  //   CR-23: editBlocked() → ข้อความเหตุผล | null = ปุ่มแก้ไขกดไม่ได้พร้อมข้อความ (เช่น Channel ที่ยังไม่มีเป้าหมาย)
   //   getState() + onAction(action, payload) → { ok, error } = สถานะที่ไม่ได้เก็บใน plan.<ปี>.workflow (แผน NPD)
+  // CR-19 สิทธิ์ (SP.core.permissions): แก้ไข / บันทึก / ยกเลิก ตามตารางสิทธิ์ — Module ของแถบ = opts.modules > หน้า Master (id ของหน้าจาก
+  //   layout.currentPage()) > ขั้น (topDown · phasing · sku) / Channel ของหน่วยขาย = opts.channelId หรือหาจาก unitId
+  //   ไม่มีสิทธิ์ = "อ่านอย่างเดียว · หน้านี้แก้ไขโดย {บทบาท}" (Sales ที่ดูหน่วยขายนอกทีม = "หน่วยขายนี้อยู่ในทีม {Channel}") + ปุ่ม "สลับเป็น {บทบาท}"
+  //   (คนแรกที่มีสิทธิ์) / ขั้นที่เปิด Workflow (Phase 2) ยังใช้กฎผู้จัดทำ / ผู้อนุมัติใน core/workflow.js
+  // CR-17 Feature Flags (SP.core.features): ขั้นที่ปิด Workflow (features.stepOn) = ไม่มีป้ายสถานะ ไม่มีประวัติ ▾ ไม่มีส่งอนุมัติ
+  //   สถานะที่เก็บไว้ถือเป็นฉบับร่าง ปุ่มเหลือ แก้ไข · บันทึก · ยกเลิก (features.visibleActions) + ข้อความอ่านอย่างเดียวของผู้ที่แก้ไม่ได้ /
+  //   แผน NPD ที่ปิด npdApproval = ไม่แสดงอะไร / ปิด baseline = ไม่ถือว่าล็อก / .actions = ปุ่มที่แสดงล่าสุด (ใช้ใน Test)
   function workflowBar(opts) {
     var W = SP.core.workflow;
+    var P = SP.core.permissions;
     var store = SP.core.store;
     var L = labels();
     var WL = L.workflow;
@@ -1192,6 +1275,59 @@
       }, WL.actions[action]);
     }
 
+    // CR-19: Module ในตารางสิทธิ์ของแถบนี้ / null = ไม่รู้จักหน้า (หน้า Test) ใช้กฎเดิม
+    function permModules() {
+      if (opts.modules) return [].concat(opts.modules);
+      if (opts.simple) {
+        var page = SP.core.layout && SP.core.layout.currentPage ? SP.core.layout.currentPage() : null;
+        var mods = page ? P.pageModules(page) : null;
+        return mods && mods.length ? mods : null;
+      }
+      return P.stepModules(opts.step);
+    }
+    function permContext() {
+      var ch = opts.channelId || null;
+      if (!ch && opts.unitId) {
+        var info = SP.core.calc.unitInfo(store.data(), opts.unitId);
+        ch = info && info.channel ? info.channel.id : null;
+      }
+      return { channelId: ch };
+    }
+    // CR-21: ชื่อบทบาทจาก master.roles / บทบาทที่แก้ได้เฉพาะทีม = "{บทบาท / บทบาท} ทีม {Channel}"
+    function editorsText(mods, pctx) {
+      var eds = P.editors(mods, pctx);
+      var named = eds.filter(function (e) { return !e.everywhere; });
+      if (named.length) eds = named;   // ผู้ดูแลระบบ (แก้ได้ทุกหน้า) แสดงเฉพาะหน้าที่ไม่มีบทบาทอื่นแก้ได้
+      var team = eds.filter(function (e) { return e.team; }), all = eds.filter(function (e) { return !e.team; });
+      var ch = pctx.channelId ? SP.core.calc.findById(SP.data.channels, pctx.channelId) : null;
+      var parts = [];
+      if (team.length) parts.push(fill(WL.teamEditors, { roles: team.map(function (e) { return e.name; }).join(' / '), channel: ch ? ch.name : '' }));
+      return parts.concat(all.map(function (e) { return e.name; })).join(WL.rolesJoin);
+    }
+    // อ่านอย่างเดียว + ปุ่มสลับเป็นคนแรกที่มีสิทธิ์ (ไม่มีใครในทีม = บอกว่ายังไม่มีทีมขาย)
+    function readOnlyNote(mods, pctx) {
+      var u = P.user();
+      var eds = P.editors(mods, pctx);
+      var team = eds.some(function (e) { return e.team; });
+      var ch = pctx.channelId ? SP.core.calc.findById(SP.data.channels, pctx.channelId) : null;
+      var text = ch && P.teamBlocked(u, mods, pctx) ? fill(WL.readOnlyTeam, { channel: ch.name })
+        : eds.length ? fill(WL.readOnlyBy, { roles: editorsText(mods, pctx) }) : WL.readOnlyNone;
+      actionsEl.appendChild(h('span', { class: 'wf-hint' }, text));
+      var to = P.firstEditor(mods, pctx);
+      if (to) actionsEl.appendChild(switchButton(to, fill(WL.switchToRole, { role: roleTitle(to) })));
+      else if (team && ch) actionsEl.appendChild(h('span', { class: 'wf-hint' }, fill(WL.noTeam, { channel: ch.name })));
+    }
+    function editButtons(editing) {
+      wrap.actions = editing ? ['save', 'cancel'] : ['edit'];
+      wrap.actions.forEach(function (a) { actionsEl.appendChild(a === 'edit' ? editButton(true) : button(a, a !== 'cancel')); });
+    }
+    // CR-23: ปุ่มแก้ไข + เหตุผลที่กดไม่ได้ (opts.editBlocked)
+    function editButton(primary) {
+      var reason = opts.editBlocked ? opts.editBlocked() : null;
+      if (reason) actionsEl.appendChild(h('span', { class: 'wf-reason', role: 'note' }, reason));
+      return button('edit', primary, reason ? { disabled: true, title: reason } : null);
+    }
+
     // สลับมุมมองผู้ใช้ (เพื่อการนำเสนอ) แล้วโหลดหน้าใหม่ให้ Header และปุ่มตรงกับบทบาท
     function switchButton(role, labelText) {
       var name = roleName(role);
@@ -1202,11 +1338,22 @@
     }
 
     function render() {
+      var FT = SP.core.features;
       clear(statusEl);
       clear(actionsEl);
+      wrap.actions = [];
       if (opts.extra) actionsEl.appendChild(opts.extra);
       var editing = !!(opts.editing && opts.editing());
+      var wfOn = opts.simple ? false : FT.stepOn(opts.step);
+      if (opts.step === 'npd' && !wfOn) return;
       if (opts.simple) {
+        var pageMods = permModules();
+        if (pageMods) {
+          var pageCtx = permContext();
+          if (!P.canAny(P.user(), pageMods, pageCtx)) { readOnlyNote(pageMods, pageCtx); return; }
+          editButtons(editing);
+          return;
+        }
         var mv = W.masterViewState(store.role(), opts.editRoles);
         if (mv.kind === 'readOnly') {
           var editor = roleName(mv.switchTo);
@@ -1214,20 +1361,34 @@
           actionsEl.appendChild(switchButton(mv.switchTo, fill(WL.switchToEditor, { name: editor })));
           return;
         }
-        (editing ? ['save', 'cancel'] : ['edit']).forEach(function (a) { actionsEl.appendChild(button(a, a !== 'cancel')); });
+        wrap.actions = editing ? ['save', 'cancel'] : ['edit'];
+        wrap.actions.forEach(function (a) { actionsEl.appendChild(button(a, a !== 'cancel')); });
         return;
       }
       var states = store.workflowStates();
-      var locked = opts.step === 'npd' ? false : W.isLocked(states);
-      var state = opts.getState ? opts.getState() : W.stateOf(states, opts.step, opts.unitId);
+      var locked = opts.step === 'npd' || !FT.isOn('baseline') ? false : W.isLocked(states);
+      var state = !wfOn ? { status: 'draft', history: [] } : opts.getState ? opts.getState() : W.stateOf(states, opts.step, opts.unitId);
       var preparerName = submitterName();
-      statusEl.appendChild(wfBadge(state.status));
-      if (locked && LOCKABLE.indexOf(opts.step) >= 0) statusEl.appendChild(h('span', { class: 'history-tag wf-locked' }, '🔒 ' + WL.lockedTag));
-      statusEl.appendChild(historyButton(state, preparerName));
+      if (wfOn) {
+        statusEl.appendChild(wfBadge(state.status));
+        if (locked && LOCKABLE.indexOf(opts.step) >= 0) statusEl.appendChild(h('span', { class: 'history-tag wf-locked' }, '🔒 ' + WL.lockedTag));
+        statusEl.appendChild(historyButton(state, preparerName));
+      }
 
+      // Phase 1 (ปิด Workflow ของขั้นนี้): แก้ไข / บันทึก / ยกเลิก ตามตารางสิทธิ์ (CR-19)
+      var stepMods = !wfOn ? permModules() : null;
+      if (stepMods) {
+        var stepCtx = permContext();
+        if (!P.canAny(P.user(), stepMods, stepCtx)) { readOnlyNote(stepMods, stepCtx); return; }
+        if (locked && LOCKABLE.indexOf(opts.step) >= 0) return;
+        editButtons(editing);
+        return;
+      }
       var view = W.viewState(state, store.role(), { step: opts.step, ownerId: opts.ownerId, ownerName: preparerName, editing: editing, locked: locked });
+      // ปิด Workflow: ผู้อนุมัติที่ยังไม่ถึงขั้น = อ่านอย่างเดียว (ผู้จัดทำคือ …) ไม่มีข้อความรอส่งอนุมัติ
+      if (!wfOn && view.kind === 'waiting') view = { kind: 'readOnly', preparerName: view.preparerName, switchTo: view.switchTo, actions: [] };
       if (view.kind === 'readOnly') {
-        var toApprover = state.status === 'submitted';
+        var toApprover = wfOn && state.status === 'submitted';
         actionsEl.appendChild(h('span', { class: 'wf-hint' }, toApprover ? fill(WL.readOnlyApprover, { name: approverName() }) : fill(WL.readOnly, { name: view.preparerName })));
         actionsEl.appendChild(switchButton(view.switchTo, toApprover ? WL.switchToApprover : WL.switchToPreparer));
         return;
@@ -1237,15 +1398,18 @@
         actionsEl.appendChild(switchButton(view.switchTo, WL.switchToPreparer));
         return;
       }
-      view.actions.forEach(function (a) {
+      wrap.actions = FT.visibleActions(view.actions);
+      wrap.actions.forEach(function (a) {
         if (a === 'submit') {
           var facts = opts.facts ? opts.facts() : {};
           var cs = W.canSubmit(opts.step, opts.unitId, opts.year, { states: states, remaining: facts.remaining, ready: facts.ready, baselineLocked: locked });
           var reason = cs.ok ? null : cs.reason === 'baseline' ? WL.reasons.baseline : (WL.reasons[cs.reason] || {})[opts.step];
           if (reason) actionsEl.appendChild(h('span', { class: 'wf-reason', role: 'note' }, reason));
           actionsEl.appendChild(button('submit', true, { disabled: !cs.ok, title: reason }));
+        } else if (a === 'edit') {
+          actionsEl.appendChild(editButton(wrap.actions.indexOf('submit') < 0));
         } else {
-          actionsEl.appendChild(button(a, a === 'save' || a === 'approve' || (a === 'edit' && view.actions.indexOf('submit') < 0)));
+          actionsEl.appendChild(button(a, a === 'save' || a === 'approve'));
         }
       });
     }
@@ -1513,10 +1677,12 @@
     return btn;
   }
 
-  // ข้อความ ⓘ ของยอดขายปีก่อน: ยอดขายปี {ปี} = ยอดขายจริง ม.ค.–{เดือนตัดยอด} + ประมาณการ {เดือนถัดไป}–ธ.ค. (คำนวณจาก history.actualMonths)
+  // ข้อความ ⓘ ของยอดขายฐาน — CR-24: ยอดขาย L12M = ยอดขายจริง 12 เดือนล่าสุดที่ปิดแล้ว (ช่วงเดือนจาก core/clock.js) ใช้เทียบการเติบโต
+  //   (ไม่มี clock = แบบเดิม: ยอดขายปี {ปี} = ยอดขายจริง ม.ค.–{เดือนตัดยอด} + ประมาณการ {เดือนถัดไป}–ธ.ค.)
   function priorNote(year) {
-    var y = SP.data.history.years[year];
     var P = labels().priorInfo;
+    if (SP.core.clock && P.l12mNote) return fill(P.l12mNote, { range: SP.core.clock.rangeLabel(false) });
+    var y = SP.data.history.years[year];
     if (!y) return fill(P.none, { year: year });
     var n = y.actualMonths;
     if (n >= 12) return fill(P.actual, { year: year });
@@ -1524,33 +1690,68 @@
     return fill(P.mixed, { year: year, actual: F.monthRange(0, n - 1), estimate: F.monthRange(n, 11) });
   }
 
-  // ชื่อบทบาทจำลอง (Sales Person = ชื่อคน)
+  // ชื่อบทบาทจำลอง (CR-19): {บทบาท} · {Channel} · {ชื่อ} (Sales Manager / Officer) / {บทบาท} · {ชื่อ} (บทบาทอื่น)
+  //   ใช้ในตัวเลือกมุมมองผู้ใช้ ประวัติ ปุ่มสลับ และหัวไฟล์ส่งออก / roleTitle = ไม่มีชื่อคน (ป้ายปุ่มสลับ)
+  //   CR-21: ผู้ใช้จาก master.users (บทบาทแรก · Channel ของทีม · ชื่อ) ชื่อบทบาทจาก master.roles
   function roleName(r) {
     if (!r) return '';
-    if (r.type === 'sales') return personName(SP.core.store.get('master.salespeople'), r.personId) || labels().roles.sales;
-    return labels().roles[r.type] || r.type;
+    var P = SP.core.permissions;
+    if (!P) return r.type === 'sales' ? personName(SP.core.store.get('master.salespeople'), r.personId) || labels().roles.sales : labels().roles[r.type] || r.type;
+    var u = P.normalize(r);
+    return [P.roleTitle(u), u.name].filter(Boolean).join(' · ');
+  }
+  function roleTitle(r) {
+    if (!r) return '';
+    var P = SP.core.permissions;
+    return P ? P.roleTitle(r) : (labels().roles[r.type] || r.type);
+  }
+
+  // CR-21: Chip ระดับสิทธิ์ ไม่เห็น (เทา) · ดู (ฟ้าอ่อน) · แก้ไข (เขียว) + "· ทีม" / ปุ่มเฉพาะ (action) ✓ อนุญาต · – ไม่อนุญาต
+  //   opts = { level: 'NONE' | 'VIEW' | 'EDIT', scope: 'ALL' | 'TEAM', action, changed (ต่างจากค่าตั้งต้น = จุดมุม), title }
+  function permChip(opts) {
+    var X = labels().perm;
+    var lv = opts.level || 'VIEW';
+    var text = opts.action ? (lv === 'EDIT' ? X.allowed : X.denied) : X.levels[lv];
+    if (lv === 'EDIT' && opts.scope === 'TEAM') text += ' · ' + X.team;
+    var cls = 'perm-chip is-' + lv.toLowerCase() + (opts.action ? ' is-action' : '') + (opts.changed ? ' is-changed' : '');
+    var aria = (opts.action ? (lv === 'EDIT' ? X.allowedText : X.deniedText) : X.levels[lv]) + (lv === 'EDIT' && opts.scope === 'TEAM' ? ' · ' + X.teamText : '') + (opts.changed ? ' · ' + X.changed : '');
+    return h('span', { class: cls, title: opts.title || aria, 'aria-label': aria }, text);
   }
 
   // แถวหัวไฟล์ส่งออก (Excel เท่านั้น): ปีแผน · สถานะ · วันเวลาที่ส่งออก · มุมมองผู้ใช้ (+ extra = [[ป้าย, ค่า]])
+  //   CR-17: ปิด approvalWorkflow = ไม่มีแถวสถานะ Workflow (ข้อความสถานะอื่น เช่น มุมมองรวม ยังแสดง)
   function exportHeader(year, status, extra) {
     var X = labels().exporting;
-    return [[X.headerYear, year], [X.headerStatus, labels().workflow.status[status] || status],
-      [X.headerAt, F.dateTime(new Date().toISOString())], [X.headerRole, roleName(SP.core.store.role())]].concat(extra || []);
+    var wfStatus = !!labels().workflow.status[status];
+    var rows = [[X.headerYear, year]];
+    if (status && (!wfStatus || SP.core.features.isOn('approvalWorkflow'))) rows.push([X.headerStatus, labels().workflow.status[status] || status]);
+    return rows.concat([[X.headerAt, F.dateTime(new Date().toISOString())], [X.headerRole, roleName(SP.core.store.role())]]).concat(extra || []);
   }
 
   // ส่วนท้ายชื่อไฟล์: สถานะภาษาอังกฤษสั้น + วันที่ YYYYMMDD / ชื่อหน่วยขายตัดอักขระที่ใช้ในชื่อไฟล์ไม่ได้
+  //   CR-17: ปิด approvalWorkflow = status ว่าง (Module ตัด _ ที่ซ้ำในชื่อไฟล์)
   function exportStamp(status) {
     var d = new Date();
     var pad = function (n) { return (n < 10 ? '0' : '') + n; };
-    return { status: labels().exporting.statusCode[status] || status, date: d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) };
+    var code = SP.core.features.isOn('approvalWorkflow') ? labels().exporting.statusCode[status] || status : '';
+    return { status: code, date: d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) };
   }
   function fileSafe(text) { return String(text || '').replace(/[\\/:*?"<>|\s]+/g, '-'); }
 
   // ป้าย "ยอดขายปี {ปี}" + ⓘ (Tooltip ที่มาของตัวเลข) ใช้ในแถบ Total, หัวคอลัมน์, แถบบริบท และรายงาน
-  function priorLabel(year, text) {
-    var note = priorNote(year);
+  //   CR-24: ป้ายตั้งต้น = ยอดขาย L12M · note = ข้อความ ⓘ อื่น (เช่น referenceNote ของยอดขายอ้างอิงรายเดือน)
+  function priorLabel(year, text, note) {
+    var n = note || priorNote(year);
     return h('span', { class: 'prior-label' }, text || fill(labels().priorInfo.label, { year: year }),
-      h('span', { class: 'info-dot', title: note, 'aria-label': note, tabindex: '0', role: 'note' }, 'ⓘ'));
+      h('span', { class: 'info-dot', title: n, 'aria-label': n, tabindex: '0', role: 'note' }, 'ⓘ'));
+  }
+  // CR-24: ⓘ ของยอดขายอ้างอิงรายเดือน — ม.ค.–ส.ค. ใช้ยอดจริงปี 2026 · ก.ย.–ธ.ค. ใช้ยอดจริงปี 2025 (ช่วงเดือนจาก core/clock.js)
+  function referenceNote() {
+    var R = labels().referenceInfo;
+    var K = SP.core.clock;
+    var lc = K.parse(K.lastClosedMonth());
+    if (lc.month >= 12) return fill(R.allLatest, { year: lc.year });
+    return fill(R.note, { latestMonths: F.monthRange(0, lc.month - 1), year: lc.year, olderMonths: F.monthRange(lc.month, 11), prev: lc.year - 1 });
   }
 
   // =====================================================================
@@ -1604,6 +1805,96 @@
         var raw = window.prompt(opts.title, input.value);
         var v = raw == null ? null : parseNumber(raw);
         resolve({ ok: raw != null && v != null, value: v });
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-16: ตัวเลือกเดือนในแถวหัวข้อ "ข้อมูล ณ เดือน [ก.ย. 2026 ▾]" (ขนาดตัวอักษรเท่าหัวข้อ เหมือนตัวเลือกปีแผน)
+  // opts: { label, tip, value ('YYYY-MM'), months: [key ที่เลือกได้], current (เดือนปัจจุบัน), currentLabel, onChange(key), guard() → bool }
+  //   Popover = ตารางเดือน 1 แถวต่อปี (เดือนที่ไม่อยู่ใน months กดไม่ได้) / เดือนปัจจุบันมีเส้นใต้ + Tooltip currentLabel
+  // → element (display: contents) ที่มี .set(key)
+  // ---------------------------------------------------------------------
+  function monthPicker(opts) {
+    var value = opts.value;
+    var btn = h('button', { type: 'button', class: 'year-title month-title', title: opts.tip || opts.label });
+    function renderBtn() {
+      clear(btn);
+      btn.appendChild(h('span', { class: 'month-title-label' }, opts.label));
+      btn.appendChild(h('span', { class: 'year-title-value' }, F.date(value)));
+      btn.appendChild(h('span', { class: 'year-title-caret no-print', 'aria-hidden': 'true' }, '▾'));
+      btn.setAttribute('aria-label', opts.label + ' ' + F.date(value));
+    }
+    var years = [];
+    (opts.months || []).forEach(function (k) { var y = Number(k.slice(0, 4)); if (years.indexOf(y) < 0) years.push(y); });
+    popover(btn, function (close) {
+      return h('div', { class: 'month-grid' }, years.map(function (y) {
+        return h('div', { class: 'month-grid-row' }, h('span', { class: 'month-grid-year' }, String(y)), F.MONTHS.map(function (name, m) {
+          var key = SP.core.calc.monthKey(y, m);
+          var ok = opts.months.indexOf(key) >= 0;
+          return h('button', {
+            type: 'button', class: 'month-grid-cell' + (key === value ? ' is-selected' : '') + (key === opts.current ? ' is-current' : ''),
+            disabled: !ok, 'aria-pressed': key === value ? 'true' : 'false', title: key === opts.current ? opts.currentLabel : F.date(key),
+            onClick: function () {
+              close();
+              if (key === value) return;
+              if (opts.guard && !opts.guard()) return;
+              value = key;
+              renderBtn();
+              opts.onChange(key);
+            }
+          }, name);
+        }));
+      }));
+    }, { className: 'month-popover', label: opts.label });
+    renderBtn();
+    var wrap = h('span', { class: 'month-picker' }, btn);
+    wrap.set = function (k) { value = k; renderBtn(); };
+    return wrap;
+  }
+
+  // CR-16: ไอคอนเล็กบอกว่าชื่อถูกซ่อน (ร้านค้าที่ชื่อเป็นบุคคลธรรมดา) + Tooltip
+  function privacyMark(title) {
+    return h('span', { class: 'privacy-mark', title: title, 'aria-label': title, role: 'img' }, icon('person-off'));
+  }
+
+  // CR-16: กล่องกรอกข้อความ 1 ช่อง opts: { title, label, value, hint, confirmLabel, validate(value) → ข้อความ error | null }
+  //   → Promise<{ ok, value (ตัดช่องว่างหัวท้าย) }> / validate ไม่ผ่าน = แสดงข้อความในกล่อง ไม่ปิด
+  function promptText(opts) {
+    var D = labels().dialog;
+    return new Promise(function (resolve) {
+      var input = h('input', { type: 'text', class: 'pm-input dlg-text-input', 'aria-label': opts.label, value: opts.value || '' });
+      var err = h('p', { class: 'dlg-error', role: 'alert', hidden: true });
+      var dlg = h('dialog', { class: 'sp-dialog', 'aria-label': opts.title });
+      var finished = false;
+      function done(ok) {
+        if (finished) return;
+        var v = input.value.trim();
+        var e = ok && opts.validate ? opts.validate(v) : null;
+        if (e) { err.textContent = e; err.hidden = false; input.focus(); return; }
+        finished = true;
+        if (dlg.open) dlg.close();
+        if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+        resolve({ ok: ok, value: v });
+      }
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); done(true); } });
+      dlg.appendChild(h('div', { class: 'dlg-body' },
+        h('h2', { class: 'dlg-title' }, opts.title),
+        h('label', { class: 'dlg-number-label' }, h('span', { class: 'field-label' }, opts.label), input),
+        opts.hint ? h('p', { class: 'dlg-text' }, opts.hint) : null,
+        err,
+        h('div', { class: 'dlg-actions' },
+          h('button', { type: 'button', class: 'btn btn-ghost dlg-cancel', onClick: function () { done(false); } }, D.cancel),
+          h('button', { type: 'button', class: 'btn btn-primary dlg-confirm', onClick: function () { done(true); } }, opts.confirmLabel || D.confirm))));
+      dlg.addEventListener('cancel', function (e) { e.preventDefault(); done(false); });
+      document.body.appendChild(dlg);
+      if (typeof dlg.showModal === 'function') { dlg.showModal(); input.focus(); input.select(); }
+      else {
+        dlg.parentNode.removeChild(dlg);
+        finished = true;
+        var raw = window.prompt(opts.title, input.value);
+        var v = raw == null ? '' : raw.trim();
+        resolve({ ok: raw != null && !(opts.validate && opts.validate(v)), value: v });
       }
     });
   }
@@ -1799,6 +2090,9 @@
   SP.core.components = {
     undoStack: undoStack,
     promptNumber: promptNumber,
+    monthPicker: monthPicker,
+    privacyMark: privacyMark,
+    promptText: promptText,
     gridKeys: gridKeys,
     h: h,
     clear: clear,
@@ -1841,6 +2135,8 @@
     popover: popover,
     menuButton: menuButton,
     seriesFilter: seriesFilter,
+    categoryFilter: categoryFilter,
+    filterChips: filterChips,
     rulesContent: rulesContent,
     rulesPanel: rulesPanel,
     rulesButton: rulesButton,
@@ -1864,9 +2160,12 @@
     exportButton: exportButton,
     priorNote: priorNote,
     roleName: roleName,
+    roleTitle: roleTitle,
+    permChip: permChip,
     exportHeader: exportHeader,
     exportStamp: exportStamp,
     fileSafe: fileSafe,
-    priorLabel: priorLabel
+    priorLabel: priorLabel,
+    referenceNote: referenceNote
   };
 })(window.SP);

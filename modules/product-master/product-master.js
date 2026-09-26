@@ -7,6 +7,7 @@
  *                 เปิดมาเป็นโหมดดู / แก้ไข (workflowBar แบบง่าย) ตามบทบาท:
  *                   ทีม Product = ติ๊ก Listing (มี "เลือกทั้งแถว" และ "เลือกทั้งคอลัมน์") / Supply Chain = ฟอร์ม Clearance
  *                 วันเริ่มขายแก้ที่รายการสินค้าหรือแผน NPD / Status คำนวณจาก calc.productStatus / แผงกฎ (พับ)
+ *                 CR-20: ป้าย "Listing โดย Sales" ที่ช่องที่ระบบสร้าง Listing ให้เมื่อ Sales เพิ่ม SKU หรือสร้าง NPD (addedBy SALES) ให้ทีม Product ตรวจสอบ
  * อ่านจาก data/:  channels, settings, content (pages.productMaster, labels) + Master ผ่าน store.data()
  * store อ่าน:     app.planYear, plan.<ปี>.topDown (.channels), master.products, master.listings, master.taxonomy,
  *                 master.accounts, master.territories, ui.productMaster.channel, ui.seriesFilter, ui.role
@@ -16,6 +17,7 @@
   'use strict';
 
   var C = SP.core.components;
+  var Perm = SP.core.permissions;
   var F = SP.core.format;
   var calc = SP.core.calc;
   var store = SP.core.store;
@@ -51,16 +53,17 @@
     }
     function dirty() { return editing ? countDiff() : 0; }
     C.guardUnsaved(dirty);
-    function role() { return store.role().type; }
-    function canListing() { return editing && role() === 'product'; }
-    function canClearance() { return editing && role() === 'supply'; }
+    // CR-21: Listing = สิทธิ์ของหน้า · Clearance = สิทธิ์ย่อย listing.clearance (ตารางสิทธิ์) / ป้ายในโหมดแก้ไขตามสิทธิ์ที่มี
+    function canListing() { return editing && Perm.can(Perm.user(), 'listing'); }
+    function canClearance() { return editing && Perm.can(Perm.user(), 'listing.clearance'); }
+    function roleHint() { return [canListing() ? page.roleHint.product : null, canClearance() ? page.roleHint.supply : null].filter(Boolean).join(' · '); }
 
     var bar = C.workflowBar({
-      simple: true, editRoles: ['product', 'supply'],
+      simple: true,
       editing: function () { return editing; },
       onEdit: function () { editing = true; draft = clone(saved); draw(); },
       onSave: function () {
-        var by = L.roles[role()] || '', at = new Date().toISOString();
+        var by = C.roleName(store.role()), at = new Date().toISOString();
         var entries = [];
         draft.products.forEach(function (p) {
           var o = calc.findProduct(saved.products, calc.productKey(p));
@@ -110,7 +113,7 @@
         h('label', { class: 'field' }, h('span', { class: 'field-label' }, page.itemTypeFilter),
           C.select({ label: page.itemTypeFilter, value: itemFilter, onChange: function (v) { itemFilter = v; renderTable(); },
             options: [{ value: '', label: page.itemTypeAll }].concat(SP.data.settings.ITEM_TYPES.map(function (t) { return { value: t, label: L.itemTypes[t] }; })) })),
-        editing ? h('span', { class: 'master-hint' }, page.roleHint[role()] || '') : h('span', { class: 'master-hint' }, page.launchHint)));
+        editing ? h('span', { class: 'master-hint' }, roleHint()) : h('span', { class: 'master-hint' }, page.launchHint)));
 
       var banner = editing ? C.editBanner() : null;
       if (banner) root.appendChild(banner);
@@ -204,14 +207,23 @@
             C.statusBadge(status), segs.length > 1 ? h('span', { class: 'pm-seg-note' }, '→ ' + segs.slice(1).map(function (sg) { return L.status[sg.status]; }).join(' → ')) : null),
           units.length ? units.map(function (u) {
             var listed = calc.isListed(listings, key, u.id);
-            if (!canListing()) return h('td', { class: 'pm-acc' + (listed ? ' is-listed' : '') }, listed ? h('span', { class: 'pm-mark', title: key + ' · ' + u.name }, page.listedMark) : null);
+            var tag = listed ? salesTag(listings, key, u) : null;   // CR-20: Listing โดย Sales (ให้ทีม Product ตรวจสอบ)
+            if (!canListing()) return h('td', { class: 'pm-acc' + (listed ? ' is-listed' : '') }, listed ? h('span', { class: 'pm-mark', title: key + ' · ' + u.name }, page.listedMark) : null, tag);
             var was = calc.isListed(saved.listings, key, u.id);
             var box = h('input', { type: 'checkbox', checked: listed, 'aria-label': key + ' · ' + u.name });
             box.addEventListener('change', function () { setListed(key, u.id, box.checked); renderTable(); });
-            return h('td', { class: 'pm-acc' + (was !== listed ? ' is-dirty-cell' : '') }, h('label', { class: 'pm-check' }, box));
+            return h('td', { class: 'pm-acc' + (was !== listed ? ' is-dirty-cell' : '') }, h('label', { class: 'pm-check' }, box), tag);
           }) : h('td', { class: 'pm-acc' }),
           h('td', { class: 'pm-cl' }, clCell),
           h('td', null, p.discontinueMonth ? F.date(p.discontinueMonth) : h('span', { class: 'muted' }, page.discontinueNone)));
+      }
+
+      // CR-20: ป้าย Listing โดย Sales + Tooltip ผู้เพิ่ม · วันที่ · เดือนเริ่มขาย
+      function salesTag(listings, key, u) {
+        var rec = listings.filter(function (l) { return l.productKey === key && l.accountId === u.id; })[0];
+        if (!rec || rec.addedBy !== 'SALES') return null;
+        return h('span', { class: 'badge tag-warn pm-by-sales', title: fill(page.bySalesTip, { unit: u.name, by: rec.addedByName || '–', date: rec.addedAt ? F.date(rec.addedAt.slice(0, 10)) : '–', from: rec.fromMonth ? F.date(rec.fromMonth) : '–' }) },
+          page.bySales);
       }
 
       // ฟอร์ม Clearance (Supply Chain): ช่วงเดือน + Stock → เขียนลง draft

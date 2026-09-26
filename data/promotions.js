@@ -17,7 +17,7 @@
     {"id":"promo-03","name":"Songkran Deal","productKey":"33430","accountIds":["seven"],"startDate":"2027-04-10","endDate":"2027-04-20","mode":"PRICE","value":129,"promoGpPct":null,"status":"CONFIRMED","createdBy":"Trade Marketing"},
     {"id":"promo-04","name":"11.11 Mega Sale","productKey":"16190","accountIds":["shopee","lazada"],"startDate":"2027-11-01","endDate":"2027-11-11","mode":"DISCOUNT_PCT","value":0.2,"promoGpPct":null,"status":"CONFIRMED","createdBy":"Trade Marketing"},
     {"id":"promo-05","name":"Blooming Heart Launch","productKey":"NPD_2027Q2_01","accountIds":["seven","eveandboy"],"startDate":"2027-06-01","endDate":"2027-06-30","mode":"DISCOUNT_PCT","value":0.15,"promoGpPct":null,"status":"CONFIRMED","createdBy":"Trade Marketing"},
-    {"id":"promo-06","name":"Back to School","productKey":"33400","accountIds":["tt-north","tt-northeast","tt-central"],"startDate":"2027-06-15","endDate":"2027-07-15","mode":"PRICE","value":80,"promoGpPct":null,"status":"DRAFT","createdBy":"Trade Marketing"},
+    {"id":"promo-06","name":"Back to School","productKey":"33400","accountIds":["TT-01","TT-02","TT-03"],"startDate":"2027-06-15","endDate":"2027-07-15","mode":"PRICE","value":80,"promoGpPct":null,"status":"DRAFT","createdBy":"Trade Marketing"},
     {"id":"promo-07","name":"Payday Deal","productKey":"12070","accountIds":["shopee"],"startDate":"2027-08-25","endDate":"2027-08-31","mode":"PRICE","value":199,"promoGpPct":null,"status":"DRAFT","createdBy":"Trade Marketing"}
   ];
 })(window.SP);

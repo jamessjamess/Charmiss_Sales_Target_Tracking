@@ -9,6 +9,8 @@
  *                 อนุมัติแล้ว → ตั้งวันเริ่มขายและ Listing ให้ (calc.applyNpdApproval) และเดือนเริ่มขายเป็นค่าตั้งต้นในหน้าวางแผน SKU
  *                 เลื่อนวันเปิดตัวหลังอนุมัติ → แผนกลับเป็นฉบับร่าง และแผน SKU ที่อนุมัติแล้วของหน่วยที่วางแผนเป็น "ต้องตรวจสอบใหม่"
  *                 ขั้น "เปิดตัวแล้ว" ระบบตั้งให้เมื่อถึงวันเปิดตัว (calc.npdStage เทียบเดือนปัจจุบันจำลอง)
+ *                 CR-20: กลุ่ม "คำขอจาก Sales (n)" ด้านบน = สินค้าที่ Sales สร้างจากหน้าวางแผน SKU (source SALES_REQUEST) ของปีที่แสดง
+ *                 ผู้ขอ · หน่วยขาย · เดือนเริ่มขาย · ราคา · หมายเหตุ · ความครบถ้วน (ทีม Product เติมข้อมูลที่รายการสินค้า / ผูกรหัสจริงตามเดิม)
  * อ่านจาก data/:  channels, settings, content (pages.npdPlan, labels) + Master ผ่าน store.data()
  * store อ่าน:     master.npdPlans, master.products, master.listings, master.taxonomy, master.priceList, plan.<ปี>.topDown,
  *                 plan.<ปี>.sku.<unitId>, plan.<ปี>.workflow.*, ui.currentMonth, ui.role
@@ -19,9 +21,11 @@
   'use strict';
 
   var C = SP.core.components;
+  var Perm = SP.core.permissions;
   var F = SP.core.format;
   var calc = SP.core.calc;
   var W = SP.core.workflow;
+  var FT = SP.core.features;   // CR-17: ปิด npdApproval = ไม่มีขั้นอนุมัติ บันทึกแล้วมีผลทันที
   var store = SP.core.store;
   var h = C.h;
   var fill = C.fill;
@@ -29,6 +33,7 @@
   var view = 'timeline';
   var yearOffset = 0;
   var collapsed = {};
+  var requestsOpen = true;   // CR-20: กลุ่มคำขอจาก Sales กาง / พับ (ตัวแปรของหน้า ไม่เก็บ)
   var STAGES = ['plan', 'concept', 'production', 'ready'];
 
   function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
@@ -46,8 +51,9 @@
     var creating = false;
 
     function cur() { return editing ? draft : saved; }
-    function role() { return store.role().type; }
-    function canEdit() { return W.canEditMaster(store.role(), ['product']); }
+    // CR-21: สิทธิ์จากตารางสิทธิ์ (หน้าแผน NPD)
+    function byName() { return C.roleName(store.role()); }
+    function canEdit() { return Perm.can(Perm.user(), 'npdPlan'); }
     function tax() { return store.get('master.taxonomy'); }
     function product(key) { return calc.findProduct(cur().products, key); }
     function unitName(id) { var i = calc.unitInfo(store.data(), id); return i ? i.unit.name : id; }
@@ -63,7 +69,7 @@
     C.guardUnsaved(dirty);
 
     var bar = C.workflowBar({
-      simple: true, editRoles: ['product'],
+      simple: true,
       editing: function () { return editing; },
       onEdit: function () { startEdit(); },
       onSave: function () { save(); },
@@ -74,13 +80,16 @@
     function startEdit() { editing = true; draft = clone(saved); draw(); }
 
     function save() {
-      var by = L.roles[role()] || '', at = new Date().toISOString();
+      var by = byName(), at = new Date().toISOString();
       var entries = [];
+      var applyNow = [];
       draft.npdPlans.forEach(function (d) {
         var o = calc.findById(saved.npdPlans, d.id);
         if (o && JSON.stringify(o) === JSON.stringify(d)) return;
+        // CR-17 ปิด npdApproval: แผนที่มีวันเปิดตัวและหน่วยขายมีผลทันทีที่บันทึก (ตั้งวันเริ่มขาย + Listing เหมือนตอนอนุมัติ)
+        if (!FT.isOn('npdApproval') && d.plannedLaunchDate && (d.plannedAccounts || []).length) applyNow.push(d);
         // เลื่อนวันเปิดตัวหลังอนุมัติ → ฉบับร่าง + แผน SKU ที่อนุมัติแล้วของหน่วยที่วางแผน → ต้องตรวจสอบใหม่
-        if (o && o.workflow && o.workflow.status === 'approved' && o.plannedLaunchDate !== d.plannedLaunchDate) {
+        if (FT.isOn('npdApproval') && o && o.workflow && o.workflow.status === 'approved' && o.plannedLaunchDate !== d.plannedLaunchDate) {
           d.workflow = W.resetToDraft(d.workflow, { by: by, at: at, note: L.workflow.invalidateNote.npd });
           [launchYear(o), launchYear(d)].filter(function (y, i, a) { return a.indexOf(y) === i; }).forEach(function (y) {
             var states = store.workflowStates(y);
@@ -94,6 +103,18 @@
         entries = entries.concat(calc.auditDiff('npd', d.productKey, before, after, { by: by, at: at }));
       });
       draft.products.slice(saved.products.length).forEach(function (p) { entries = entries.concat(calc.auditDiff('product', calc.productKey(p), null, p, { by: by, at: at })); });
+      if (applyNow.length) {
+        var listings = store.get('master.listings');
+        applyNow.forEach(function (d) {
+          var applied = calc.applyNpdApproval({ products: draft.products, listings: listings }, d);
+          draft.products = applied.products;
+          listings = applied.listings;
+          // สถานะภายใน = มีผลแล้ว (calc.npdStartMonth ใช้เป็นค่าตั้งต้นของแผน SKU) ไม่แสดงในหน้าจอเมื่อปิด npdApproval
+          d.workflow = { status: 'approved', history: ((d.workflow && d.workflow.history) || []).concat([{ action: 'apply', by: by, at: at }]) };
+          entries.push({ entity: 'product', key: d.productKey, field: 'launchDate', oldValue: null, newValue: d.plannedLaunchDate, by: by, at: at });
+        });
+        store.set('master.listings', listings);
+      }
       store.set('master.npdPlans', draft.npdPlans);
       store.set('master.products', draft.products);
       store.set('master.priceList', draft.priceList);
@@ -141,7 +162,7 @@
         h('div', { class: 'card npd-kpi' }, h('span', { class: 'pl-kpi-label' }, fill(K.inYear, { year: planYear })), h('strong', { class: 'pl-kpi-value' }, String(inYear.length))),
         h('div', { class: 'card npd-kpi npd-kpi-series' }, h('span', { class: 'pl-kpi-label' }, K.bySeries),
           h('span', { class: 'npd-series-list' }, Object.keys(bySeries).map(function (s) { return h('span', { class: 'badge tag-muted' }, s + ' ' + bySeries[s]); }))),
-        h('div', { class: 'card npd-kpi' + (pending ? ' is-warn' : '') }, h('span', { class: 'pl-kpi-label' }, K.pending), h('strong', { class: 'pl-kpi-value' }, String(pending))),
+        FT.isOn('npdApproval') ? h('div', { class: 'card npd-kpi' + (pending ? ' is-warn' : '') }, h('span', { class: 'pl-kpi-label' }, K.pending), h('strong', { class: 'pl-kpi-value' }, String(pending))) : null,
         h('div', { class: 'card npd-kpi' + (missing ? ' is-danger' : '') }, h('span', { class: 'pl-kpi-label' }, K.missing), h('strong', { class: 'pl-kpi-value' }, String(missing)))));
 
       var year = planYear + yearOffset;
@@ -154,6 +175,7 @@
         h('span', { class: 'legend npd-legend' }, STAGES.concat(['launched']).map(function (s) { return h('span', { class: 'legend-item' }, h('span', { class: 'swatch npd-sw', style: { '--c': C.tokenVar('--npd-' + s) } }), page.stages[s]); })),
         editing ? h('span', { class: 'tool-right' }, h('button', { type: 'button', class: 'btn btn-primary btn-sm npd-create', onClick: openCreate }, page.create)) : null));
       if (editing) { var b = C.editBanner(); b.update(dirty()); root.appendChild(b); }
+      root.appendChild(requestsCard(year));
 
       var card = h('div', { class: 'card fit-card npd-card' });
       root.appendChild(card);
@@ -161,6 +183,37 @@
       if (!list.length) card.appendChild(h('p', { class: 'grid-empty' }, page.empty));
       else card.appendChild(view === 'timeline' ? timeline(list, year) : table(list));
       if (drawerCtl.isOpen()) renderDrawer();
+    }
+
+    // CR-20: คำขอจาก Sales ของปีที่แสดง (เดือนเริ่มขายในปีนั้น) เรียงตามเดือนเริ่มขาย
+    function requestsCard(year) {
+      var R = page.requests;
+      var d = store.data();
+      var list = cur().products.filter(function (p) { return p.source === 'SALES_REQUEST' && p.request && String(p.request.startMonth || '').slice(0, 4) === String(year); })
+        .sort(function (a, b) { return a.request.startMonth < b.request.startMonth ? -1 : a.request.startMonth > b.request.startMonth ? 1 : 0; });
+      var head = h('button', { type: 'button', class: 'npd-req-head', 'aria-expanded': requestsOpen ? 'true' : 'false', onClick: function () { requestsOpen = !requestsOpen; draw(); } },
+        h('span', { class: 'tree-toggle', 'aria-hidden': 'true' }, requestsOpen ? '▾' : '▸'), h('strong', null, fill(R.title, { n: list.length })), h('span', { class: 'muted small' }, ' · ' + R.lead));
+      var card = h('section', { class: 'card npd-requests' }, head);
+      if (!requestsOpen) return card;
+      if (!list.length) { card.appendChild(h('p', { class: 'muted small npd-req-empty' }, R.empty)); return card; }
+      var Cl = R.columns;
+      card.appendChild(h('div', { class: 'npd-req-scroll' }, h('table', { class: 'data-grid npd-req-table' },
+        h('thead', null, h('tr', null, ['sku', 'by', 'units', 'start', 'price', 'note', 'data'].map(function (k) { return h('th', { scope: 'col', class: k === 'price' ? 'num' : null }, Cl[k]); }))),
+        h('tbody', null, list.map(function (p) {
+          var r = p.request;
+          var key = calc.productKey(p);
+          var comp = calc.productCompleteness(p, cur().priceList);
+          var units = (r.unitIds || []).map(function (u) { var i = calc.unitInfo(d, u); return i ? i.unit.name : u; }).join(', ');
+          return h('tr', null,
+            h('td', null, h('strong', null, key), ' ' + p.name),
+            h('td', null, (p.requestedBy || '–'), p.requestedAt ? h('span', { class: 'muted small' }, ' · ' + F.date(p.requestedAt.slice(0, 10))) : null),
+            h('td', null, units || '–'),
+            h('td', null, F.date(r.startMonth)),
+            h('td', { class: 'num' }, F.baht(r.price, 2)),
+            h('td', { class: 'npd-req-note', title: r.note || '' }, r.note || '–'),
+            h('td', null, h('span', { class: 'badge ' + (comp.complete ? 'tag-ok' : 'tag-warn') }, comp.complete ? R.complete : fill(R.missing, { n: comp.missingRequired.length }))));
+        })))));
+      return card;
     }
 
     function groupsOf(list) {
@@ -193,7 +246,7 @@
           var row = h('div', { class: 'npd-row npd-item' + (selected === n.id ? ' is-selected' : ''), role: 'row', tabindex: '0', dataset: { id: n.id },
             onClick: function () { openPlan(n.id); }, onKeydown: function (e) { if (e.key === 'Enter') openPlan(n.id); } },
             h('div', { class: 'npd-label', role: 'cell' }, C.productThumb(p, T, { size: 'sm' }),
-              h('span', { class: 'npd-name' }, h('span', { class: 'npd-name-text', title: p.name }, p.name), h('span', { class: 'npd-sub' }, n.productKey + ' · ', C.wfBadge(statusOf(n))))));
+              h('span', { class: 'npd-name' }, h('span', { class: 'npd-name-text', title: p.name }, p.name), h('span', { class: 'npd-sub' }, n.productKey, FT.isOn('npdApproval') ? [' · ', C.wfBadge(statusOf(n))] : null))));
           var track = h('div', { class: 'npd-track', role: 'cell' });
           if (n.plannedLaunchDate) {
             var start = calc.monthIndex(n.plannedLaunchDate, year);
@@ -230,12 +283,12 @@
             h('td', null, n.plannedLaunchDate ? F.date(n.plannedLaunchDate) : '–'),
             h('td', { title: names }, fill(page.accountsCount, { n: (n.plannedAccounts || []).length })),
             h('td', { class: 'num' + (cov.missing.length ? ' text-short' : '') }, fill(page.inPlanText, { x: cov.inPlan, y: cov.planned })),
-            h('td', null, C.wfBadge(statusOf(n)))));
+            FT.isOn('npdApproval') ? h('td', null, C.wfBadge(statusOf(n))) : null));
         });
       });
       return h('div', { class: 'fit-scroll' }, h('table', { class: 'data-grid npd-table' },
         h('thead', null, h('tr', null, ['sku', 'series', 'stage', 'launch', 'accounts'].map(function (k) { return h('th', { scope: 'col' }, Cl[k]); }),
-          h('th', { scope: 'col', class: 'num' }, Cl.inPlan), h('th', { scope: 'col' }, Cl.approval))),
+          h('th', { scope: 'col', class: 'num' }, Cl.inPlan), FT.isOn('npdApproval') ? h('th', { scope: 'col' }, Cl.approval) : null)),
         body));
     }
 
@@ -289,13 +342,14 @@
         body.appendChild(h('section', { class: 'pd-section' },
           field(F2.product, n.productKey + ' · ' + p.name), field(F2.series, calc.taxonomyName(T, 'series', n.seriesId) || '–'),
           field(F2.stage, [stageSel, h('span', { class: 'muted small' }, ' ' + page.stageAuto)]), field(F2.launch, launch), field(F2.note, note)));
-        if (statusOf(calc.findById(saved.npdPlans, n.id) || {}) === 'approved') body.appendChild(h('p', { class: 'callout callout-info npd-note' }, page.launchMovedNote));
+        if (!FT.isOn('npdApproval')) body.appendChild(h('p', { class: 'callout callout-info npd-note' }, page.saveEffect));
+        else if (statusOf(calc.findById(saved.npdPlans, n.id) || {}) === 'approved') body.appendChild(h('p', { class: 'callout callout-info npd-note' }, page.launchMovedNote));
       } else {
         body.appendChild(h('section', { class: 'pd-section' },
           field(F2.product, n.productKey + ' · ' + p.name), field(F2.series, calc.taxonomyName(T, 'series', n.seriesId) || '–'),
           field(F2.stage, page.stages[stage]), field(F2.launch, n.plannedLaunchDate ? F.date(n.plannedLaunchDate) : '–'),
           n.note ? field(F2.note, n.note) : null));
-        if (statusOf(n) === 'approved') body.appendChild(h('p', { class: 'callout callout-info npd-note' }, page.approvedEffect));
+        if (FT.isOn('npdApproval') && statusOf(n) === 'approved') body.appendChild(h('p', { class: 'callout callout-info npd-note' }, page.approvedEffect));
       }
       body.appendChild(accountsSection(n));
       body.appendChild(h('a', { href: SP.core.paths.to(SP.core.registry.byId('productList').path) }, page.productLink));
@@ -407,7 +461,7 @@
               key = p.tempCode;
               seriesId = p.seriesId;
               if (Number(rsp.value) > 0) {
-                var res = calc.addPrice(draft.priceList, { productKey: key, priceType: 'RSP', channelId: null, price: Number(rsp.value), effectiveFrom: store.today(), by: L.roles[role()] || '', at: at });
+                var res = calc.addPrice(draft.priceList, { productKey: key, priceType: 'RSP', channelId: null, price: Number(rsp.value), effectiveFrom: store.today(), by: byName(), at: at });
                 if (res.ok) draft.priceList = res.list;
               }
             } else {

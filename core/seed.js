@@ -4,7 +4,7 @@
  * อ่าน data/:  productImport (data/products.js), seed ตามชื่อใน productImport.seed (data/seed/seed-charmiss.js),
  *              taxonomy, listingRules (data/listings.js), priceImport (data/pricing.js), erpImport (data/erp-snapshot.js),
  *              accounts, territories, channels, history, settings, promotions
- * เขียน:       SP.data.products, taxonomy.series, listings, priceList, erpSnapshot,
+ * เขียน:       SP.data.products, taxonomy.series, listings, priceList, accountPrices (CR-18), erpSnapshot,
  *              history.years.<ปีของ seed>.skuQty (ยอดขายราย SKU), history.years.<ปี>.monthly ของหน่วยที่มียอดราย SKU จริง
  *              (รูปแบบรายเดือนจาก SKU ยอดทั้งปีเท่าเดิม), history.runRate
  * store:       ไม่อ่าน ไม่เขียน (store โหลดหลังไฟล์นี้ ค่าตั้งต้นของ master.* จึงเป็นข้อมูลที่นำเข้าแล้ว)
@@ -13,7 +13,8 @@
  *   1. สินค้า: seed.products + productImport.newProducts → โครง Product Master
  *      Series จาก Campaign (ยกเว้น notSeries เช่น Existing) · หมวดสินค้าจากคำในชื่อ (calc.inferCategory, inferred: true)
  *      ขนาดบรรจุจากชื่อ (5g, 50ml) · Status ไม่เก็บ (คำนวณจากวันที่)
- *   2. ราคา: RSP ทั่วไป · SELL_IN (dealerPrice) ของ Channel ใน priceImport.dealerChannels · ราคาเฉพาะ Account · priceImport.changes
+ *   2. ราคา: RSP ทั่วไป · SELL_IN (dealerPrice) ของ Channel ใน priceImport.dealerChannels · priceImport.changes
+ *      ราคาต่อ Account (CR-18) = SP.data.accountPrices [{ productKey, accountId, price }] ราคาเดียวทั้งปี (รวม VAT) ไม่อยู่ใน Price List
  *   3. Listing: seed.listings (ชื่อ Account → id) · สินค้าใหม่ → newProductUnits · หน่วยอื่นตาม listingRules.units
  *   4. ยอดขายปีก่อนราย SKU: หน่วยใน seed = history ของ seed / หน่วยอื่น = รูปแบบของหน่วยต้นแบบ (from) เฉพาะ SKU ที่ Listing
  *      ปรับให้ Net Sales แต่ละเดือนเท่ากับ history.years.<ปี>.monthly ของหน่วยนั้น · Run-rate = เฉลี่ย RUN_RATE_MONTHS เดือนจริงล่าสุด
@@ -84,11 +85,7 @@
         if (src.dealerPrice > 0) list.push({ productKey: key, priceType: 'SELL_IN', channelId: ch, accountId: null, price: src.dealerPrice, effectiveFrom: f, effectiveTo: null, by: by, at: f + 'T09:00:00' });
       });
     });
-    (seed.accountPrices || []).forEach(function (a) {
-      var unit = unitIdOf(data, a.account);
-      if (!unit || !(a.rsp > 0)) return;
-      list.push({ productKey: a.trCode, priceType: 'RSP', channelId: null, accountId: unit, price: a.rsp, effectiveFrom: a.effectiveFrom || cfg.priceFrom, effectiveTo: null, by: by, at: (a.effectiveFrom || cfg.priceFrom) + 'T09:00:00' });
-    });
+
     (pcfg.changes || []).forEach(function (c) {
       var res = calc.addPrice(list, c);
       if (res.ok) list = res.list;
@@ -126,7 +123,7 @@
   // Net Sales ต่อชิ้นของสินค้าในหน่วยขาย เดือน m ปี year (ราคาที่มีผล × (1 − GP) ตามสูตรใน calc)
   function unitNet(d, key, unit, year, m) {
     var det = calc.pricingDetail(d, key, unit, year, m);
-    return calc.chain({ units: 1, price: det.price, gp: det.gp }).netSales;
+    return calc.chain({ units: 1, price: det.price, gp: det.gp }).netSales || 0;   // GP 0 (TT) = ÷ (1 + VAT) อย่างเดียว
   }
 
   // ปรับให้ผลรวมเป็นจำนวนเต็มเท่ากับ total โดยคงสัดส่วน (Largest remainder)
@@ -205,16 +202,23 @@
     if (!seed) return null;
     var built = buildProducts(seed, cfg, data.taxonomy);
     var priceList = buildPrices(data, seed, cfg, data.priceImport || {});
+    // CR-18: ราคาต่อ Account จาก seed (ชื่อ Account → id) ราคาเดียวทั้งปี
+    var accountPrices = [];
+    (seed.accountPrices || []).forEach(function (a) {
+      var unit = unitIdOf(data, a.account);
+      if (unit && a.rsp > 0) accountPrices = calc.setAccountPrice(accountPrices, a.trCode, unit, a.rsp);
+    });
     var listCfg = { newProducts: cfg.newProducts, seriesList: built.series };
     var listings = buildListings(data, seed, listCfg, data.listingRules || {}, built.products);
     var d = {};
     Object.keys(data).forEach(function (k) { d[k] = data[k]; });
     d.products = built.products;
     d.priceList = priceList;
+    d.accountPrices = accountPrices;
     d.listings = listings;
     var history = buildHistory(d, seed, data.listingRules || {}, listings);
     return {
-      products: built.products, series: built.series, priceList: priceList, listings: listings, history: history,
+      products: built.products, series: built.series, priceList: priceList, accountPrices: accountPrices, listings: listings, history: history,
       erpSnapshot: buildErp(built.products, priceList, cfg, data.erpImport || {})
     };
   }
@@ -226,6 +230,7 @@
       return !result.series.some(function (x) { return x.id === s.id; });
     }));
     SP.data.priceList = result.priceList;
+    SP.data.accountPrices = result.accountPrices;
     SP.data.listings = result.listings;
     SP.data.history = result.history;
     SP.data.erpSnapshot = result.erpSnapshot;

@@ -1,29 +1,31 @@
-/* modules/top-down/top-down.css — ขั้นที่ 1 จัดสรรเป้าหมายประจำปี: แถบ Total + ตารางเต็มความกว้าง (CR-10 ไม่มีแผงกราฟ) หัวคอลัมน์บรรทัดเดียว
+/* modules/top-down/top-down.css — ขั้นที่ 1 Annual Target (CR-23): แถบ Total + ตารางแถว Channel (ยอดขาย 3 ปีใต้หัวกลุ่ม) หัวคอลัมน์บรรทัดเดียว
  * ทดสอบที่ viewport 1920×937 (จอ 1080 หักแถบ Chrome/Taskbar) และ 1366×625 ต้องไม่เลื่อน ไม่มี Scrollbar แนวนอน
- * จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ (body.fit-screen) ตารางเลื่อนแนวตั้งภายในการ์ด / ห้ามตัดตัวเลขด้วย "…" */
+ * จอกว้างตั้งแต่ 1024px หน้าสูงเท่าจอ (body.fit-screen) ตารางสูงตามแถว (ไม่ยืดเต็มจอ) เลื่อนภายในเมื่อแถวล้น / ห้ามตัดตัวเลขด้วย "…" */
 
 .page-topDown {
-  --td-row-h: 34px;
-  --td-col-prior: 200px;
-  --td-col-pct: 104px;
-  --td-col-amount: 136px;
-  --td-col-growth: 88px;
-  --td-col-compare: 240px;
-  --td-col-manage: 176px;
+  --td-row-h: 40px;
+  --td-col-hist: 104px;
+  --td-col-l12m: 104px;
+  --td-col-pct: 120px;
+  --td-col-amount: 160px;
+  --td-col-growth: 96px;
+  --td-col-compare: 260px;
+  --td-col-manage: 88px;
 }
 @media (max-width: 1599px) {
   .page-topDown {
     --fs-table: 13px;
-    --td-col-prior: 168px;
-    --td-col-pct: 88px;
-    --td-col-amount: 112px;
-    --td-col-growth: 68px;
-    --td-col-compare: 160px;
-    --td-col-manage: 148px;
+    --td-col-hist: 80px;
+    --td-col-l12m: 100px;   /* CR-24: บรรทัดช่วงเดือน L12M ไม่ถูกตัด */
+    --td-col-pct: 96px;
+    --td-col-amount: 128px;
+    --td-col-growth: 72px;
+    --td-col-compare: 170px;
+    --td-col-manage: 64px;
   }
 }
 @media (max-height: 700px) {
-  .page-topDown { --td-row-h: 30px; }
+  .page-topDown { --td-row-h: 34px; }
 }
 
 .page-topDown .module-body > * + * { margin-top: var(--sp-2); }
@@ -47,20 +49,21 @@
 .td-growth-amount { font-weight: var(--fw-medium); }
 @media (max-width: 560px) { .td-total-item { white-space: normal; } }
 
-/* ---------- ตาราง (ซ้าย) + แผงกราฟ (ขวา) ---------- */
-.td-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+/* ---------- ตาราง: สูงตามแถว (ไม่มีพื้นที่ว่างกลางตาราง) ---------- */
+.td-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .card.td-tree { padding: 0; min-height: 0; overflow: hidden; }
 .card.td-tree > * + * { margin-top: 0; }
 .td-scroll { overflow-y: auto; overflow-x: hidden; max-height: 100%; }
 
 @media (min-width: 1024px) {
-  .page-topDown .module-body > .td-layout { flex: 1 1 auto; min-height: 0; }
-  .td-tree { display: flex; flex-direction: column; }
-  .td-tree .td-scroll { flex: 1 1 auto; min-height: 0; }
+  .page-topDown .module-body > .td-layout { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .td-tree { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+  .td-tree .td-scroll { flex: 0 1 auto; min-height: 0; }
 }
 
 .td-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-table); }
-.td-table col.col-prior { width: var(--td-col-prior); }
+.td-table col.col-hist { width: var(--td-col-hist); }
+.td-table col.col-l12m { width: var(--td-col-l12m); }
 .td-table col.col-pct { width: var(--td-col-pct); }
 .td-table col.col-amount { width: var(--td-col-amount); }
 .td-table col.col-growth { width: var(--td-col-growth); }
@@ -74,69 +77,111 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* ชื่อยาวขึ้นบรรทัดใหม่ได้ ไม่ตัดด้วย "…" */
-.td-table .td-name { white-space: normal; line-height: 1.2; overflow-wrap: anywhere; }
 .td-table .num { text-align: right; }
+/* หัว 2 ชั้น (หัวกลุ่มยอดขาย + ปี) ติดบน */
 .td-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
-  height: 32px;
+  height: 26px;
   background: var(--c-surface-2);
   font-size: 12px;
   font-weight: var(--fw-bold);
   color: var(--c-text-muted);
+  white-space: nowrap;
 }
+.td-table thead .td-head-years th { top: 26px; }
+.td-table thead th[rowspan] { vertical-align: bottom; padding-bottom: 4px; }
+.td-table thead th.td-hist-group { text-align: center; border-bottom: 1px solid var(--c-border-strong); }
 @media (max-width: 1599px) { .td-table thead th { font-size: 11px; } }
 .has-tip { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
-.td-prior { color: var(--c-text-muted); }
-/* % ที่คำนวณจากคอลัมน์อื่น (อ่านอย่างเดียว) สีจาง — ช่องกรอกอยู่คนละคอลัมน์ตามระดับ */
-.td-table td.is-derived { color: var(--c-text-muted); font-weight: var(--fw-medium); opacity: 0.8; }
 .td-table thead .prior-label { display: inline; }
 .td-table thead .prior-label .info-dot { margin-left: 4px; }
-/* หัวคอลัมน์บรรทัดเดียวทุกคอลัมน์ (ตารางเต็มความกว้าง) */
-.td-table thead th { white-space: nowrap; }
+.td-hist { color: var(--c-text-muted); }
+.td-hist.is-latest { color: var(--c-text); }
 
-/* แถว Channel: แถบสีซ้ายตาม colorToken (--c) */
-.td-ch-row > * { background: var(--c-surface-2); font-weight: var(--fw-bold); }
-.td-ch-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: var(--sp-3); }
-.td-toggle { font: inherit; font-size: var(--fs-sm); width: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; color: var(--c-text-muted); }
+/* แถว Channel: แถบสีซ้ายตาม colorToken (--c) · ชื่อย่อ + ลิงก์จำนวนหน่วยขาย */
+.td-ch-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: var(--sp-3); white-space: normal; line-height: 1.2; }
+.td-ch-row > * { font-weight: var(--fw-bold); }
+.td-ch-row:hover > * { background: var(--c-primary-soft); }
 .td-ch-name { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
-.td-unit-row > th:first-child { box-shadow: inset 5px 0 0 var(--c); padding-left: calc(var(--sp-3) + 24px); font-weight: var(--fw-medium); cursor: help; }
-.td-unit-row .td-unit-name > span:first-child { border-bottom: 1px dotted var(--c-border); }
-/* ผู้รับผิดชอบปัจจุบันต่อท้ายชื่อหน่วยขาย */
-.td-owner { margin-left: var(--sp-2); font-size: 11px; font-weight: var(--fw-medium); color: var(--c-text-muted); white-space: nowrap; }
-.td-owner.is-vacant { font-style: italic; }
-.td-table tr.is-hl > * { background: var(--c-primary-soft); }
+.td-units-link { display: block; margin-top: 1px; font-size: 11px; font-weight: var(--fw-medium); color: var(--c-text-muted); }
+.td-units-link:hover { color: var(--c-primary-strong); }
 
 /* แถวคงเหลือ (components.remainingRow) */
-.td-table .remaining-row > * { height: 30px; font-size: 12px; }
-.td-table .remaining-row > .rem-label { box-shadow: inset 5px 0 0 var(--c, var(--c-border-strong)); padding-left: calc(var(--sp-3) + 24px); }
-.td-table .td-rem-total > * { border-top: 2px solid var(--c-border-strong); height: 34px; }
-.td-table .td-rem-total > .rem-label { padding-left: var(--sp-3); box-shadow: none; }
-/* ป้ายคงเหลือขึ้นบรรทัดใหม่ได้เมื่อคอลัมน์ชื่อแคบ (โหมดแก้ไขมีคอลัมน์จัดการ) */
-.td-table .remaining-row > .rem-label { white-space: normal; line-height: 1.15; }
-@media (max-width: 1599px) { .td-table.is-editing .remaining-row > .rem-label { padding-left: calc(var(--sp-2) + 8px); } }
+.td-table .remaining-row > * { height: 34px; font-size: 12px; }
+.td-table .td-rem-total > * { border-top: 2px solid var(--c-border-strong); }
+.td-table .td-rem-total > .rem-label { padding-left: var(--sp-3); white-space: normal; line-height: 1.15; }
 
 /* แท่งเทียบปีก่อน */
 .td-compare { padding-right: var(--sp-3) !important; }
-/* หัวคอลัมน์เป้าหมายเทียบปีก่อน: ชื่อ + แกน 0 · … · สูงสุด ล้าน (ระยะขอบเท่าช่องในตาราง ให้แกนตรงกับแท่ง) */
-.td-table thead th.td-vly-head { padding-right: var(--sp-3); vertical-align: bottom; padding-bottom: 2px; }
+.td-table thead th.td-vly-head { padding-right: var(--sp-3); }
 
 /* โหมดแก้ไข: ช่อง % และบาท (percentAmountInput) + คอลัมน์จัดการ */
 .td-table .num-input { width: 100%; }
-.td-table input.num { width: 100%; font-size: var(--fs-table); padding: 1px 4px; height: calc(var(--td-row-h) - 8px); }
-.td-ch-row input.num { font-weight: var(--fw-bold); }
+.td-table input.num { width: 100%; font-size: var(--fs-table); padding: 1px 4px; height: calc(var(--td-row-h) - 12px); font-weight: var(--fw-bold); }
 .td-table .num-suffix { display: none; }
 .td-manage { font-weight: var(--fw-medium) !important; }
 .td-manage-group { display: inline-flex; align-items: center; gap: var(--sp-1); }
-.td-manage .account-picker .btn { padding: 2px var(--sp-2); border: 1px solid var(--c-border-strong); background: var(--c-surface); }
-.td-manage .select-sm { min-width: 0; max-width: 150px; }
 .td-normalize { padding: 2px var(--sp-2); font-size: 12px; }
 .td-add-channel td { height: auto; padding: 4px var(--sp-3); background: var(--c-surface); }
 .td-add-channel .account-picker .btn { border: 1px solid var(--c-border-strong); background: var(--c-surface); }
 
 @media (max-width: 1023px) {
   .td-scroll { max-height: none; overflow-x: auto; }
-  .td-table { min-width: 640px; }
+  .td-table { min-width: 760px; }
 }
+
+/* ---------- CR-24: กราฟ 2 ใบใต้ตาราง (55 : 45 สูงเท่ากัน · ใช้พื้นที่ที่เหลือ) ---------- */
+.td-charts { display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); gap: var(--sp-2); align-items: stretch; }
+@media (min-width: 1024px) {
+  .page-topDown .module-body > .td-charts { flex: 1 1 auto; min-height: 190px; }
+}
+@media (max-width: 1279px) { .td-charts { grid-template-columns: minmax(0, 1fr); } }
+.card.td-chart { display: flex; flex-direction: column; min-height: 0; padding: var(--sp-2) var(--sp-3); }
+.card.td-chart > * + * { margin-top: var(--sp-1); }
+.card > .td-chart-title { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
+/* Waterfall กลางการ์ด แต่ไม่ล้นขึ้นทับหัวการ์ด (safe) · จอเตี้ยแถวบางลง */
+.td-chart-growth .wfc { align-content: safe center; flex: 1 1 auto; min-height: 0; }
+@media (max-height: 700px) {
+  .page-topDown .module-body > .td-charts { min-height: 170px; }
+  .td-chart-growth .wfc { gap: 1px var(--sp-2); font-size: 12px; }
+  .td-chart-growth .wfc-track { height: 15px; }
+  .td-chart-growth .wfc-axis-track { height: 17px; }
+  .page-topDown .scol { min-height: 120px; }
+}
+.td-ch-row.is-hl > * { background: var(--c-primary-soft); }
+.td-l12m .prior-label { display: inline; }
+.td-l12m-range { display: block; font-size: 10px; font-weight: var(--fw-medium); color: var(--c-text-muted); line-height: 1.1; }
+
+/* แท่งแนวตั้งซ้อน (charts.stackedColumns) — แกน Y ซ้าย · ตัวเลขรวมเหนือแท่ง · ป้ายการเติบโตระหว่างแท่ง · Legend ตาม Channel */
+.scol { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 150px; font-size: 12px; }
+.scol-body { flex: 1 1 auto; display: grid; grid-template-columns: 44px minmax(0, 1fr); min-height: 0; padding-top: 18px; }
+.scol-yaxis { position: relative; }
+.scol-tick.is-hidden { visibility: hidden; }
+.scol-tick { position: absolute; right: 6px; transform: translateY(50%); font-size: 11px; line-height: 1; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.scol-plot { position: relative; border-left: 1px solid var(--c-border-strong); }
+.scol-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--c-border); }
+.scol-grid.is-base { border-top-color: var(--c-border-strong); }
+.scol-cols { position: absolute; inset: 0; display: flex; padding: 0 var(--sp-3); }
+.scol-col { position: relative; flex: 1 1 0; min-width: 0; }
+.scol-gap { position: relative; flex: 0 0 52px; }
+.scol-stack { position: absolute; left: 14%; right: 14%; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 3px 3px 0 0; overflow: hidden; }
+.scol-stack.is-target { box-shadow: 0 0 0 2px var(--c-text); }
+.scol-seg { display: flex; align-items: center; justify-content: center; min-height: 1px; flex: 0 0 auto; background: var(--c); border-top: 1px solid var(--c-surface); cursor: default; outline: none; transition: opacity 0.12s; }
+.scol-seg:first-child { border-top: 0; }
+.scol-seg.is-dim { opacity: 0.35; }
+.scol-seg.is-hl, .scol-seg:focus-visible { filter: brightness(1.08); }
+.scol-share { font-size: 11px; font-weight: var(--fw-bold); color: var(--c-surface); font-variant-numeric: tabular-nums; }
+.scol-share.is-hidden { visibility: hidden; }
+.scol-total { position: absolute; left: 0; right: 0; transform: translateY(-3px); text-align: center; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scol-growth { position: absolute; left: 0; right: 0; transform: translateY(50%); text-align: center; font-size: 11px; font-weight: var(--fw-bold); color: var(--c-text-muted); white-space: nowrap; }
+.scol-xrow { display: grid; grid-template-columns: 44px minmax(0, 1fr); margin-top: 4px; }
+.scol-xlabels { display: flex; padding: 0 var(--sp-3); }
+.scol-xlabel { flex: 1 1 0; min-width: 0; text-align: center; font-weight: var(--fw-bold); line-height: 1.15; }
+.scol-xlabel small { display: block; font-size: 10px; font-weight: var(--fw-medium); color: var(--c-text-muted); }
+.scol-xlabel.is-target { color: var(--c-primary-strong); }
+.scol-legend { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: 4px; padding-left: 44px; font-size: 12px; }
+.scol-legend-item { display: inline-flex; align-items: center; gap: 6px; cursor: default; }
+.scol-legend-item.is-dim { opacity: 0.45; }
+.scol-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--c); }
