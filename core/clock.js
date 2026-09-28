@@ -8,8 +8,10 @@
  *   fullYears()         = ปีปฏิทินเต็ม 2 ปีก่อนปีของเดือนปิดล่าสุด ([2024, 2025]) — คอลัมน์ยอดขายรายปีคู่กับ L12M
  *   label(key, short)   = 'ก.ย. 2025' / short = 'ก.ย. 25' · rangeLabel(short) = 'ก.ย. 25 – ส.ค. 26'
  *   parse / key / addMonths = ตัวช่วยเดือน 'YYYY-MM'
+ *   CR-32: horizonEnd() = settings.PLAN_HORIZON_END ('2027-12') เดือนสุดท้ายของแผน (ไม่มีค่า = ธ.ค. ของปีถัดจากเดือนปัจจุบัน) ·
+ *          horizonYears() = ปีของเดือนปัจจุบัน ถึงปีของ horizonEnd ([2026, 2027])
  * เดือนปัจจุบันจำลองของผู้รับผิดชอบ ทีมขาย ผลงานรายคน และโหมดปรับแผน (ui.currentMonth = มี.ค. ของปีแผน) ยังแยกอยู่ที่ store.currentKey()
- * อ่านจาก data/: settings (DEMO_CURRENT_MONTH) · store: ไม่อ่าน ไม่เขียน (Pure — Test เปลี่ยนเดือนได้ด้วย settings.DEMO_CURRENT_MONTH)
+ * อ่านจาก data/: settings (DEMO_CURRENT_MONTH · PLAN_HORIZON_END) · store: ไม่อ่าน ไม่เขียน (Pure — Test เปลี่ยนเดือนได้ด้วย settings.DEMO_CURRENT_MONTH)
  */
 (function (SP) {
   'use strict';
@@ -40,6 +42,12 @@
     return F.MONTHS[p.month - 1] + ' ' + (short ? String(p.year).slice(-2) : p.year);
   }
   function rangeLabel(short) { var r = l12mRange(); return label(r.from, short) + ' – ' + label(r.to, short); }
+  function horizonEnd() { return settings().PLAN_HORIZON_END || key(parse(currentMonth()).year + 1, 12); }
+  function horizonYears() {
+    var out = [];
+    for (var y = parse(currentMonth()).year; y <= parse(horizonEnd()).year; y++) out.push(y);
+    return out;
+  }
 
   SP.core.clock = {
     currentMonth: currentMonth,
@@ -49,6 +57,8 @@
     fullYears: fullYears,
     label: label,
     rangeLabel: rangeLabel,
+    horizonEnd: horizonEnd,
+    horizonYears: horizonYears,
     parse: parse,
     key: key,
     addMonths: addMonths

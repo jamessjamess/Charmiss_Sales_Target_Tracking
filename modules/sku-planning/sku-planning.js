@@ -4,7 +4,7 @@
  * หน้าที่:        แถวที่ 1 = แถบบริบท (subChannelPicker ตัวเดียวกับหน้า Phasing): Channel | Account/เขต ‹ › | ผู้รับผิดชอบ ·
  *                 GP (เฉพาะ Channel ที่มี GP) · เป้าหมายทั้งปี · ยอดขายปีก่อน · การเติบโต
  *                 แถวที่ 2 (CR-11) = ค้นหา · จัดกลุ่ม Series | Status | ไม่จัดกลุ่ม (+ พับ/กางทั้งหมด) · Series ▾ · เรียง ▾ ·
- *                 มุมมอง ชิ้น | Sale Amount | Net Sales · ⓘ · ☐ แสดงยอดปีก่อน · โหมด · (ปรับแผน) เดือนปัจจุบัน · ? (Legend + กฎ + คีย์ลัด)
+ *                 มุมมอง ชิ้น | Sale Amount | Net Sales · ⓘ · ☐ แสดงยอดปีก่อน · โหมด · (ปรับแผน) เดือนปัจจุบัน · CR-28 Legend + กฎ + คีย์ลัด ย้ายไปปุ่ม ? ต่อท้ายชื่อหน้า (ctx.addHelp)
  *                 (แก้ไข) แถบแก้ไข = จำนวนรายการที่ยังไม่บันทึก · ปรับทั้งหน่วยขาย ±% · ปรับให้ครบตามเป้าหมาย · + สร้าง NPD · คำสั่งของแถวที่เลือก
  *                 CR-20: ค่าตั้งต้น = ยอดขายเดือนเดียวกันปีก่อน (ไม่มีเมนูค่าตั้งต้น ▾) · + เพิ่ม SKU = Drawer จาก Product Master ทั้งหมด
  *                 (Listing แล้ว / ยังไม่ได้ Listing → Listing โดย Sales ตอนบันทึก) · + สร้าง NPD = Drawer ฟอร์ม (สิทธิ์ npdFromSku) บันทึกลง Master ทันที
@@ -24,13 +24,13 @@
  *                 → ราคาเฉพาะ Account → ราคาทั่วไป) หลังล็อก Baseline แผนครั้งแรกใช้ราคาตอนล็อก (snapshot) แผนล่าสุดใช้ราคาปัจจุบัน
  *                 ส่งออก ▾ (Excel / CSV) ตามมุมมองที่แสดง
  * อ่านจาก data/:  channels, history, actuals, settings, targets, content (pages.skuPlanning, labels) + Master ผ่าน store.data()
- *                 (products, listings, priceList, promotions, npdPlans, taxonomy)
+ *                 (products, listings, basePrices, promoPrices, npdPlans, taxonomy)
  * store อ่าน:     app.planYear, plan.<ปี>.topDown, plan.<ปี>.phasing.<id> (.monthPct), plan.<ปี>.sku.<id> (Baseline),
  *                 plan.<ปี>.forecast.<id>, plan.<ปี>.workflow.*, master.*, ui.selection, ui.planMode, ui.currentMonth,
  *                 ui.seriesFilter, ui.skuShowLastYear, ui.role, master.teams (CR-19 สิทธิ์แก้ไข = สมาชิกทีมของ Channel ผ่าน workflowBar ·
  *                 Channel ในทีมขึ้นก่อนใน subChannelPicker)
  * store เขียน:    plan.<ปี>.sku.<id> (โหมดสร้างแผนครั้งแรก), plan.<ปี>.forecast.<id> (โหมดปรับแผน ไม่เขียนทับ Baseline) ตอนกด บันทึก
- *                 + master.listings (Listing โดย Sales ตอนบันทึก) · master.products / priceList / accountPrices / listings / audit (สร้าง NPD ทันที)
+ *                 + master.listings (Listing โดย Sales ตอนบันทึก) · master.products / basePrices / listings / npdPlans / codeCounters / audit (สร้าง NPD ทันที)
  *                 (รวม method = วิธีเติมยอดของหน่วย) / ui.selection, ui.planMode, ui.currentMonth, ui.seriesFilter, ui.skuShowLastYear /
  *                 plan.<ปี>.workflow.<sku|forecast>.<id> (ผ่าน workflowBar)
  *
@@ -56,10 +56,12 @@
   var sortBy = 'total';
   var collapsed = {};          // '<จัดกลุ่ม>:<กลุ่ม>' → true
   var searchText = '';
+  var ageFilter = '';          // CR-27: '' ทั้งหมด · le1y · y1to2 · gt2y (calc.ageMatch) · CR-33 + notStarted (calc.skuAgeGroup)
+  var noSaleOnly = false;      // CR-27: Checkbox เฉพาะที่ไม่มียอด ≥ NO_SALE_WARN_MONTHS
   // ลำดับรายการใน Legend (แผง ?)
-  var LEGEND_KEYS = ['locked', 'manual', 'system', 'clearance', 'override', 'estimated', 'actual', 'frozen', 'promo', 'anomaly', 'dirty'];
+  var LEGEND_KEYS = ['locked', 'manual', 'system', 'clearance', 'override', 'actual', 'frozen', 'anomaly', 'dirty'];
   var REFORECAST_KEYS = ['actual', 'frozen'];   // CR-17: แสดงเฉพาะเมื่อเปิด reforecast
-  var SORTS = ['total', 'code', 'name', 'growth'];
+  var SORTS = ['total', 'code', 'name', 'growth', 'age', 'noSale', 'recent'];   // CR-26 + อายุการขาย
 
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
 
@@ -111,7 +113,7 @@
     function baselineSnapshot() {
       var states = store.workflowStates();
       var s = W.stateOf(states, 'baseline');
-      return FT.locked(W.isLocked(states)) && s.snapshot && s.snapshot.priceList ? s.snapshot : null;
+      return FT.locked(W.isLocked(states)) && s.snapshot && s.snapshot.basePrices ? s.snapshot : null;
     }
     function gridOpts(mode, target, prior) {
       return { year: year, mode: mode, currentMonth: store.get('ui.currentMonth'), snapshot: mode === 'reforecast' ? null : baselineSnapshot(), target: target, prior: !!prior };
@@ -121,9 +123,7 @@
     function guard() { if (!C.confirmDiscard(dirty())) return false; editing = false; return true; }
 
     function legendItem(k) {
-      if (k === 'promo') return FT.isOn('promotionCalendar') ? h('span', { class: 'legend-item' }, h('span', { class: 'promo-mark' }, 'P'), Lg.promo) : null;
       if (k === 'override') return h('span', { class: 'legend-item' }, h('span', { class: 'swatch sp-override-swatch' }, h('span', { class: 'override-dot' })), Lg.override);
-      if (k === 'estimated') return h('span', { class: 'legend-item' }, h('span', { class: 'swatch sp-override-swatch' }, h('span', { class: 'est-dot' })), Lg.estimated);
       if (k === 'actual') return h('span', { class: 'legend-item' }, h('span', { class: 'swatch cell-actual' }), Lg.actual);
       if (k === 'frozen') return h('span', { class: 'legend-item' }, h('span', { class: 'swatch cell-frozen' }), '🔒 ' + Lg.frozen);
       if (k === 'dirty') return h('span', { class: 'legend-item' }, h('span', { class: 'swatch sp-dirty-swatch' }), Lg.dirty);
@@ -136,6 +136,13 @@
         h('div', { class: 'legend sp-legend-full' }, LEGEND_KEYS.filter(function (k) { return FT.isOn('reforecast') || REFORECAST_KEYS.indexOf(k) < 0; }).map(legendItem)),
         h('h3', { class: 'popover-title' }, K.keysTitle),
         h('dl', { class: 'sp-keys' }, K.keys.map(function (k) { return [h('dt', null, k[0]), h('dd', null, k[1])]; })));
+    }
+    // CR-28: กฎ Status และวิธีเติมยอด ย้ายจากปุ่ม ? ในแถวเครื่องมือ ไปเป็นหัวข้อในปุ่ม ? ต่อท้ายชื่อหน้า (components.pageHelp)
+    if (ctx.addHelp) {
+      ctx.addHelp(page.rulesLink, function () {
+        var R = L.rules;
+        return h('div', { class: 'sp-rules-help' }, h('h3', { class: 'popover-title' }, R.legendTitle), helpNode(), h('h3', { class: 'popover-title' }, R.title), C.rulesContent());
+      });
     }
 
     function draw() {
@@ -153,7 +160,7 @@
       var master = store.master();
       var money = view !== 'units';
       var showLY = !!store.get('ui.skuShowLastYear');
-      var seriesOptions = calc.seriesList(master.taxonomy, master.products.filter(function (p) { return (p.itemType || 'SALE') === 'SALE'; }));
+      var seriesOptions = calc.seriesList(master.taxonomy, master.products);
       var series = (store.get('ui.seriesFilter') || []).filter(function (s) { return seriesOptions.some(function (o) { return o.value === s; }); });
 
       // ---------- แถวที่ 1: แถบบริบท ----------
@@ -185,6 +192,9 @@
 
       var unitId = unit.id;
       if (lastUnit !== unitId + '|' + mode) { lastUnit = unitId + '|' + mode; searchText = ''; selected = {}; }
+      // CR-26: คลิกช่อง SKU ในตารางแผนของ Plan Summary → ค้นหา SKU นั้น (ui.skuSearchHandoff อ่านครั้งเดียว)
+      var handoff = store.get('ui.skuSearchHandoff');
+      if (handoff) { store.set('ui.skuSearchHandoff', null); searchText = String(handoff); ageFilter = ''; noSaleOnly = false; }
       var key = planKeyFor(unitId, mode);
       saved = store.get(key);
       if (!editing || !draft || draft.key !== key) { draft = clone(saved); draft.key = key; }
@@ -206,6 +216,20 @@
       var first = gridOf(currentPlan(), true);
       var savedGrid = editing ? gridOf(saved, true) : first;
 
+      // CR-26: เริ่มขาย · อายุการขายของทุกแถว (calc.salesAge — ไม่มีประวัติในหน่วยขาย = เดือนเริ่มขายใน Listing / แผน)
+      var K = SP.core.clock;
+      var AG = page.age;
+      var ages = {};
+      first.rows.forEach(function (r) { ages[r.key] = calc.salesAge(data, r.key, unitId, { master: master, startMonth: r.item.startMonth, year: year }); });
+      function ageText(n) { var y = Math.floor(n / 12), m = n % 12; return y ? (m ? fill(AG.yearsMonths, { y: y, m: m }) : fill(AG.years, { y: y })) : fill(AG.months, { m: m }); }
+      // CR-27 ช่วงเวลาขาย {เริ่ม} – ปัจจุบัน / {เริ่ม} – {ขายล่าสุด} · ไม่มียอดในหน่วยขาย = {เริ่ม} (Listing) · ยังไม่เริ่มขาย = เริ่ม {เดือนตามแผน} (ใช้ทั้งตารางและไฟล์ส่งออก)
+      function ageRangeText(a, short) {
+        if (!a) return '';
+        if (!a.started) return a.plannedStart ? fill(AG.plannedStart, { month: K.label(a.plannedStart, short) }) : AG.none;
+        if (a.current) return fill(AG.range, { from: K.label(a.firstSaleMonth, short), to: AG.present });
+        return a.lastSaleMonth ? fill(AG.range, { from: K.label(a.firstSaleMonth, short), to: K.label(a.lastSaleMonth, short) }) : K.label(a.firstSaleMonth, short);
+      }
+
       var gpLabel = ch.gpLabel || L.context.gp;
       C.contextStats([
         ch.hasGP ? (first.gp == null ? { label: gpLabel, value: h('span', { class: 'text-short' }, fill(L.context.gpMissing, { gpLabel: gpLabel })), title: fill(L.explain.gpMissing, { gpLabel: gpLabel, unit: unit.name }) }
@@ -225,7 +249,7 @@
         var open = r.cells.filter(function (c) { return c.source !== 'locked' && c.price > 0; });
         if (!open.length) return { price: null, source: '' };
         var same = open.every(function (c) { return Math.abs(c.price - open[0].price) < 0.005; });
-        var src = open.some(function (c) { return c.promos.length; }) ? B.priceSource.promo : B.priceSource[open[0].priceSource] || '';
+        var src = fill(B.priceSource[open[0].priceSource] || '', { unit: unit.name, channel: ch.name });
         var units = r.total.units;
         return { price: same ? open[0].price : units > 0 ? Math.round(r.total.sellOut / units * 100) / 100 : open[0].price,
           source: same ? src : src + ' · ' + page.exportSpec.priceVaries };
@@ -244,8 +268,12 @@
           var netNa = g.gpMissing;
           var rows = g.rows.map(function (r) {
             var pr = priceOfRow(r);
+            var a = ages[r.key] || calc.salesAge(data, r.key, unitId, { master: master, startMonth: r.item.startMonth, year: year });
             return { type: X.rowTypes.sku, sku: r.key, name: r.product.name, series: calc.taxonomyName(master.taxonomy, 'series', r.product.seriesId) || '',
               status: L.status[r.status], start: F.monthYear(r.item.startMonth, year), months: r.cells.map(pick),
+              salesRange: ageRangeText(a, false), ageGroup: AG.groups[calc.skuAgeGroup(a)],
+              ageChannel: a.firstSaleMonthInChannel ? K.label(a.firstSaleMonthInChannel) : '',
+              ageMonths: a.started ? a.sellingMonths : null, ageNoSale: a.started ? a.monthsSinceLastSale : null,
               price: pr.price, priceSource: pr.source, sale: r.total.sellOut, gp: ch.hasGP ? g.gp : null, net: netNa ? null : r.total.net };
           });
           rows.push({ type: X.rowTypes.planUnits, months: g.totals.units });
@@ -253,7 +281,10 @@
           rows.push({ type: fill(X.rowTypes.target, { money: mName }), months: target });
           rows.push({ type: X.rowTypes.remaining, months: target.map(function (t, m) { return t - planMoney[m]; }) });
           var columns = [{ key: 'type', label: X.cols.rowType }, { key: 'sku', label: X.cols.sku }, { key: 'name', label: X.cols.name, width: 36 },
-            { key: 'series', label: X.cols.series }, { key: 'status', label: X.cols.status }, { key: 'start', label: X.cols.start }]
+            { key: 'series', label: X.cols.series }, { key: 'status', label: X.cols.status }, { key: 'start', label: X.cols.start },
+            // CR-26: เริ่มขายและอายุการขาย · CR-33 แยก ช่วงเวลาขาย | อายุ (ป้ายกลุ่ม)
+            { key: 'salesRange', label: X.cols.salesRange }, { key: 'ageGroup', label: X.cols.ageGroup }, { key: 'ageChannel', label: X.cols.ageChannel },
+            { key: 'ageMonths', label: X.cols.ageMonths, type: 'number' }, { key: 'ageNoSale', label: X.cols.ageNoSale, type: 'number' }]
             .concat(F.MONTHS.map(function (mn, i) { return { key: 'm' + i, label: mn, type: 'number', value: function (r) { return r.months[i]; } }; }))
             .concat([{ key: 'total', label: X.cols.total, type: 'number', value: function (r) { return r.months.some(function (v) { return v == null; }) ? null : calc.sum(r.months); } },
               { key: 'price', label: X.cols.price, type: 'price' }, { key: 'priceSource', label: X.cols.priceSource },
@@ -438,7 +469,7 @@
         renderList();
       }
 
-      // ---------- Drawer: + สร้าง NPD (Sales Manager / Officer ของ Channel · ใช้ได้ทันทีด้วยรหัสชั่วคราว) ----------
+      // ---------- Drawer: + สร้าง NPD (Sales Manager / Officer ของ Channel · ใช้ได้ทันที · CR-30 Product Code จากระบบ ต้องเลือก Type) ----------
       function openNpd() {
         var N = page.npdForm;
         var tax = master.taxonomy;
@@ -466,7 +497,7 @@
         var errs = h('ul', { class: 'pr-errors sp-npd-errors', role: 'alert' });
         function field(label, node, required) { return h('label', { class: 'pd-field' }, h('span', { class: 'pd-label' }, label + (required ? ' *' : '')), h('span', { class: 'pd-value' }, node)); }
         drawerCtl.body.appendChild(h('section', { class: 'pd-section sp-npd-form' },
-          field(N.fields.name, name, true), field(N.fields.series, seriesSel, true), field(N.fields.category, cat),
+          field(N.fields.name, name, true), field(N.fields.series, seriesSel, true), field(N.fields.category, cat, true),
           field(fill(N.fields.price, { unit: unit.name }), h('span', { class: 'num-input' }, price, h('span', { class: 'num-suffix' }, L.baht)), true),
           field(N.fields.month, month, true),
           field(fill(N.fields.units, { channel: ch.name }), unitBoxes.length ? h('span', { class: 'sp-npd-units' }, unitBoxes) : h('span', { class: 'muted small' }, N.noOtherUnits)),
@@ -487,13 +518,14 @@
           };
           var m = store.master();
           var at = new Date().toISOString(), by = C.roleName(store.role());
-          var res = calc.createSalesNpd({ products: m.products, priceList: m.priceList, accountPrices: m.accountPrices, listings: m.listings }, input, { by: by, at: at });
+          var res = calc.createSalesNpd({ products: m.products, basePrices: m.basePrices, listings: m.listings, taxonomy: m.taxonomy, codeCounters: m.codeCounters, npdPlans: m.npdPlans }, input, { by: by, at: at });
           C.clear(errs);
           if (!res.ok) { res.errors.forEach(function (e) { errs.appendChild(h('li', null, N.errors[e])); }); return; }
           store.set('master.products', res.master.products);
-          store.set('master.priceList', res.master.priceList);
-          store.set('master.accountPrices', res.master.accountPrices);
+          store.set('master.basePrices', res.master.basePrices);
+          store.set('master.npdPlans', res.master.npdPlans);
           store.set('master.listings', res.master.listings);
+          store.set('master.codeCounters', res.master.codeCounters);
           store.appendAudit(calc.auditDiff('product', res.key, null, res.product, { by: by, at: at }));
           data = store.data();
           var next = clone(draft);
@@ -524,6 +556,18 @@
           options: seriesOptions, value: series, guard: function () { return true; },
           onChange: function (v) { store.set('ui.seriesFilter', v); draw(); }
         }),
+        // CR-27: ตัวกรองอายุ + Checkbox ไม่มียอด (ใช้ร่วมกันได้) · CR-33 ป้ายกลุ่มชุดเดียวกับคอลัมน์อายุ (AG.groups · calc.AGE_GROUPS)
+        h('label', { class: 'field' }, h('span', { class: 'field-label' }, AG.filterLabel),
+          C.select({
+            label: AG.filterLabel, value: ageFilter, className: 'sp-age-filter' + (ageFilter ? ' is-active' : ''),
+            options: [''].concat(calc.AGE_GROUPS).map(function (v) { return { value: v, label: v ? AG.groups[v] : AG.filterAll }; }),
+            onChange: function (v) { ageFilter = v; draw(); }
+          })),
+        (function () {
+          var box = h('input', { type: 'checkbox', checked: noSaleOnly, 'aria-label': fill(AG.noSaleOnly, { n: S.NO_SALE_WARN_MONTHS }) });
+          box.addEventListener('change', function () { noSaleOnly = box.checked; draw(); });
+          return h('label', { class: 'sp-ly-toggle sp-nosale-toggle' }, box, h('span', null, fill(AG.noSaleOnly, { n: S.NO_SALE_WARN_MONTHS })));
+        })(),
         h('label', { class: 'field' }, h('span', { class: 'field-label' }, page.sortLabel),
           C.select({
             label: page.sortLabel, value: sortBy, className: 'sp-sort',
@@ -558,8 +602,7 @@
             label: page.currentMonthLabel, value: String(current),
             options: F.MONTHS.map(function (m, i) { return { value: String(i), label: F.monthYear(i, year) }; }),
             onChange: function (v) { if (!guard()) { draw(); return; } store.set('ui.currentMonth', Number(v)); draw(); }
-          })) : null,
-        C.rulesButton(helpNode()));
+          })) : null);
       root.appendChild(controls);
 
       // ---------- แถบแก้ไข: สถานะ · ค่าตั้งต้น ▾ · คำสั่งของแถวที่เลือก ----------
@@ -579,17 +622,20 @@
       // ---------- ตาราง ----------
       var refs = { cells: {}, rowTotal: {}, rowLY: {}, rowGrowth: {}, boxes: {}, groups: [], target: [], baseline: [], planUnits: [], planMoney: [], grid: first, trs: [] };
       var moneyName = view === 'sellOut' ? L.views.sellOut : L.views.net;
-      var shownRows = first.rows.filter(function (r) { return calc.inSeries(r.product, series); });
+      var seriesRows = first.rows.filter(function (r) { return calc.inSeries(r.product, series); });
+      var shownRows = seriesRows.filter(function (r) { return calc.ageMatch(ages[r.key], ageFilter, noSaleOnly); });
       // เรียงตามค่าที่บันทึกแล้ว (ลำดับไม่กระโดดระหว่างแก้ไข)
       var sortValues = {};
       savedGrid.rows.forEach(function (r) {
         var v = pickTotal(r.total), ly = r.ly ? pickTotal(r.ly) : null;
-        sortValues[r.key] = { value: v, growth: calc.growth(v, ly) };
+        sortValues[r.key] = { value: v, growth: calc.growth(v, ly), age: ages[r.key] || null };
       });
       var groups = calc.groupPlanRows(calc.sortPlanRows(shownRows, sortBy, sortValues), groupBy, master.taxonomy);
       var segs = calc.ownerSegments(data.assignments, data.salespeople, unitId, year);
       var multiOwner = segs.length > 1;
-      var span = 14 + (showLY ? 2 : 0);
+      var span = 16 + (showLY ? 2 : 0);   // CR-33: SKU + ช่วงเวลาขาย + อายุ + 12 เดือน + ทั้งปี
+      var estMonths = [];   // CR-27: จำนวนแถวที่ยอดอ้างอิงของเดือนนั้นเป็นประมาณการ
+      first.rows.forEach(function (r) { r.cells.forEach(function (c, m) { if (c.lyEstimated && c.source !== 'locked') estMonths[m] = (estMonths[m] || 0) + 1; }); });   // CR-26: + คอลัมน์ เริ่มขาย · อายุ
 
       function numCells(list, lyList) {
         var tds = [];
@@ -597,21 +643,27 @@
         if (showLY) { var a = h('td', { class: 'num col-ly' }), b = h('td', { class: 'num col-growth' }); tds.push(a, b); if (lyList) lyList.push(a, b); }
         return tds;
       }
-      function head(label, title) { return h('th', { class: 'row-head', scope: 'row', title: title }, label); }
+      // หัวแถวของแถวที่ไม่ใช่ SKU ครอบ 3 คอลัมน์ (SKU + ช่วงเวลาขาย + อายุ · CR-33)
+      function head(label, title) { return h('th', { class: 'row-head', scope: 'row', title: title, colspan: '3' }, label); }
       function infoRow(cls, parts) {
         return h('tr', { class: 'sp-info ' + cls }, h('td', { class: 'sp-info-cell', colspan: String(span) }, h('span', { class: 'sp-info-body' }, parts)));
       }
 
       var thead = h('thead', null,
         // แถบผู้รับผิดชอบรายเดือน แสดงเฉพาะเมื่อมีการเปลี่ยนคนระหว่างปี (คนเดียวทั้งปี = แสดงในแถบบริบทแล้ว)
-        multiOwner ? h('tr', { class: 'sp-owner-row' }, h('th', { class: 'row-head', scope: 'row', title: owner.title }, R.owner),
+        multiOwner ? h('tr', { class: 'sp-owner-row' }, h('th', { class: 'row-head', scope: 'row', title: owner.title, colspan: '3' }, R.owner),
           C.ownerStrip(data, unitId, year, { tag: 'td' }), h('td', { class: 'col-total' }), showLY ? [h('td', { class: 'col-ly' }), h('td', { class: 'col-growth' })] : null) : null,
         h('tr', { class: 'sp-head' },
           h('th', { class: 'row-head sp-sku-head', scope: 'col' }, h('span', null, page.skuColumn), editing ? addButton(page.addSku) : null),
+          h('th', { class: 'sp-age sp-range sp-age-head', scope: 'col', title: fill(AG.headTip, { month: K.label(K.currentMonth()), last: K.label(K.lastClosedMonth()), n: S.NO_SALE_WARN_MONTHS }) }, h('span', { class: 'has-tip' }, AG.rangeColumn)),
+          h('th', { class: 'sp-age sp-agegrp sp-age-head', scope: 'col', title: AG.groupHeadTip }, h('span', { class: 'has-tip' }, AG.groupColumn)),
           F.MONTHS.map(function (m, i) {
             var reason = reforecast ? calc.cellState(mode, i, current, 'manual').reason : null;
-            return h('th', { class: 'num' + (reason ? ' head-' + reason : ''), scope: 'col', dataset: { col: String(i) }, title: reason ? page.cellReasons[reason] : null },
-              m, reason === 'actual' ? h('span', { class: 'head-tag' }, page.cellReasons.actual) : reason === 'frozen' ? h('span', { class: 'head-tag' }, '🔒') : null);
+            // CR-27: เดือนที่ยังมีแถวใช้ยอดอ้างอิงประมาณการ (ไม่มียอดจริงราย SKU) → ป้ายเดียวที่หัวเดือน แทนจุดรายช่อง
+            var est = !reason && estMonths[i];
+            return h('th', { class: 'num' + (reason ? ' head-' + reason : est ? ' head-est' : ''), scope: 'col', dataset: { col: String(i) }, title: reason ? page.cellReasons[reason] : est ? fill(page.estHeadTip, { n: estMonths[i] }) : null },
+              m, reason === 'actual' ? h('span', { class: 'head-tag' }, page.cellReasons.actual) : reason === 'frozen' ? h('span', { class: 'head-tag' }, '🔒')
+                : est ? h('span', { class: 'head-tag' }, page.estHead) : null);
           }),
           h('th', { class: 'num col-total', scope: 'col', dataset: { col: '12' }, title: editing && !money ? page.annualTitle : null }, page.totalColumn),
           showLY ? [h('th', { class: 'num col-ly', scope: 'col', title: fill(page.lyColumnTip, { range: SP.core.clock.rangeLabel(false) }) }, page.lyColumn),
@@ -647,8 +699,11 @@
       function groupHeader(g, id) {
         var name = groupName(g);
         var count = h('span', { class: 'sp-group-count' });
+        // CR-26: จำนวน SKU ที่ไม่มียอดในกลุ่ม
+        var ns = g.rows.filter(function (r) { return ages[r.key] && ages[r.key].noSale; }).length;
+        var nsCount = ns ? h('span', { class: 'sp-group-nosale', title: fill(AG.groupNoSaleTip, { n: ns, months: S.NO_SALE_WARN_MONTHS }) }, fill(AG.groupNoSale, { n: ns })) : null;
         var toggle = h('button', { type: 'button', class: 'sp-group-toggle', 'aria-label': fill(page.groupToggle, { group: name }) },
-          h('span', { class: 'sp-caret', 'aria-hidden': 'true' }), h('span', { class: 'sp-group-name' }, name), count);
+          h('span', { class: 'sp-caret', 'aria-hidden': 'true' }), h('span', { class: 'sp-group-name' }, name), count, nsCount);
         toggle.addEventListener('click', function () { collapsed[id] = !collapsed[id]; applyVisibility(); });
         var box = null;
         if (editing) {
@@ -660,9 +715,29 @@
         }
         var cells = [];
         var tr = h('tr', { class: 'sp-group', dataset: { group: id } },
-          h('th', { class: 'row-head sp-group-cell', scope: 'rowgroup' }, h('span', { class: 'sp-group-inner' }, box, toggle)),
+          h('th', { class: 'row-head sp-group-cell', scope: 'rowgroup', colspan: '3' }, h('span', { class: 'sp-group-inner' }, box, toggle)),
           numCells(cells, cells));
         return { tr: tr, cells: cells, count: count, toggle: toggle, box: box };
+      }
+
+      // CR-33: 2 คอลัมน์ ช่วงเวลาขาย (ข้อความเดิม + ป้าย ไม่มียอด {n} ด.) | อายุ (ป้ายกลุ่มชุดเดียวกับตัวกรอง · ระยะเวลาจริงใน Tooltip) · ไม่มีป้าย "อายุยาว" แล้ว
+      function ageCell(a) {
+        if (!a) return [h('td', { class: 'sp-age sp-range' }), h('td', { class: 'sp-age sp-agegrp' })];
+        var tip, line2 = [];
+        var group = calc.skuAgeGroup(a);
+        var len = null;
+        if (!a.started) {
+          tip = a.plannedStart ? fill(AG.tipPlanned, { unit: unit.name, month: K.label(a.plannedStart) }) : AG.groups.notStarted;
+        } else {
+          if (!a.lastSaleMonth) line2.push(h('span', { class: 'sp-age-len' }, AG.noHistory));
+          if (a.noSale) line2.push(h('span', { class: 'sp-age-badge is-nosale' }, fill(AG.noSaleBadge, { n: a.monthsSinceLastSale })));
+          len = a.lastSaleMonth ? ageText(a.sellingMonths) : AG.noHistory;
+          tip = fill(AG.tip, { unit: unit.name, first: K.label(a.firstSaleMonth), channel: ch.name, channelFirst: a.firstSaleMonthInChannel ? K.label(a.firstSaleMonthInChannel) : '–',
+            last: a.lastSaleMonth ? K.label(a.lastSaleMonth) : '–', months: a.sellingMonths }) + (a.source === 'listing' ? ' · ' + AG.tipListing : '');
+        }
+        var groupTip = len ? fill(AG.groupTip, { len: len, tip: tip }) : tip;
+        return [h('td', { class: 'sp-age sp-range', title: tip }, h('span', { class: 'sp-age-first' }, ageRangeText(a, true)), line2.length ? h('span', { class: 'sp-age-line2' }, line2) : null),
+          h('td', { class: 'sp-age sp-agegrp', title: groupTip }, h('span', { class: 'sp-age-group is-' + group }, AG.groups[group]))];
       }
 
       function skuRow(row) {
@@ -719,16 +794,17 @@
           h('span', { class: 'sku-text' },
             h('span', { class: 'sku-line1' },
               h('span', { class: 'sku-name', dataset: { product: sku }, tabindex: '0' }, name),
-              chip, item.stopped ? h('span', { class: 'badge st-ended' }, page.stopped) : null, requestWarn(p)),
+              chip, item.stopped ? h('span', { class: 'badge st-ended' }, page.stopped) : null, requestWarn(p),
+              row.listingStatus === 'offered' ? h('span', { class: 'badge tag-warn sp-offered', title: page.listingOfferedTip }, page.listingOffered) : null,
+              row.quarterLaunch ? h('span', { class: 'badge tag-warn sp-quarter', title: fill(page.quarterLaunchTip, { quarter: String(row.quarterLaunch).split('-').reverse().join(' ') }) }, page.quarterLaunch) : null),
             h('span', { class: 'sku-line2' }, line2)),
           menu);
 
+        var ageTd = ageCell(ages[sku]);
         var tds = row.cells.map(function (cell, m) {
           var input = editing && cell.state.editable && !money;
           var td = h('td', { class: 'num', dataset: { cell: '1', col: String(m), sku: sku, m: String(m) }, tabindex: input ? null : '-1' });
           var ref = { td: td, input: null, text: null, cell: cell };
-          // ป้าย P อยู่มุมบนซ้ายภายในช่อง (ก่อนตัวเลข)
-          if (cell.promos.length && FT.isOn('promotionCalendar')) td.appendChild(h('span', { class: 'promo-mark', 'aria-hidden': 'true' }, 'P'));
           if (input) {
             ref.input = C.numberInput({
               value: cell.units, min: 0, grouping: true, commit: true, className: 'cell',
@@ -744,9 +820,6 @@
           if (showLY) { ref.ly = h('span', { class: 'cell-ly' }); td.appendChild(ref.ly); }
           ref.dot = h('span', { class: 'override-dot', hidden: true });
           td.appendChild(ref.dot);
-          // CR-24: จุดมุมล่างขวา = ยอดอ้างอิงของเดือนนี้เป็นประมาณการ (SKU ไม่มียอดจริงรายเดือนของปีก่อนหน้า)
-          ref.est = h('span', { class: 'est-dot', hidden: true, 'aria-hidden': 'true' });
-          td.appendChild(ref.est);
           ref.mark = h('span', { class: 'anomaly-mark', 'aria-hidden': 'true' });
           td.appendChild(ref.mark);
           refs.cells[sku].push(ref);
@@ -774,7 +847,7 @@
           extra = [refs.rowLY[sku], refs.rowGrowth[sku]];
         }
         var haystack = (sku + ' ' + name + ' ' + (p.name || '') + ' ' + (p.shortName || '')).toLowerCase();
-        var tr = h('tr', { class: 'sp-row' + (item.stopped ? ' row-stopped' : ''), dataset: { row: sku, search: haystack } }, th, tds, totalTd, extra);
+        var tr = h('tr', { class: 'sp-row' + (item.stopped ? ' row-stopped' : ''), dataset: { row: sku, search: haystack } }, th, ageTd, tds, totalTd, extra);
         refs.trs.push(tr);
         return tr;
       }
@@ -801,8 +874,11 @@
       }
       var emptyRow = h('tr', { class: 'sp-empty-row', hidden: true }, h('td', { class: 'sp-empty', colspan: String(span) }, page.searchEmpty));
       tbody.appendChild(emptyRow);
-      if (!shownRows.length && series.length && !seriesMissing.length) {
+      var ageActive = !!ageFilter || noSaleOnly;
+      if (!shownRows.length && series.length && !seriesMissing.length && !(ageActive && seriesRows.length)) {
         tbody.appendChild(h('tr', null, h('td', { class: 'sp-empty', colspan: String(span) }, page.seriesEmpty)));
+      } else if (!shownRows.length && ageActive) {
+        tbody.appendChild(h('tr', null, h('td', { class: 'sp-empty', colspan: String(span) }, AG.empty)));
       }
 
       // ท้ายตาราง: ติดล่างเมื่อแถวล้นกล่อง (--i = ลำดับนับจากล่าง ใช้คำนวณตำแหน่ง bottom)
@@ -819,7 +895,7 @@
       footRows.forEach(function (tr, i) { tr.style.setProperty('--i', String(footRows.length - i)); });
 
       var tableEl = h('table', { class: 'sku-grid' + (money ? ' is-money' : '') + (editing ? ' is-editing' : '') + (multiOwner ? ' has-owner' : '') + (showLY ? ' has-ly' : '') },
-        h('colgroup', null, h('col', { class: 'col-sku' }), F.MONTHS.map(function () { return h('col'); }), h('col', { class: 'col-sum' }),
+        h('colgroup', null, h('col', { class: 'col-sku' }), h('col', { class: 'col-range' }), h('col', { class: 'col-agegrp' }), F.MONTHS.map(function () { return h('col'); }), h('col', { class: 'col-sum' }),
           showLY ? [h('col', { class: 'col-ly' }), h('col', { class: 'col-growth' })] : null),
         thead, tbody, tfoot);
       var scroll = h('div', { class: 'sp-scroll' }, tableEl);
@@ -860,10 +936,10 @@
         var mark = editing ? calc.anomalyMark(c.units, c.ly) : null;
         if (mark) notes.push(fill(B.anomaly[mark], { pct: F.pct(S.ANOMALY_PCT, 0) }));
         return { heading: heading, breakdown: calc.cellBreakdown(c.units, c.price, c.gp, ch.hasGP, refs.grid.includesVat), hasGP: ch.hasGP,
-          priceText: c.promos.length ? B.priceSource.promo : B.priceSource[c.priceSource], sourceText: src, notes: notes };
+          priceText: fill(B.priceSource[c.priceSource] || '', { unit: unit.name, channel: ch.name }), sourceText: src, notes: notes };
       });
 
-      // Tooltip ชื่อ SKU: ชื่อเต็ม · รหัส · หมวดสินค้า · Series · RSP (+ ราคาต่อ Account / ราคา Dealer) · Status ของปีแผน
+      // Tooltip ชื่อ SKU: ชื่อเต็ม · รหัส · หมวดสินค้า · Series · RSP (+ Promotion Price ของหน่วยนี้ / ราคา Dealer) ณ เดือนปัจจุบันจำลอง · Status ของปีแผน
       var PT = page.productTip;
       C.hoverTip(scroll, '[data-product]', function (el) {
         var k = el.dataset.product;
@@ -871,9 +947,10 @@
         if (!p) return null;
         var tx = calc.productTaxonomy(master.taxonomy, p);
         var date = store.today();
-        var rsp = calc.rspOn(data.priceList, k, date, ch.id);
-        var acc = calc.accountPriceOf(data.accountPrices, k, unitId);
-        var dealer = ch.priceBasis === 'SELL_IN' ? calc.priceOn(data.priceList, k, 'SELL_IN', ch.id, date, unitId) : null;
+        var rsp = calc.rspAt(data.basePrices, k, date);
+        var res = calc.resolvePrice(data, k, unitId, date);
+        var acc = res.source === 'base' ? null : res.price;
+        var dealer = calc.channelPriceType(ch) !== 'RSP' ? calc.basePriceAt(data.basePrices, k, calc.channelPriceType(ch), date) : null;
         function money2(v) { return F.number(v, Math.abs(v - Math.round(v)) < 0.005 ? 0 : 2); }
         var row = rowOf(k);
         return h('div', { class: 'sku-tip' }, C.productThumb(p, master.taxonomy, { size: 'md' }),
@@ -884,7 +961,7 @@
               h('li', null, PT.category + ': ' + ([tx.category, tx.subCategory, tx.type].filter(Boolean).join(' › ') || '–')),
               h('li', null, PT.series + ': ' + ([tx.series, tx.subSeries].filter(Boolean).join(' › ') || '–')),
               h('li', null, PT.rsp + ': ' + (rsp != null ? fill(PT.rspValue, { price: money2(rsp), date: F.date(date) }) : PT.noRsp)),
-              acc != null ? h('li', null, fill(PT.accountPrice, { unit: unit.name }) + ': ' + money2(acc) + ' ' + L.baht) : null,
+              acc != null ? h('li', null, fill(PT.promoPrice[res.source], { unit: unit.name, channel: ch.name }) + ': ' + money2(acc) + ' ' + L.baht) : null,
               dealer != null ? h('li', null, PT.dealer + ': ' + money2(dealer) + ' ' + L.baht) : null,
               row ? h('li', null, fill(PT.status, { year: year }) + ': ' + row.segments.map(function (s) { return L.status[s.status] + ' ' + F.monthRange(s.from, s.to); }).join(' · ')) : null,
               p.note ? h('li', null, p.note) : null)));
@@ -1066,7 +1143,6 @@
               (c.override ? ' is-override' : '') + (c.promos.length ? ' has-promo' : '') +
               (editing && cellDirty(draft, saved, row.key, m) ? ' is-dirty-cell' : '');
             ref.dot.hidden = !c.override;
-            ref.est.hidden = !(c.lyEstimated && c.ly != null && c.source !== 'locked');
             if (ref.input) ref.input.setValue(c.units, force);
             else ref.text.textContent = fmt(pick(c));
             if (ref.ly) ref.ly.textContent = c.ly == null ? '' : fmt(pickLY(c));
@@ -1128,7 +1204,7 @@
         var canYear = editing && !netNa && yearRem.status !== 'ok' && openMonths.length > 0;
         cells.push({ node: remNode(yearRem, canYear ? function () { openCloseGap(openMonths); } : null, G.yearButton), className: 'num col-total m-' + yearRem.status, title: C.remainingText(yearRem) });
         if (showLY) { cells.push({ text: '', className: 'col-ly' }); cells.push({ text: '', className: 'col-growth' }); }
-        var nextRem = C.remainingRow({ rem: yearRem, tag: 'tr', cells: cells, className: 'row-remaining' });
+        var nextRem = C.remainingRow({ rem: yearRem, tag: 'tr', cells: cells, className: 'row-remaining', labelColspan: 3 });   // CR-33: SKU + ช่วงเวลาขาย + อายุ
         nextRem.firstChild.classList.add('row-head');
         nextRem.firstChild.title = R.remainingNote;
         if (yearRem.status === 'short' && !(netNa && view !== 'sellOut')) {

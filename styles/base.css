@@ -74,9 +74,9 @@ strong { font-weight: var(--fw-bold); }
 
 .role-field { display: inline-flex; align-items: center; gap: var(--sp-1); }
 .header-actions .select { min-width: 0; font-size: var(--fs-sm); padding: 2px var(--sp-5) 2px var(--sp-2); font-weight: var(--fw-bold); }
-.role-select { max-width: 14em; }
+.role-select { max-width: 24em; }
+.role-field .field-label { cursor: help; }   /* Tooltip = (จำลองสำหรับการนำเสนอ) */
 .role-picker { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-2); border: 1px dashed var(--c-border-strong); border-radius: var(--radius-sm); }
-.role-note { font-size: 11px; color: var(--c-text-muted); white-space: nowrap; }
 
 .store-warning {
   font-size: var(--fs-xs);
@@ -91,7 +91,7 @@ strong { font-weight: var(--fw-bold); }
 
 @media (max-width: 1280px) {
   .brand-tag { display: none; }
-  .role-note { display: none; }
+  .role-select { max-width: 21em; }
 }
 
 /* ---------------- Shell: Side Menu + เนื้อหา ---------------- */
@@ -201,8 +201,9 @@ strong { font-weight: var(--fw-bold); }
 @media (max-width: 720px) {
   .header-bar { flex-wrap: wrap; gap: var(--sp-2); padding-left: var(--sp-2); padding-right: var(--sp-2); }
   .header-actions { flex-wrap: wrap; gap: var(--sp-2); }
-  .role-picker { border: 0; padding: 0; }
-  .role-select { max-width: 10em; }
+  .role-picker { border: 0; padding: 0; flex: 1 1 100%; min-width: 0; }
+  .role-field { flex: 1 1 auto; min-width: 0; }
+  .role-select { max-width: none; flex: 1 1 auto; min-width: 0; }
 }
 
 /* ---------------- หน้า ---------------- */

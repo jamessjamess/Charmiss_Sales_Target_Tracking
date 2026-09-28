@@ -3,7 +3,7 @@
  *
  * หลังนำเข้า (core/seed.js) SP.data.listings = [{ productKey, accountId (= unitId) }]
  *   เจ้าของข้อมูล: ทีม Product / ไม่มีรายการ = ไม่ได้ Listing → ไม่แสดงในหน้าวางแผนของหน่วยนั้น
- *   ค่าที่แก้ในหน้า Listing และวันเริ่มขาย เก็บที่ store: master.listings / แผน NPD ที่อนุมัติแล้วเพิ่ม Listing ให้เอง
+ *   ค่าที่แก้ในหน้า Listing เก็บที่ store: master.listings / แผน NPD ที่อนุมัติแล้วเพิ่ม Listing ให้เอง
  *
  * CR-11 ที่มาของ Listing:
  *   7-Eleven และ EVEANDBOY = listings ใน data/seed/ (ข้อมูลจริง)

@@ -38,7 +38,7 @@
     },
     {
       name: 'tx-3. moveSkus Highlighter ← SKU 16470, 16480 จาก Blush → Blush ลด 2 · Highlighter เพิ่ม 2 · สินค้าทั้งสองชี้ไป Highlighter (Type ตามปลายทาง)',
-      expected: [25, 23, 0, 2, true, ['sub-cheek-highlight', 'sub-cheek-highlight'], ['type-highlighter', 'type-highlighter'], 2],
+      expected: [26, 24, 0, 2, true, ['sub-cheek-highlight', 'sub-cheek-highlight'], ['type-highlighter', 'type-highlighter'], 2],
       actual: function () {
         var before = products();
         var res = T().moveSkus(before, 'sub-cheek-blush', 'sub-cheek-highlight', ['16470', '16480'], D().taxonomy);
@@ -95,8 +95,8 @@
       }
     },
     {
-      name: 'tx-8. crossTab(products, "series", "category") → ผลรวมทุกช่อง = จำนวน SKU ที่มีทั้ง Series และ Category (115)',
-      expected: [115, 115, true],
+      name: 'tx-8. crossTab(products, "series", "category") → ผลรวมทุกช่อง = จำนวน SKU ที่มีทั้ง Series และ Category (117 · CR-30 รวม NPD ปี 2028)',
+      expected: [117, 117, true],
       actual: function () {
         var ct = T().crossTab(products(), 'series', 'category', D().taxonomy);
         var cells = 0;
@@ -140,7 +140,7 @@
     },
     {
       name: 'tx-12. ย้าย SKU ไปปลายทางที่ปิดใช้งาน → ไม่ยอมรับ · ย้ายข้ามระดับ → ไม่ยอมรับ · ข้อมูลต้นฉบับไม่ถูกแก้',
-      expected: ['inactive', 'level', 25],
+      expected: ['inactive', 'level', 26],
       actual: function () {
         var t = T().setActive(D().taxonomy, 'category', 'sub-cheek-highlight', false);
         var a = T().moveSkus(products(), 'sub-cheek-blush', 'sub-cheek-highlight', null, t);

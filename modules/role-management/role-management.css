@@ -1,66 +1,87 @@
-/* modules/role-management/role-management.css — Role Management (CR-21 · CR-25 แยก 3 หน้า Permissions · Roles · Users ใช้ไฟล์นี้ร่วมกัน):
- * เมทริกซ์ (หัวตารางและคอลัมน์แรกติด) · ตารางบทบาท / ผู้ใช้ · ฟอร์มใน <dialog> */
+/* modules/role-management/role-management.css — Role Management (CR-31 · 2 หน้า Permissions · Users ใช้ไฟล์นี้ร่วมกัน):
+ * ตารางสิทธิ์ (หัวตารางและคอลัมน์ชื่อติด · แถวสูง ~40px · เส้นแบ่งแถวจาง ไม่มีเส้นแบ่งคอลัมน์ · Hover แถวและคอลัมน์) · แผงด้านข้าง · Drawer ผู้ใช้
+ * ช่องสิทธิ์ (.perm-cell) อยู่ใน styles/components.css */
 .page-roleManagement .module-body > * + *, .page-roleRoles .module-body > * + *, .page-roleUsers .module-body > * + * { margin-top: var(--sp-3); }
-.rm-tabs { align-items: center; }
-.rm-limit { font-size: var(--fs-xs); }
 .rm-head-tools { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rm-head-menu[hidden], .rm-add-user[hidden] { display: none; }
 .rm-toolbar { align-items: center; }
-.rm-check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); white-space: nowrap; }
-.rm-legend { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rm-toolbar .select { font-size: 13px; }
+.rm-keys { font-size: var(--fs-xs); }
 .rm-notice { margin: 0; }
 
-/* เมทริกซ์: คอลัมน์แรก (หน้า / สิทธิ์) ติดซ้าย หัวตารางติดบน */
-.rm-matrix { width: 100%; }
-.rm-matrix .rm-page-col { position: sticky; left: 0; z-index: 2; min-width: 15em; max-width: 22em; white-space: normal; background: var(--c-surface); font-weight: var(--fw-medium); font-size: var(--fs-sm); color: var(--c-text); }
-.rm-matrix thead th { z-index: 3; }
-.rm-matrix thead .rm-page-col { z-index: 4; background: var(--c-surface-2); }
-.rm-matrix .rm-role-col { text-align: center; min-width: 6.5em; }
-.rm-matrix .rm-cell { text-align: center; padding: 3px 4px; }
-.rm-matrix tr.is-sub .rm-page-col { padding-left: calc(var(--sp-2) + 1.4em); font-weight: normal; color: var(--c-text-muted); }
-.rm-matrix tr.is-sub .rm-page-col::before { content: '└ '; color: var(--c-border-strong); }
-.rm-matrix tr.rm-group > * { background: var(--c-surface-2); font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text-muted); padding-top: 6px; padding-bottom: 6px; }
-.rm-matrix tr.rm-group .rm-page-col { background: var(--c-surface-2); }
-.rm-group-label { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.rm-matrix tr.rm-page-head .rm-page-col { color: var(--c-text); }
-.rm-matrix tr.rm-row:hover > * { background: var(--c-primary-soft); }
-.rm-col-menu { width: auto; height: auto; min-height: 28px; padding: 2px 6px; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--c-text); white-space: nowrap; }
-.rm-group-menu { width: 24px; height: 24px; }
-.rm-cell-btn { width: auto; height: auto; padding: 0; border-radius: var(--radius-sm); background: none; }
-.rm-cell-btn:hover .perm-chip, .rm-cell-btn:focus-visible .perm-chip { outline: 2px solid var(--c-primary); outline-offset: 1px; }
-/* CR-25: บรรทัดสรุปใต้ชื่อบทบาท · ช่องไม่เห็น = พื้นเทาอ่อนว่าง (เห็นภาพรวมในแวบเดียว) */
-.rm-role-sum { display: block; margin-top: 1px; font-size: 11px; font-weight: normal; color: var(--c-text-muted); white-space: nowrap; cursor: help; }
-.rm-matrix .rm-cell.is-none { background: var(--c-surface-2); }
-.rm-none { position: relative; display: inline-block; width: 3em; height: 20px; vertical-align: middle; }
-.rm-none.is-changed::after { content: ''; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-dirty); box-shadow: 0 0 0 2px var(--c-surface); }
-.rm-none-legend { width: 1.6em; height: 16px; border: 1px solid var(--c-border); border-radius: 4px; background: var(--c-surface-2); }
-.rm-cell-btn:hover .rm-none, .rm-cell-btn:focus-visible .rm-none { outline: 2px solid var(--c-primary); outline-offset: 1px; border-radius: 4px; }
-.rm-home { white-space: nowrap; }
-.rm-home-select { min-width: 12em; }
+/* ตารางสิทธิ์ร่วม */
+.rm-matrix, .rm-users { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-sm); }
+.rm-matrix th, .rm-matrix td, .rm-users th, .rm-users td { border-left: 0; border-right: 0; border-bottom: 1px solid color-mix(in srgb, var(--c-border) 60%, transparent); }
+.rm-matrix tbody tr, .rm-users tbody tr { height: 40px; }
+.rm-cell { text-align: center; padding: 2px 6px; }
+.rm-cell:focus-visible { outline: 2px solid var(--c-primary); outline-offset: -2px; }
+.rm-cell.is-editable { cursor: pointer; }
+.rm-cell.is-editable:hover .perm-cell { text-decoration: underline dotted var(--c-border-strong); }
+.rm-cell.is-dirty { box-shadow: inset 0 -2px 0 var(--c-primary-strong); }
+.rm-matrix tbody tr.rm-row:hover > *, .rm-users tbody tr.rm-user-row:hover > * { background: color-mix(in srgb, var(--c-primary) 5%, var(--c-surface)); }
+.rm-matrix .is-hover-col { background: color-mix(in srgb, var(--c-primary) 5%, var(--c-surface)) !important; }
 
-/* บทบาท / ผู้ใช้ */
-.rm-roles td, .rm-users td { vertical-align: middle; }
-.rm-order { white-space: nowrap; font-variant-numeric: tabular-nums; }
-.rm-drag { cursor: grab; color: var(--c-text-muted); margin-right: 6px; letter-spacing: -2px; }
-.rm-move { display: inline-flex; gap: 2px; margin-left: 6px; }
-.rm-move .icon-btn { width: 26px; height: 26px; }
-.rm-role-row.is-dragging { opacity: 0.5; }
-.rm-role-name { width: 14em; max-width: 100%; }
-.rm-role-desc { width: 100%; min-width: 16em; }
-.rm-role-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.rm-user-row.is-inactive td { color: var(--c-text-muted); }
-.rm-user-row.is-dirty-row td:first-child { box-shadow: inset 3px 0 0 var(--c-dirty); }
-.rm-user-name { font-weight: var(--fw-medium); text-align: left; }
-.rm-user-search { width: 14em; }
+/* Permissions: คอลัมน์แรก (หน้า) ติดซ้าย หัวตารางติดบน */
+.rm-matrix .rm-page-col { position: sticky; left: 0; z-index: 2; min-width: 15em; max-width: 22em; white-space: normal; background: var(--c-surface); font-weight: var(--fw-medium); color: var(--c-text); text-align: left; }
+.rm-matrix thead th { position: sticky; top: 0; z-index: 3; background: var(--c-surface-2); vertical-align: bottom; }
+.rm-matrix thead .rm-page-col { z-index: 4; }
+.rm-matrix .rm-role-col { text-align: center; min-width: 7.5em; padding: 4px 6px; }
+.rm-role-line { display: inline-flex; align-items: center; justify-content: center; gap: 2px; white-space: nowrap; }
+.rm-role-name { font-weight: var(--fw-bold); color: var(--c-text); }
+.rm-custom { margin-left: 3px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--c-border-strong); font-size: 10px; font-weight: normal; color: var(--c-text-muted); }
+.rm-role-menu { width: 24px; height: 24px; color: var(--c-text-muted); }
+.rm-role-users { display: block; margin: 1px auto 0; font-size: 11px; font-weight: normal; color: var(--c-text-muted); text-decoration: none; }
+.rm-role-users:hover { color: var(--c-primary-strong); text-decoration: underline; }
+.rm-add-col { min-width: 8em; text-align: center; }
+.rm-matrix tr.is-sub .rm-page-col { padding-left: calc(var(--sp-2) + 1.4em); font-size: var(--fs-xs); font-weight: normal; color: var(--c-text-muted); }
+.rm-matrix tr.rm-page-head .rm-page-col { color: var(--c-text); }
+.rm-group > th, .rm-u-group > th { position: sticky; left: 0; background: var(--c-surface); padding: 10px var(--sp-2) 4px; text-align: left; }
+.rm-group-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit;
+  font-size: 11px; font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--c-text-muted); }
+.rm-caret { font-size: 10px; }
+.rm-row-menu { width: auto; height: auto; padding: 2px 4px; border-radius: var(--radius-sm); font: inherit; color: inherit; text-align: left; white-space: normal; }
+.rm-row-menu:hover { text-decoration: underline; }
+.rm-role-menu-list .menu-heading { padding: 6px 10px 2px; font-size: 10px; font-weight: var(--fw-bold); letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-text-muted); }
+.rm-role-menu-list .menu-heading:not(:first-child) { border-top: 1px solid var(--c-border); margin-top: 4px; }
+.rm-choice-box { display: grid; gap: 4px; }
+.rm-choice .seg { padding: 4px 10px; font-size: 13px; }
+.rm-panel { width: min(460px, 100vw); }
+.rm-panel-form .pm-input, .rm-panel-form .select { width: 100%; }
+
+/* Users: ชื่อ · บทบาท · ทีม ติดซ้าย + คอลัมน์สิทธิ์ของ Module */
+.rm-users thead th { position: sticky; top: 0; z-index: 3; background: var(--c-surface-2); font-size: var(--fs-xs); vertical-align: bottom; }
+.rm-users thead tr.rm-u-head2 th { top: 28px; font-weight: normal; color: var(--c-text-muted); }
+.rm-users .rm-u-name, .rm-users .rm-u-roles, .rm-users .rm-u-person, .rm-users .rm-u-team { position: sticky; z-index: 2; background: var(--c-surface); text-align: left; }
+.rm-users .rm-u-name { left: 0; width: 170px; min-width: 170px; }
+.rm-users .rm-u-roles { left: 170px; width: 170px; min-width: 170px; }
+/* CR-32: คอลัมน์ บุคลากร (person.userId) */
+.rm-users .rm-u-person { left: 340px; width: 140px; min-width: 140px; font-size: var(--fs-xs); }
+.rm-users .rm-u-team { left: 480px; width: 140px; min-width: 140px; border-right: 1px solid var(--c-border) !important; }
+.rm-users thead .rm-u-name, .rm-users thead .rm-u-roles, .rm-users thead .rm-u-person, .rm-users thead .rm-u-team { z-index: 4; background: var(--c-surface-2); }
+.rm-person-pick { max-width: 100%; font-size: var(--fs-xs); }
+.rm-users .rm-u-perm { text-align: center; min-width: 6.5em; white-space: normal; line-height: 1.2; }
+.rm-users .rm-u-page { border-bottom: 1px solid var(--c-border) !important; }
+.rm-u-name-line { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.rm-user-name { padding: 0; border: 0; background: none; font: inherit; font-weight: var(--fw-medium); color: var(--c-text); text-align: left; cursor: pointer; }
+.rm-user-name:hover { color: var(--c-primary-strong); text-decoration: underline; }
+.rm-u-row-menu { width: 22px; height: 22px; }
+.rm-u-rolecell { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rm-u-role { font-weight: var(--fw-medium); }
+.rm-role-chip { font-size: 10px; padding: 0 6px; }
+.rm-u-roles-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; border: 1px dashed var(--c-border-strong); border-radius: var(--radius-sm); background: none; font: inherit; cursor: pointer; text-align: left; }
+.rm-team { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.rm-team-link { text-decoration: none; }
+.rm-team-link:hover { color: var(--c-primary-strong); text-decoration: underline; }
+.rm-user-row.is-inactive > * { color: var(--c-text-muted); opacity: 0.6; }
+.rm-user-row.is-dirty-row > .rm-u-name { box-shadow: inset 3px 0 0 var(--c-dirty); }
+.rm-user-search { width: 12em; }
+.rm-roles-list { max-height: 50vh; overflow: auto; }
 .rm-form { display: grid; gap: var(--sp-2); min-width: min(420px, 80vw); }
 .rm-form .select, .rm-form .pm-input { width: 100%; }
 .rm-role-boxes { display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); }
 
-/* Drawer สิทธิ์ที่มีผลจริง */
+/* Drawer ผู้ใช้ */
 .rm-effective { width: 100%; font-size: var(--fs-sm); }
 .rm-effective td { vertical-align: middle; }
-.rm-history-list { max-height: 60vh; overflow: auto; }
-
-@media (max-width: 1023px) {
-  .rm-matrix .rm-page-col { min-width: 11em; }
-  .rm-limit { flex-basis: 100%; }
-}
+.rm-effective tr.is-sub td:first-child { padding-left: 1.4em; color: var(--c-text-muted); font-size: var(--fs-xs); }
+.rm-user-body .pd-section h3 { font-size: var(--fs-xs); letter-spacing: 0.05em; text-transform: uppercase; color: var(--c-text-muted); }

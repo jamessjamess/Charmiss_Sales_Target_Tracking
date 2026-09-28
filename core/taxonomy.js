@@ -261,7 +261,7 @@
   }
 
   // รายการที่แสดงในแท็บ kind ตามตัวกรอง
-  // filters = { category, subCategory, type, series, subSeries: [id], status: 'active' | 'inactive' | 'all', data: 'all' | 'noSku' | 'dupParent' | 'expired', showZero }
+  // filters = { category, subCategory, type, series, subSeries: [id], status: 'active' | 'inactive' | 'all', data: 'all' | 'noSku' | 'dupParent' | 'expired' | 'noPrefix' (CR-30: Type ที่ยังไม่มีเลขนำหน้า Product Code), showZero }
   //   มิติเดียวกับแท็บ = แสดงเฉพาะรายการที่เลือก ลูกหลาน และรายการแม่ในเส้นทาง / อีกมิติ = นับเฉพาะ SKU ที่ตรง (x / y) ซ่อนรายการที่ได้ 0 (ยกเว้น showZero)
   //   รายการที่ไม่ตรงแต่มีรายการย่อยที่ตรง แสดงเป็นเส้นทาง (show = true, match = false)
   // → { show: { id: bool }, match: { id: bool }, count: { id: { total, filtered } }, cross: { field: [id] } | null, same: bool }
@@ -289,7 +289,7 @@
       var parent = n.parentId ? find(tax, kind, n.parentId) : null;
       var ok = (status === 'all' || (status === 'active' ? n.active !== false : n.active === false))
         && (!allowed || allowed[n.id])
-        && (data === 'all' || (data === 'noSku' ? c.total === 0 : data === 'dupParent' ? !!parent && norm(parent.name) === norm(n.name) : data === 'expired' ? seriesEnded(n, today) : true))
+        && (data === 'all' || (data === 'noSku' ? c.total === 0 : data === 'dupParent' ? !!parent && norm(parent.name) === norm(n.name) : data === 'expired' ? seriesEnded(n, today) : data === 'noPrefix' ? n.level === 'TYPE' && !n.codePrefix : true))
         && (!cross || filters.showZero || c.filtered > 0);
       match[n.id] = ok;
     });

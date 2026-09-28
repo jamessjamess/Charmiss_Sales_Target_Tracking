@@ -1,6 +1,7 @@
 /* modules/sku-planning/sku-planning.css — SKU Grid (CR-11)
  * แถบเครื่องมือ: แถบบริบท + ตัวควบคุมตาราง (+ แถบแก้ไข) / 12 เดือน + ทั้งปี พอดีกว้าง 1920px เมื่อเมนูข้างเปิด / ห้ามตัดตัวเลขด้วย "…"
  * CR-24: ชื่อ SKU ~260px · เดือน ~90px · ทั้งปี 110px / แสดงยอดอ้างอิง (+ L12M · การเติบโต) = ตัวเลขเล็กลง 1 ขั้น ไม่พอเลื่อนแนวนอนภายในตาราง
+ * CR-26: + คอลัมน์ เริ่มขาย · อายุ 110px ติดซ้ายต่อจากชื่อ SKU (ชื่อ SKU ลดเหลือ 230px) · หัวแถวอื่นครอบ 2 คอลัมน์
  * หัวตาราง + แถวเป้าหมาย ติดบน / คอลัมน์ SKU ติดซ้าย / แถว SKU สูงคงที่ ~48px (ชื่อ 2 บรรทัด)
  * กล่องตารางสูงตามแถว: แถวน้อย = แถวรวมต่อจากแถวสุดท้ายทันที / แถวล้นกล่อง = ตารางเลื่อนภายใน แถวรวมและคงเหลือติดล่าง
  * จอกว้างตั้งแต่ 1024px: หน้าไม่ยืด (body.fit-screen) / CR-24: Side Menu ไม่พับเอง (ผู้ใช้พับเองได้) หน้าไม่เลื่อนแนวนอน */
@@ -8,11 +9,14 @@
 .page-skuPlanning {
   --sp-owner-h: 0px;
   --sp-head-h: 30px;
-  --sp-row-h: 48px;
+  --sp-row-h: 52px;   /* CR-27: ชื่อ SKU 2 บรรทัด + รหัส · Series */
   --sp-group-h: 30px;
   --sp-foot-h: 30px;
   --sp-rem-h: 40px;
-  --sp-col-sku: 260px;
+  --sp-col-sku: 230px;
+  --sp-col-age: 130px;          /* CR-33: ช่วงเวลาขาย + อายุ รวมกันเท่าคอลัมน์เดิม */
+  --sp-col-range: 80px;
+  --sp-col-agegrp: calc(var(--sp-col-age) - var(--sp-col-range));
   --sp-col-sum: 110px;
   --sp-col-ly: 100px;
   --sp-col-growth: 70px;
@@ -34,16 +38,16 @@
 }
 
 /* ---------- แถวที่ 2: ตัวควบคุมตาราง ---------- */
-/* แถวเดียวที่ 1920px (เมนูข้างพับ) — ตัวอักษร 14px / จอแคบกว่านั้นขึ้นบรรทัดที่ 2 ได้ */
-.sp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
-.sp-controls .select { font-size: 14px; padding-top: 4px; padding-bottom: 4px; min-width: 8em; }
-.sp-controls .seg { padding: 4px 10px; font-size: 14px; }
-.sp-controls .field { gap: var(--sp-1); }
-.sp-controls .field-label, .sp-controls .ss-button { font-size: 14px; }
-.sp-search { font: inherit; font-size: 14px; width: 10em; padding: 4px var(--sp-2); border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface); }
+/* แถวเดียวที่ 1920px (เมนูข้างเปิด · CR-27 + ตัวกรองอายุและ Checkbox ไม่มียอด) — ตัวอักษร 13px / จอแคบกว่านั้นขึ้นบรรทัดที่ 2 ได้ */
+.sp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.sp-controls .select { font-size: 13px; padding-top: 4px; padding-bottom: 4px; min-width: 0; }
+.sp-controls .seg { padding: 4px 9px; font-size: 13px; }
+.sp-controls .field { gap: 4px; }
+.sp-controls .field-label, .sp-controls .ss-button { font-size: 13px; }
+.sp-search { font: inherit; font-size: 13px; width: 8.5em; padding: 4px var(--sp-2); border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface); }
 .sp-search:focus { border-color: var(--c-primary); outline: 2px solid var(--c-primary-soft); }
 .sp-toggle-all { padding: 3px var(--sp-2); font-size: var(--fs-xs); white-space: nowrap; }
-.sp-ly-toggle { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: 14px; white-space: nowrap; cursor: pointer; }
+.sp-ly-toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .sp-ly-toggle input { width: 16px; height: 16px; margin: 0; }
 .sp-view { gap: var(--sp-1); }
 .sp-controls .help-btn { min-width: 24px; height: 24px; }
@@ -78,8 +82,10 @@
 
 /* ---------- ตาราง ---------- */
 .sp-scroll { overflow: auto; border: 1px solid var(--c-border); border-radius: var(--radius-sm); background: var(--c-surface); }
-.sku-grid { width: 100%; min-width: calc(var(--sp-col-sku) + 12 * var(--sp-col-month) + var(--sp-col-sum)); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-cell); }
-.sku-grid.has-ly { --sp-col-month: 84px; min-width: calc(var(--sp-col-sku) + 12 * var(--sp-col-month) + var(--sp-col-sum) + var(--sp-col-ly) + var(--sp-col-growth)); }
+.sku-grid { width: 100%; min-width: calc(var(--sp-col-sku) + var(--sp-col-age) + 12 * var(--sp-col-month) + var(--sp-col-sum)); table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: var(--fs-cell); }
+.sku-grid.has-ly { --sp-col-sku: 220px; --sp-col-month: 83px; min-width: calc(var(--sp-col-sku) + var(--sp-col-age) + 12 * var(--sp-col-month) + var(--sp-col-sum) + var(--sp-col-ly) + var(--sp-col-growth)); }
+.sku-grid col.col-range { width: var(--sp-col-range); }
+.sku-grid col.col-agegrp { width: var(--sp-col-agegrp); }
 .sku-grid.has-owner { --sp-owner-h: 24px; }
 .sku-grid col.col-sku { width: var(--sp-col-sku); }
 .sku-grid col.col-sum { width: var(--sp-col-sum); }
@@ -194,7 +200,8 @@
 .is-editing .sku-text { max-width: calc(100% - 52px); }
 .sku-grid:not(.is-editing) .sku-text { max-width: 100%; }
 .sku-line1 { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
-.sku-name { font-weight: var(--fw-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* CR-27: ชื่อตัดขึ้นบรรทัดที่สองได้ (สูงสุด 2 บรรทัด แล้วจึง …) · Tooltip ชื่อเต็มที่ชื่อ (hoverTip) */
+.sku-name { font-weight: var(--fw-bold); overflow: hidden; min-width: 0; white-space: normal; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
 .sku-line1 .badge { font-size: 10.5px; padding: 0 6px; line-height: 1.5; flex: none; }
 .sku-line2 { display: flex; align-items: center; gap: 0 var(--sp-1); font-size: 11px; font-weight: normal; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; min-width: 0; }
 .sku-line2 > * + *::before { content: '· '; }
@@ -236,9 +243,8 @@
 .cell-icon { font-size: 10px; margin-right: 2px; opacity: 0.8; }
 
 .override-dot { position: absolute; top: 3px; right: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-override); }
-/* CR-24: ยอดอ้างอิงเป็นประมาณการ (ไม่มียอดจริงเดือนนี้) — จุดกลวงมุมล่างขวา */
-.est-dot { position: absolute; bottom: 2px; right: 1px; width: 5px; height: 5px; border-radius: 50%; border: 1.5px solid var(--c-ly-fg); background: var(--c-surface); pointer-events: none; }
-.sp-override-swatch .est-dot { bottom: 1px; right: 1px; }
+/* CR-27: เดือนที่ยอดอ้างอิงบางแถวเป็นประมาณการ → ป้ายที่หัวเดือน (แทนจุดรายช่องของ CR-24) */
+.sku-grid thead th.head-est { cursor: help; }
 
 /* ป้าย P มุมบนซ้ายภายในช่องเสมอ (อยู่เหนือช่องกรอก ไม่คร่อมเส้นช่อง) */
 .sku-grid td .promo-mark { position: absolute; left: 2px; top: 2px; z-index: 1; font-size: 9px; line-height: 1.3; padding: 0 2px; pointer-events: none; }
@@ -254,8 +260,8 @@
   .sku-grid.has-ly { --fs-cell: 13px; }
 }
 @media (max-width: 1599px) {
-  .page-skuPlanning { --sp-col-sku: 236px; --sp-col-sum: 96px; --sp-col-ly: 88px; --sp-col-growth: 60px; --sp-col-month: 72px; --fs-cell: 12.5px; }
-  .sku-grid.has-ly { --sp-col-sku: 212px; --sp-col-ly: 82px; --sp-col-growth: 56px; --sp-col-month: 70px; --fs-cell: 12px; }
+  .page-skuPlanning { --sp-col-sku: 210px; --sp-col-age: 116px; --sp-col-range: 70px; --sp-col-sum: 96px; --sp-col-ly: 88px; --sp-col-growth: 60px; --sp-col-month: 72px; --fs-cell: 12.5px; }
+  .sku-grid.has-ly { --sp-col-sku: 196px; --sp-col-ly: 82px; --sp-col-growth: 56px; --sp-col-month: 70px; --fs-cell: 12px; }
   .sku-grid th, .sku-grid td { padding-left: 3px; padding-right: 3px; }
 }
 
@@ -285,3 +291,23 @@
 .row-remaining .sp-fill-target, .row-remaining .sp-new-npd { margin: 2px 4px 2px 0; }
 .sp-req-warn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: var(--fw-bold);
   background: var(--status-over-bg); color: var(--status-over-fg); border: 1px solid var(--status-over-fg); cursor: help; }
+
+/* CR-26 / CR-33: ช่วงเวลาขาย | อายุ — ติดซ้ายต่อจากชื่อ SKU · ช่วงเวลาขาย + ป้าย ไม่มียอด (ส้ม) · อายุ = ป้ายกลุ่ม (ระยะเวลาจริงใน Tooltip) */
+.sku-grid .sp-age { position: sticky; left: var(--sp-col-sku); z-index: 2; background: var(--c-surface); text-align: left; white-space: normal; line-height: 1.15; padding: 2px 5px; cursor: help; }
+.sku-grid .sp-agegrp { left: calc(var(--sp-col-sku) + var(--sp-col-range)); border-right: 1px solid var(--c-border); }
+.sku-grid thead th.sp-age { z-index: 4; font-size: 12px; }
+.sku-grid thead th.sp-range { left: var(--sp-col-sku); }
+.sku-grid thead th.sp-agegrp { left: calc(var(--sp-col-sku) + var(--sp-col-range)); }
+.sp-age-group { display: inline-block; font-size: 11.5px; font-weight: var(--fw-medium); line-height: 1.2; }
+.sp-age-group.is-notStarted { color: var(--c-text-muted); font-weight: normal; }
+.sp-age-first { display: block; font-weight: var(--fw-bold); font-size: 12.5px; }
+.sp-age-line2 { display: flex; flex-wrap: wrap; align-items: center; gap: 1px 4px; margin-top: 1px; font-size: 11px; color: var(--c-text-muted); }
+.sp-age-len { white-space: nowrap; }
+.sp-age-badge { font-size: 10px; line-height: 1.45; padding: 0 5px; border-radius: 999px; white-space: nowrap; font-weight: var(--fw-bold); }
+.sp-age-badge.is-nosale { color: var(--c-anomaly-up); background: color-mix(in srgb, var(--c-anomaly-up) 14%, var(--c-surface)); }
+.sp-group-nosale { margin-left: var(--sp-1); font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--c-anomaly-up); cursor: help; }
+.sp-age-filter.is-active { border-color: var(--c-primary); }
+@media (max-width: 1599px) {
+  .sp-age-first { font-size: 12px; }
+  .sp-age-line2 { font-size: 10.5px; }
+}

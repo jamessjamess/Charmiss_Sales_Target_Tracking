@@ -1,43 +1,69 @@
-/* modules/npd-plan/npd-plan.css — แผน NPD: KPI 4 ใบ · Timeline (แถว Series → SKU × 12 เดือน) · ตาราง · Drawer */
+/* modules/npd-plan/npd-plan.css — แผน NPD (CR-30): KPI 4 ใบ · Timeline ช่วงเวลาต่อเนื่อง (12 / 18 / 24 เดือน · เส้นแบ่งปี) · ตาราง · Drawer */
 .page-npdPlan .module-body > * + * { margin-top: var(--sp-2); }
 
 .npd-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
-.card.npd-kpi { display: flex; align-items: baseline; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-top: 3px solid var(--c-border-strong); }
+.card.npd-kpi { display: flex; align-items: baseline; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); border-top: 3px solid var(--c-border-strong); text-align: left; font: inherit; color: inherit; }
 .card.npd-kpi > * + * { margin-top: 0; }
-.card.npd-kpi.is-warn { border-top-color: var(--c-warn-bd); }
 .card.npd-kpi.is-danger { border-top-color: var(--c-danger-bd); }
+button.card.npd-kpi { cursor: pointer; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border); border-bottom: 1px solid var(--c-border); }
+button.card.npd-kpi:hover { background: var(--c-surface-2); }
 .npd-kpi .pl-kpi-label { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--c-text-muted); flex: 1 1 auto; }
 .npd-kpi .pl-kpi-value { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.npd-kpi-pair { gap: var(--sp-4); }
+.npd-kpi-part { display: inline-flex; align-items: baseline; gap: var(--sp-2); flex: 1 1 0; }
+.npd-kpi-more { font-size: var(--fs-lg, 18px); color: var(--c-text-muted); }
 .npd-kpi-series .pl-kpi-label { flex: 0 0 auto; white-space: nowrap; }
 .npd-series-list { flex: 1 1 auto; display: inline-flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .npd-series-list .badge { font-size: 11px; }
+.npd-missing-popover { min-width: 300px; max-width: 420px; }
+.npd-missing-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow: auto; font-size: var(--fs-sm); }
+.npd-missing-list li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); padding: 4px 0; border-bottom: 1px solid var(--c-border); }
+.npd-open-link { white-space: nowrap; font-weight: var(--fw-bold); }
 
-.npd-year { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.npd-toolbar { gap: var(--sp-2); }
+.npd-toolbar .seg { padding: 4px 10px; font-size: 13px; }
+.npd-toolbar .select { font-size: 13px; max-width: 11em; }
+.npd-toolbar .select.is-active { border-color: var(--c-primary); box-shadow: 0 0 0 1px var(--c-primary-soft); }
+.npd-range { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.npd-requests-chip { border-radius: 999px; border: 1px solid var(--c-border-strong); background: var(--c-surface); color: var(--c-text-muted); }
+.npd-requests-chip.has-requests { border-color: var(--c-warn-bd); background: var(--c-warn-bg); color: var(--c-warn-fg); font-weight: var(--fw-bold); }
+.npd-requests-chip.is-active { box-shadow: 0 0 0 2px var(--c-primary-soft); border-color: var(--c-primary); }
 .npd-legend { font-size: var(--fs-xs); }
 .npd-sw { background: var(--c); }
 
-/* Timeline: คอลัมน์ชื่อ + 12 เดือน (ใช้ Grid เดียวกันทุกแถว) */
-.npd-timeline { --npd-label: 300px; min-width: 760px; font-size: 13px; }
+/* Timeline: คอลัมน์ชื่อติดซ้าย + n เดือน (--npd-n) · หัวเดือนติดบน · เส้นแบ่งปีที่ ม.ค. */
+.npd-timeline { --npd-label: 280px; --npd-col: minmax(34px, 1fr); min-width: calc(var(--npd-label) + var(--npd-n, 12) * 34px); font-size: 13px; }
 .npd-row { display: grid; grid-template-columns: var(--npd-label) minmax(0, 1fr); border-bottom: 1px solid var(--c-border); }
 .npd-head { position: sticky; top: 0; z-index: 3; background: var(--c-surface-2); font-weight: var(--fw-bold); font-size: var(--fs-xs); color: var(--c-text-muted);
-  grid-template-columns: var(--npd-label) repeat(12, minmax(0, 1fr)); }
-.npd-head > * { padding: 6px var(--sp-2); }
-.npd-month { text-align: center; border-left: 1px solid var(--c-border); }
+  grid-template-columns: var(--npd-label) repeat(var(--npd-n, 12), var(--npd-col)); }
+.npd-head > * { padding: 4px 2px; }
+.npd-head .npd-label { position: sticky; left: 0; z-index: 4; background: var(--c-surface-2); padding: 4px var(--sp-2); align-items: flex-end; }
+.npd-month { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; text-align: center; border-left: 1px solid var(--c-border); line-height: 1.15; }
+.npd-month .npd-year { font-size: 10px; color: var(--c-text); }
+.npd-month.is-year-start { border-left: 2px solid var(--c-border-strong); }
 .npd-month.is-current { color: var(--c-primary-strong); box-shadow: inset 0 -2px 0 var(--c-primary); }
-.npd-group { display: flex; align-items: center; gap: var(--sp-1); padding: 4px var(--sp-2); background: var(--c-surface-2); font-weight: var(--fw-bold); }
 .npd-item { cursor: pointer; }
-.npd-item:hover > *, .npd-item:focus-visible > * { background: var(--c-surface-2); }
-.npd-item.is-selected > * { background: var(--c-primary-soft); }
-.npd-label { display: flex; align-items: center; gap: var(--sp-2); padding: 4px var(--sp-2); min-width: 0; }
-.npd-name { display: flex; flex-direction: column; min-width: 0; }
-.npd-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.npd-sub { font-size: 11px; color: var(--c-text-muted); display: flex; align-items: center; gap: 4px; }
+.npd-item:hover > .npd-label, .npd-item:focus-visible > .npd-label { background: var(--c-surface-2); }
+.npd-item.is-selected > .npd-label { background: var(--c-primary-soft); }
+.npd-label { position: sticky; left: 0; z-index: 2; display: flex; align-items: center; gap: var(--sp-2); padding: 4px var(--sp-2); min-width: 0; background: var(--c-surface); border-right: 1px solid var(--c-border); }
+.npd-name { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.npd-name-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; font-weight: var(--fw-medium); }
+.npd-sub { font-size: 11px; color: var(--c-text-muted); display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .npd-sub .badge { font-size: 10px; padding: 0 5px; }
-.npd-track { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: center; min-height: 40px;
-  background: linear-gradient(to right, var(--c-border) 1px, transparent 1px) 0 0 / calc(100% / 12) 100%; }
-.npd-band { grid-row: 1; z-index: 1; height: 20px; margin: 0 2px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--c) 22%, transparent);
-  border: 1px solid var(--c); color: var(--c-text); font-size: 11px; line-height: 18px; padding-left: 16px; white-space: nowrap; overflow: hidden; }
-.npd-pin { grid-row: 1; z-index: 2; justify-self: start; margin-left: calc(var(--x) - 6px); color: var(--c); font-size: 14px; line-height: 1; }
+.npd-line { font-size: 11px; color: var(--c-text-muted); line-height: 1.2; }
+.npd-overdue { flex: 0 0 auto; color: var(--c-warn-fg); font-size: 16px; cursor: help; }
+.npd-track { display: grid; grid-template-columns: repeat(var(--npd-n, 12), var(--npd-col)); align-items: center; min-height: 52px; }
+.npd-cell { grid-row: 1; align-self: stretch; border-left: 1px solid var(--c-border); }
+.npd-cell.is-year-start { border-left: 2px solid var(--c-border-strong); }
+.npd-cell.is-current { background: color-mix(in srgb, var(--c-primary) 6%, transparent); }
+.npd-seg { grid-row: 1; z-index: 1; height: 18px; margin: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--c) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent); color: var(--c-text); font-size: 10px; line-height: 16px; padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.npd-seg.is-current { border: 2px solid var(--c); font-weight: var(--fw-bold); line-height: 14px; }
+.npd-pin { grid-row: 1; z-index: 3; justify-self: center; color: var(--c); font-size: 16px; line-height: 1; }
+.npd-after { grid-row: 1; z-index: 2; height: 18px; margin: 0 1px; border-radius: 3px; background: color-mix(in srgb, var(--npd-launched) 14%, transparent);
+  color: var(--npd-launched); font-size: 10px; font-weight: var(--fw-bold); line-height: 18px; text-align: right; padding-right: 4px; }
+.npd-quarter { grid-row: 1; z-index: 2; height: 18px; margin: 0 1px; border: 2px dashed var(--npd-launched); border-radius: 3px; color: var(--npd-launched);
+  font-weight: var(--fw-bold); font-size: 12px; line-height: 14px; text-align: center; }
 .thumb-sm { flex: 0 0 auto; }
 .npd-label .thumb-sm { width: 28px; height: 28px; font-size: 10px; }
 
@@ -47,6 +73,7 @@
 .npd-table tr.is-clickable:hover > * { background: var(--c-surface-2); }
 .npd-table tr.is-selected > * { background: var(--c-primary-soft); }
 .npd-table .npd-name { flex-direction: row; align-items: center; gap: var(--sp-2); }
+.npd-acc-cell { max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .npd-stage { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
 .npd-stage::before { content: ''; width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
 
@@ -57,16 +84,14 @@
 .npd-accounts td { padding: 3px var(--sp-2); }
 .npd-open { text-decoration: none; font-weight: var(--fw-bold); }
 .npd-note { font-size: var(--fs-sm); }
+.npd-note.callout-warn { background: var(--c-warn-bg); border-color: var(--c-warn-bd); color: var(--c-warn-fg); }
 .npd-drawer .pd-body > a { font-size: var(--fs-sm); }
+.npd-targets { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px var(--sp-3); font-size: var(--fs-sm); }
+.npd-targets li.is-current { font-weight: var(--fw-bold); }
+.npd-targets li.is-overdue { color: var(--c-warn-fg); font-weight: var(--fw-bold); }
+.npd-targets-edit { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-3); }
+.npd-target-field { display: flex; flex-direction: column; gap: 2px; }
+.npd-launch-edit { flex-wrap: wrap; gap: var(--sp-2); }
 
 @media (max-width: 1100px) { .npd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .npd-kpis { grid-template-columns: minmax(0, 1fr); } .npd-timeline { --npd-label: 200px; } }
-
-/* CR-20: คำขอจาก Sales (กลุ่มแยกด้านบน เลื่อนภายในเมื่อมีหลายรายการ) */
-.npd-requests { padding: var(--sp-2) var(--sp-3); }
-.npd-requests > * + * { margin-top: var(--sp-2); }
-.npd-req-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; font: inherit; }
-.npd-req-scroll { max-height: 180px; overflow: auto; }
-.npd-req-table { font-size: 13px; }
-.npd-req-note { max-width: 22em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.npd-req-empty { margin: 0; }
+@media (max-width: 600px) { .npd-kpis { grid-template-columns: minmax(0, 1fr); } .npd-timeline { --npd-label: 190px; } .npd-targets, .npd-targets-edit { grid-template-columns: minmax(0, 1fr); } }

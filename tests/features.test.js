@@ -14,7 +14,7 @@
   function FT() { return SP.core.features; }
   function W() { return SP.core.workflow; }
   function calc() { return SP.core.calc; }
-  var ALL_ON = { approvalWorkflow: true, baseline: true, reforecast: true, sellIn: true, npdApproval: true, promotionCalendar: true };
+  var ALL_ON = { approvalWorkflow: true, baseline: true, reforecast: true, sellIn: true, npdApproval: true };
   var EDIT = ['edit', 'save', 'cancel'];
   var DIRECTOR = { type: 'director', personId: null }, MANAGEMENT = { type: 'management', personId: null };
   function subset(list) { return list.every(function (a) { return EDIT.indexOf(a) >= 0; }); }

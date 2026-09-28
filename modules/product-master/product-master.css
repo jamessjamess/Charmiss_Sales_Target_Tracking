@@ -1,5 +1,6 @@
-/* modules/product-master/product-master.css — ตาราง Product Master (คอลัมน์ SKU ติดซ้าย เลื่อนแนวนอนภายในการ์ด)
- * โหมดดู = ข้อความและเครื่องหมาย ✓ / โหมดแก้ไข = ช่องกรอกและ Checkbox (ช่องที่ยังไม่บันทึกขอบหนา) */
+/* modules/product-master/product-master.css — หน้า Listing (คอลัมน์ SKU ติดซ้าย เลื่อนแนวนอนภายในการ์ด)
+ * CR-30 รอบ 3: ช่องหน่วยขาย 2 บรรทัด (สัญลักษณ์สถานะ + เดือนเริ่ม / อายุ) · สีเฉพาะสัญลักษณ์ (ไม่ทาพื้นทั้งช่อง)
+ * โหมดแก้ไข = คลิกช่องเปิด Popover · Shift / Ctrl + คลิก = เลือกหลายช่อง (ช่องที่ยังไม่บันทึกขอบหนา) */
 
 .page-productMaster .module-body > * + * { margin-top: var(--sp-3); }
 
@@ -24,7 +25,8 @@
 .pm-table thead tr:nth-child(2) th { top: 26px; }
 .pm-acc-group { text-align: center !important; color: var(--c-text-muted); border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border); }
 .pm-mark { font-weight: var(--fw-bold); color: var(--c-success-fg); }
-.pm-table td.pm-acc.is-listed { background: var(--c-success-bg); }
+.pm-mark.is-offered { color: var(--c-warn-fg); }
+.pm-mark.is-delisted { color: var(--c-danger-fg); }
 .pm-table td.is-dirty-cell { box-shadow: inset 0 0 0 2px var(--c-dirty); }
 
 .pm-table .pm-sku { position: sticky; left: 0; z-index: 1; background: var(--c-surface); min-width: 260px; max-width: 320px; white-space: normal; border-right: 1px solid var(--c-border); }
@@ -32,8 +34,31 @@
 .pm-sku-code { font-weight: var(--fw-bold); }
 .pm-sub { display: block; font-size: 11px; font-weight: normal; color: var(--c-text-muted); }
 .pm-status .badge { font-size: 11px; padding: 0 6px; }
-.pm-table .pm-acc { text-align: center; width: 88px; max-width: 110px; }
+.pm-table .pm-acc { text-align: center; width: 88px; max-width: 110px; line-height: 1.2; }
 .pm-acc-name { display: block; overflow: hidden; text-overflow: ellipsis; }
+.pm-acc-count { display: block; font-size: 10px; font-weight: normal; color: var(--c-text-muted); }
+.pm-cell-1, .pm-cell-2 { display: block; white-space: nowrap; }
+.pm-cell-1 { font-size: 12px; font-variant-numeric: tabular-nums; }
+.pm-cell-1 .pm-mark { margin-right: 3px; }
+.pm-cell-2 { font-size: 10px; color: var(--c-text-muted); min-height: 1.2em; }
+.pm-to { margin-left: 2px; color: var(--c-danger-fg); }
+.pm-nosale-tag { color: var(--c-warn-fg); font-weight: var(--fw-medium); }
+.pm-table td.pm-acc.has-delisted .pm-cell-1 { color: var(--c-text-muted); }
+.pm-table.is-editing td.pm-acc { cursor: pointer; }
+.pm-table.is-editing td.pm-acc:hover { background: var(--c-surface-2); }
+.pm-table td.pm-acc.is-picked { background: var(--c-primary-soft); box-shadow: inset 0 0 0 2px var(--c-primary); }
+.pm-table .pm-cov { text-align: center; font-variant-numeric: tabular-nums; width: 90px; }
+.pm-sub .badge { font-size: 10px; padding: 0 5px; line-height: 1.5; }
+.pm-nosale { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-sm); }
+
+/* แถบช่องที่เลือก (ลอยด้านล่าง) และ Popover ของช่อง */
+.pm-selection { position: sticky; bottom: var(--sp-2); z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); width: max-content; max-width: 100%;
+  padding: var(--sp-2) var(--sp-3); background: var(--c-surface); border: 1px solid var(--c-primary); border-radius: var(--radius-sm); box-shadow: 0 4px 12px var(--c-shadow); }
+.pm-selection-text { font-weight: var(--fw-bold); }
+.pm-l-popover { max-width: 420px; }
+.pm-l-form { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: flex-end; }
+.pm-l-shortcuts { display: flex; flex-wrap: wrap; gap: var(--sp-1) var(--sp-3); margin-top: var(--sp-2); font-size: var(--fs-sm); }
+.pm-l-history { margin-top: var(--sp-2); max-height: 8em; overflow: auto; font-size: 11px; }
 .pm-cl-head .history-tag { vertical-align: middle; }
 .pm-cl-fields { display: inline-flex; align-items: center; gap: 4px; }
 .pm-empty { color: var(--c-text-muted); text-align: center !important; padding: var(--sp-4) !important; }

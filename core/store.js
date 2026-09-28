@@ -15,16 +15,17 @@
  *                                     (โหมดปรับแผนเขียนที่นี่เท่านั้น ไม่เขียนทับ Baseline)
  *   plan.<ปี>.workflow.<step>.<unitId|all>  { status, history: [{ action, by, at, note }], snapshot }
  *                                     step = topDown (all) | phasing | sku | forecast | baseline (all)  default: ฉบับร่าง
- *                                     baseline.snapshot = { gp, priceList, promotions } ราคาตอนล็อก (ใช้คำนวณแผนครั้งแรกหลังล็อก)
+ *                                     baseline.snapshot = { gp, basePrices, promoPrices } ราคาตอนล็อก (ใช้คำนวณแผนครั้งแรกหลังล็อก)
  *                                     + report (CR-12) = ตัวเลขทั้งหมดของรายงานสรุปแผนตอนล็อก (core/report.js build) — รายงานที่ล็อกแล้วอ่านจากที่นี่
  *   plan.<ปี>.baselineVersions        [{ no, code, at, by }] ประวัติเลขฉบับของรายงาน ({ปี}-BL-{nn}) ต่อท้ายทุกครั้งที่ล็อก Baseline   default: []
  *   master.products                   Product Master (ไม่แยกปี)   default: data/products.js
  *   master.listings                   [{ productKey, accountId (= unitId) }] (ไม่แยกปี)   default: data/listings.js
  *   master.taxonomy                   หมวดสินค้าและ Series   default: data/taxonomy.js
- *   master.priceList                  ราคาตามวันที่มีผล   default: data/pricing.js
- *   master.accountPrices              ราคาต่อ Account [{ productKey, accountId, price }] ราคาเดียวทั้งปี รวม VAT (CR-18)   default: data/pricing.js (จาก seed)
- *   master.promotions                 Promotion Price   default: data/promotions.js
+ *   master.basePrices                 CR-30 ราคาหลักรายเดือน [{ productKey, priceType, effectiveMonth, price, by, at }]   default: data/pricing.js (core/seed.js)
+ *   master.promoPrices                CR-30 Promotion Price รายเดือน [{ productKey, channelId, unitId | null, month, price, by, at }] (แทน accountPrices)   default: data/pricing.js (จาก seed)
  *   master.npdPlans                   แผน NPD (มี workflow ของตัวเอง)   default: data/npd.js
+ *   master.codeCounters               CR-30 เลข Product Code ล่าสุดของแต่ละกลุ่ม { <เลขนำหน้า>: number }   default: core/seed.js
+ *   ui.columnPresets                  CR-30 Preset คอลัมน์ส่วนตัว { <userId>: { <tableId>: { presets, defaultId, columns } } } · ui.productMoreFilters
  *   master.audit                      Audit log [{ entity, key, field, oldValue, newValue, by, at }]   default: []
  *   master.accounts / master.territories / master.salespeople / master.assignments
  *                                     Account, เขตการขาย, Sales Person, ผู้รับผิดชอบตามช่วงเดือน (ไม่แยกปี)
@@ -50,7 +51,7 @@
  * API: get(key) / set(key, value) / remove(key) กลับไปใช้ค่าตั้งต้น / reset() ล้างทุก Key
  *      isSet(key) / keys() / onChange(fn) / status { persistent, crossPage }
  *      year() = ปีแผนที่เลือก / planKey('topDown') = 'plan.<ปีที่เลือก>.topDown'
- *      master() = { products, listings, taxonomy, priceList, accountPrices, promotions, npdPlans, audit, accounts, territories, salespeople,
+ *      master() = { products, listings, taxonomy, basePrices, promoPrices, npdPlans, codeCounters, audit, accounts, territories, salespeople,
  *                   assignments, stores, storeAssignments, storeMoves, provinceSuggestions } จาก master.*
  *      data()   = SP.data ที่แทน Master ทุกชุดด้วยค่าใน master.*
  *                 (ส่งให้ calc แทน SP.data เพื่อให้ค่าที่แก้ในหน้า Master มีผลทุกหน้า)
@@ -72,8 +73,13 @@
   // รุ่นโครงข้อมูล: v6 เปลี่ยนสินค้าเป็น productKey (TR Code / รหัสชั่วคราว) / 7 = CR-11 สินค้าจริงจาก data/seed/
   // 8 = CR-16 เขต TT และ Sales Person TT จากข้อมูลร้านค้าจริง (id เขตเปลี่ยน)
   // 9 = CR-18 ราคารวม VAT + ราคาต่อ Account แยกจาก Price List (master.accountPrices)
-  // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด)
-  var DATA_VERSION = 9;
+  // 10 = CR-30 Product Code ระบบสร้าง (รหัสชั่วคราวเดิมเปลี่ยนเป็นรหัสระบบ) · ตัด Internal Code / Item Type
+  // 11 = CR-30 ราคาหลักรายเดือน (master.basePrices) + Promotion Price (master.promoPrices) แทน priceList / accountPrices / promotions · แผน NPD ต่อเนื่อง
+  // 12 = CR-32 หน่วยขายและคู่ค้าทุก Channel (master.customers · master.customerAssignments · accounts[].suggest)
+  // 13 = CR-32 ผูกผู้ใช้กับบุคลากรที่ person.userId ที่เดียว (master.users ไม่มี salesPersonId แล้ว)
+  // 14 = CR-30 รอบ 3 Listing ตามช่วงเวลาและสถานะ (master.listings: status · fromMonth · toMonth)
+  // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด · CR-32 แจ้งผู้ใช้ 1 ครั้งด้วย ui.toast = content.site.dataVersionToast)
+  var DATA_VERSION = 14;
 
   function sessionAdapter() {
     var ss;
@@ -119,7 +125,11 @@
 
   function clone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
 
+  // CR-29: Channel Master แก้ได้ที่หน้า Account & Platform (ตั้งค่า Channel) → master.channels · ค่าที่บันทึกไว้แทน SP.data.channels ทั้งเว็บ
+  //   (ทุก Module อ่าน SP.data.channels) · ค่าตั้งต้นจาก data/channels.js ตอนโหลด · รีเซ็ตข้อมูล = กลับค่าตั้งต้น
+  var BASE_CHANNELS = JSON.parse(JSON.stringify(SP.data.channels || []));
   var DEFAULTS = [
+    { match: /^master\.channels$/, make: function () { return clone(BASE_CHANNELS); } },
     {
       match: /^app\.planYear$/,
       make: function () { return SP.data.settings.DEFAULT_PLAN_YEAR; }
@@ -157,10 +167,10 @@
     { match: /^master\.products$/, make: function () { return clone(SP.data.products); } },
     { match: /^master\.listings$/, make: function () { return clone(SP.data.listings); } },
     { match: /^master\.taxonomy$/, make: function () { return clone(SP.data.taxonomy); } },
-    { match: /^master\.priceList$/, make: function () { return clone(SP.data.priceList); } },
-    { match: /^master\.accountPrices$/, make: function () { return clone(SP.data.accountPrices || []); } },
-    { match: /^master\.promotions$/, make: function () { return clone(SP.data.promotions); } },
+    { match: /^master\.basePrices$/, make: function () { return clone(SP.data.basePrices || []); } },
+    { match: /^master\.promoPrices$/, make: function () { return clone(SP.data.promoPrices || []); } },
     { match: /^master\.npdPlans$/, make: function () { return clone(SP.data.npdPlans); } },
+    { match: /^master\.codeCounters$/, make: function () { return clone(SP.data.codeCounters || {}); } },
     { match: /^master\.audit$/, make: function () { return []; } },
     { match: /^master\.accounts$/, make: function () { return clone(SP.data.accounts); } },
     { match: /^master\.territories$/, make: function () { return clone(SP.data.territories); } },
@@ -170,6 +180,9 @@
     { match: /^master\.storeAssignments$/, make: function () { return clone(SP.data.storeAssignments || []); } },
     { match: /^master\.storeMoves$/, make: function () { return []; } },
     { match: /^master\.provinceSuggestions$/, make: function () { return clone(SP.data.provinceSuggestions || {}); } },
+    // CR-32: คู่ค้าของ Account / Platform (ร้านค้า TT อยู่ที่ master.stores) · ช่วงของคู่ค้าในหน่วยขาย (TT อยู่ที่ master.storeAssignments)
+    { match: /^master\.customers$/, make: function () { return clone(SP.data.customers || []); } },
+    { match: /^master\.customerAssignments$/, make: function () { return clone(SP.data.customerAssignments || []); } },
     {
       match: /^ui\.selection$/,
       make: function () {
@@ -189,6 +202,8 @@
     { match: /^ui\.sidebarCollapsed$/, make: function () { return false; } },
     { match: /^ui\.seriesFilter$/, make: function () { return []; } },
     { match: /^ui\.productColumns$/, make: function () { return []; } },
+    { match: /^ui\.columnPresets$/, make: function () { return {}; } },
+    { match: /^ui\.productMoreFilters$/, make: function () { return false; } },
     { match: /^ui\.skuShowLastYear$/, make: function () { return false; } },
     { match: /^ui\.summaryTab$/, make: function () { return null; } },
     { match: /^app\.dataVersion$/, make: function () { return DATA_VERSION; } }
@@ -222,6 +237,9 @@
         delete values[k];
         adapter.remove(k);
       });
+      // CR-32: แจ้ง 1 ครั้งว่าโหลดข้อมูลตั้งต้นใหม่ (layout แสดง ui.toast แล้วล้าง)
+      var note = SP.data.content && SP.data.content.site && SP.data.content.site.dataVersionToast;
+      if (note) put('ui.toast', note);
     }
     if (values['app.dataVersion'] !== DATA_VERSION) put('app.dataVersion', DATA_VERSION);
     function put(k, v) { values[k] = v; changed.push(k); }
@@ -253,6 +271,7 @@
     changed.forEach(function (k) { adapter.save(k, values[k]); });
   }
   migrate();
+  if (Object.prototype.hasOwnProperty.call(values, 'master.channels') && Array.isArray(values['master.channels'])) SP.data.channels = clone(values['master.channels']);
 
   // เปิดจากไฟล์ในเครื่อง: Chrome/Edge ให้ location.origin = 'file://' และแชร์ sessionStorage ข้ามหน้าได้
   // Firefox ให้ 'null' เพราะมองแต่ละไฟล์เป็นคนละ Origin ค่าจึงไม่ส่งต่อข้ามหน้า
@@ -266,6 +285,7 @@
   function set(key, value) {
     values[key] = clone(value);
     adapter.save(key, values[key]);
+    if (key === 'master.channels' && Array.isArray(value)) SP.data.channels = clone(value);   // CR-29
     emit(key);
   }
 
@@ -282,10 +302,10 @@
       products: get('master.products'),
       listings: get('master.listings'),
       taxonomy: get('master.taxonomy'),
-      priceList: get('master.priceList'),
-      accountPrices: get('master.accountPrices'),
-      promotions: get('master.promotions'),
+      basePrices: get('master.basePrices'),
+      promoPrices: get('master.promoPrices'),
       npdPlans: get('master.npdPlans'),
+      codeCounters: get('master.codeCounters'),
       audit: get('master.audit'),
       accounts: get('master.accounts'),
       territories: get('master.territories'),
@@ -294,7 +314,9 @@
       stores: get('master.stores'),
       storeAssignments: get('master.storeAssignments'),
       storeMoves: get('master.storeMoves'),
-      provinceSuggestions: get('master.provinceSuggestions')
+      provinceSuggestions: get('master.provinceSuggestions'),
+      customers: get('master.customers'),
+      customerAssignments: get('master.customerAssignments')
     };
   }
 
@@ -364,6 +386,7 @@
     reset: function () {
       values = {};
       adapter.clear();
+      SP.data.channels = clone(BASE_CHANNELS);   // CR-29
       // เก็บรุ่นข้อมูลไว้ ไม่อย่างนั้นค่าที่ตั้งหลังรีเซ็ต (เช่น มุมมองผู้ใช้) ถูกล้างอีกครั้งตอนเปิดหน้าถัดไป
       values['app.dataVersion'] = DATA_VERSION;
       adapter.save('app.dataVersion', DATA_VERSION);

@@ -141,8 +141,8 @@
 .card.td-chart { display: flex; flex-direction: column; min-height: 0; padding: var(--sp-2) var(--sp-3); }
 .card.td-chart > * + * { margin-top: var(--sp-1); }
 .card > .td-chart-title { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
-/* Waterfall กลางการ์ด แต่ไม่ล้นขึ้นทับหัวการ์ด (safe) · จอเตี้ยแถวบางลง */
-.td-chart-growth .wfc { align-content: safe center; flex: 1 1 auto; min-height: 0; }
+/* CR-27: Waterfall ชิดบนของการ์ด (การ์ดสูงเท่าการ์ดซ้าย) · จอเตี้ยแถวบางลง */
+.td-chart-growth .wfc { align-content: start; flex: 1 1 auto; min-height: 0; }
 @media (max-height: 700px) {
   .page-topDown .module-body > .td-charts { min-height: 170px; }
   .td-chart-growth .wfc { gap: 1px var(--sp-2); font-size: 12px; }
@@ -175,6 +175,7 @@
 .scol-share { font-size: 11px; font-weight: var(--fw-bold); color: var(--c-surface); font-variant-numeric: tabular-nums; }
 .scol-share.is-hidden { visibility: hidden; }
 .scol-total { position: absolute; left: 0; right: 0; transform: translateY(-3px); text-align: center; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.scol-growth.is-muted { font-weight: var(--fw-medium); font-size: 10px; opacity: 0.75; white-space: normal; line-height: 1.15; }
 .scol-growth { position: absolute; left: 0; right: 0; transform: translateY(50%); text-align: center; font-size: 11px; font-weight: var(--fw-bold); color: var(--c-text-muted); white-space: nowrap; }
 .scol-xrow { display: grid; grid-template-columns: 44px minmax(0, 1fr); margin-top: 4px; }
 .scol-xlabels { display: flex; padding: 0 var(--sp-3); }

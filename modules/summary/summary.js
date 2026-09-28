@@ -7,12 +7,16 @@
  *     CR-16: อนุมัติเป้าหมายแล้วมีร้านค้าย้ายเขต → บรรทัด ร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย + รายการร้าน (report.storeMoves) นับเป็น 1 รายการ
  *     ตารางเดียว 1 แถวต่อหน่วยขาย (ทุกหน่วย calc.planActions all เรียงตามความรุนแรง ไม่มีประเด็นอยู่ท้าย): ส่วนต่าง ·
  *     เป้าหมายรายเดือน / แผน SKU (สถานะ · ผู้อนุมัติ · วันที่อนุมัติ กดสถานะ = Popover ประวัติ) · การดำเนินการถัดไป
- *     + ตัวกรอง Channel · ผู้รับผิดชอบ · เฉพาะที่มีส่วนต่าง · แสดงเฉพาะที่มีประเด็น
+ *     + ตัวกรอง Channel · ผู้รับผิดชอบ · CR-28 แท็บ ทั้งหมด · ขาด · เกิน · จัดสรรครบ · ไม่มีผู้รับผิดชอบ พร้อมจำนวน (calc.actionTabs · จำที่ ui.statusFilter)
+ *     CR-28 ส่วนต่าง = ขาด / เกิน {ล้าน} ({% ของเป้าหมายหน่วยขาย}) · ปุ่ม ไปแก้ไข → / กำหนดผู้รับผิดชอบ → · เรียง ไม่มีผู้รับผิดชอบ → % ส่วนต่างมากไปน้อย
  *   รายงานสรุปแผน (ประกาศและหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้เฉพาะแท็บนี้):
  *     หัวรายงาน: เลขฉบับ {ปี}-BL-{nn} | {ปี}-DRAFT · สถานะ · จัดสรรเป้าหมายประจำปี · พิมพ์เมื่อ · หมายเหตุที่มาของตัวเลข
  *     ยังไม่ล็อก = ลายน้ำ "ฉบับร่าง · ยังไม่ได้รับอนุมัติ" ทุกหน้า (บนจอและตอนพิมพ์) / ล็อกแล้ว = ตัวเลขทั้งหมดจาก Snapshot ของ Baseline
  *     Filter Channel · KPI 4 ใบ · กราฟรายเดือน (charts.barLine) : ที่มาของการเติบโต (charts.waterfall + stackedShare) = 60 : 40
  *     ตาราง Channel → หน่วยขาย (ยอดขายปีก่อน · เป้าหมาย · % ของ Total · เป้าหมายเทียบปีก่อน · แผน · ส่วนต่าง · สถานะอนุมัติ 2 ไอคอน · ผู้รับผิดชอบ)
+ *     CR-26: แผนตามสินค้าและช่องทาง (report.pivotPlan) — แถว Series / Category / Status › SKU (Tree พับได้) × คอลัมน์ Channel / หน่วยขาย /
+ *       เดือน / ไตรมาส · ค่า Net Sales / Sale Amount / จำนวนชิ้น · แสดงเป็นค่า / % ของแถว / % ของคอลัมน์ · ตัวกรอง · สีพื้นไล่ความเข้มต่อระดับแถว ·
+ *       คลิกช่อง SKU × หน่วยขาย = SKU Planning ของหน่วยนั้น (ui.selection + ui.skuSearchHandoff) · ส่งออกแบบแบน · ตัวเลือกจำที่ ui.summaryPivot
  *     สัดส่วนแผนตามกลุ่มสินค้า · เป้าหมายรายผู้รับผิดชอบ / การอนุมัติ: ยังไม่ล็อก = บรรทัด "อนุมัติครบแล้ว x/y หน่วยขาย" ใต้หัวรายงาน ·
  *     ล็อกแล้ว = ตารางย่อ 1 แถวต่อหน่วยขาย (ผู้อนุมัติ · วันที่ ของเป้าหมายรายเดือนและแผน SKU) + ช่องลงนาม
  *     ตัวเลขเป็นล้านบาท 2 ตำแหน่ง (KPI บาทเต็ม) / พิมพ์ A4 แนวนอน
@@ -20,10 +24,10 @@
  * CR-17 Feature Flags: ปิด approvalWorkflow = ติดตามสถานะเหลือ Channel · หน่วยขาย · ผู้รับผิดชอบ · ส่วนต่าง · การดำเนินการถัดไป (ปิดส่วนต่าง /
  *   กำหนดผู้รับผิดชอบ / –) ไม่มีบรรทัดจัดสรรเป้าหมายประจำปี · รายงานไม่มีบรรทัดสถานะ การอนุมัติ และคอลัมน์สถานะอนุมัติ · KPI = หน่วยขายที่จัดสรรครบ x / y
  *   ปิด baseline = ไม่มีปุ่มล็อก / บรรทัด Baseline / ส่วนการอนุมัติ / ช่องลงนาม รายงานเป็น {ปี}-DRAFT + ลายน้ำเสมอ
- * store อ่าน:     app.planYear, plan.<ปี>.workflow.*, plan.<ปี>.baselineVersions, ui.role, ui.summaryTab (+ Key ที่ core/report.js อ่าน)
- * store เขียน:    ui.summaryTab · ui.selection (ก่อนพาไปหน้าของรายการที่กด)
+ * store อ่าน:     app.planYear, plan.<ปี>.workflow.*, plan.<ปี>.baselineVersions, ui.role, ui.summaryTab, ui.statusFilter (+ Key ที่ core/report.js อ่าน)
+ * store เขียน:    ui.summaryTab · ui.statusFilter (CR-28) · ui.selection (ก่อนพาไปหน้าของรายการที่กด) · ui.summaryPivot · ui.skuSearchHandoff (CR-26)
  *                 plan.<ปี>.workflow.baseline.all (ล็อก / ปลดล็อกผ่าน core/workflow.js — snapshot = { gp ต่อหน่วยขาย, priceList,
- *                 accountPrices (CR-18), promotions ที่ยืนยันแล้ว, report = core/report.js build() }) · plan.<ปี>.baselineVersions (ต่อท้ายฉบับใหม่ตอนล็อก)
+ *                 CR-30 basePrices · promoPrices, report = core/report.js build() }) · plan.<ปี>.baselineVersions (ต่อท้ายฉบับใหม่ตอนล็อก)
  */
 (function (SP) {
   'use strict';
@@ -41,10 +45,15 @@
   var channelFilter = [];   // รายงาน: Channel ที่เลือก ([] = ทุก Channel)
   var collapsed = {};       // รายงาน: <channelId>: true = พับแถวหน่วยขาย
   var mixBy = 'series';     // รายงาน: กราฟกลุ่มสินค้าที่ 2 'series' | 'category'
-  var act = { channel: '', owner: '', gapOnly: false, issuesOnly: false };   // ติดตามสถานะ: ตัวกรอง (owner '_none' = ยังไม่มีผู้รับผิดชอบ)
+  var ytdMode = 'plan';     // CR-29 เป้าหมายรายผู้รับผิดชอบ: ผลงาน YTD ของ 'plan' ปีแผน | 'current' ปีปัจจุบัน (Actual อย่างเดียว)
+  var act = { channel: '', owner: '' };   // ติดตามสถานะ: ตัวกรอง (owner '_none' = ยังไม่มีผู้รับผิดชอบ) · แท็บตัวกรองจำที่ ui.statusFilter (CR-28)
   // สีแท่งตาม Status ของ SKU (ชื่อ Token)
   var STATUS_TOKENS = { planned: '--c-st-planned-fg', 'new': '--c-st-new-fg', active: '--c-st-active-fg', clearance: '--c-st-clearance-fg', discontinued: '--c-st-discontinued-fg' };
   var AP_STATES = ['draft', 'submitted', 'approved', 'returned', 'review'];
+  var MIX_STATUSES = ['active', 'new', 'clearance'];   // CR-27: แท่ง Status ในสัดส่วนแผน
+  // CR-26: ตาราง Pivot — ค่าตั้งต้น (ตัวเลือกจำที่ ui.summaryPivot) · แถวที่กางไว้ (path ของ node → true) ไม่เก็บ
+  var PIVOT_DEFAULT = { rows: 'series', cols: 'channel', value: 'net', show: 'value', filters: { series: [], channels: [], units: [], statuses: [], q: '' } };
+  var pivotOpen = {};
 
   function mb(v) { return F.millionPlain(v, 2); }
   // ป้ายแกนเป็นล้านบาท (charts.millionTick)
@@ -145,12 +154,11 @@
       var data = store.data();
       function zone(id) { var t = id ? calc.findById(data.territories, id) : null; return t ? String(t.name).split(' · ')[0] : Y.unassigned; }
       var amount = calc.sum(moved.map(function (m) { return m.salesRef; }));
-      var names = SP.data.channels.filter(function (c) { return c.allocationUnit === 'TERRITORY'; }).map(function (c) { return c.name; }).join(', ');
       var items = moved.slice(0, MAX).map(function (m) {
         return h('li', null, fill(Y.storesMovedItem, { name: m.name, id: m.systemId, from: zone(m.from), to: zone(m.to), month: F.date(m.fromMonth), amount: F.baht(m.salesRef) }));
       });
       if (moved.length > MAX) items.push(h('li', { class: 'muted' }, fill(Y.storesMovedMore, { n: moved.length - MAX })));
-      items.push(h('li', null, link('territories', fill(Y.storesMovedLink, { page: fill(pageTitle('territories'), { territoryChannels: names }) }))));
+      items.push(h('li', null, link('territories', fill(Y.storesMovedLink, { page: pageTitle('salesUnits') }))));   // CR-32: หน้าเดิมพาไป Sales Unit & Customer แท็บเขต
       return {
         tag: 'tag-warn', title: Y.storesMovedTip,
         text: fill(Y.storesMoved, { n: F.number(moved.length), amount: F.baht(amount) }),
@@ -193,7 +201,7 @@
         var by = L.roles.director;
         var res = W.applyAction(store.workflowStates(), {
           step: 'baseline', unitId: null, action: 'lock', by: by, at: at,
-          snapshot: { gp: gp, priceList: data.priceList, accountPrices: data.accountPrices || [], promotions: (data.promotions || []).filter(function (p) { return p.status === 'CONFIRMED'; }), report: rep }
+          snapshot: { gp: gp, basePrices: data.basePrices || [], promoPrices: data.promoPrices || [], report: rep }
         });
         if (!res.ok) return;
         store.saveWorkflowStates(res.states);
@@ -230,7 +238,7 @@
       live.channels.forEach(function (c) { chById[c.id] = c; });
       var all = calc.planActions(live.units.map(function (u) {
         return { id: u.id, name: u.name, channelId: u.channelId, target: u.target, plan: u.plan, phasing: u.phasing, sku: u.sku, vacant: u.owner.vacant, owner: u.owner };
-      }), { topDown: live.topDown, locked: locked, all: true, approval: AP_ON });
+      }), { topDown: live.topDown, locked: locked, all: true, approval: AP_ON, sort: 'pct' });
       var approvalOf = {};
       live.approvals.forEach(function (a) { approvalOf[a.step + '.' + a.unitId] = a; });
       var owners = [];
@@ -238,13 +246,17 @@
         var o = r.unit.owner;
         if (!o.vacant && !owners.some(function (x) { return x.id === o.id; })) owners.push({ id: o.id, name: o.name });
       });
-      var rows = all.filter(function (r) {
+      var base = all.filter(function (r) {
         var o = r.unit.owner;
         return (!act.channel || r.unit.channelId === act.channel)
-          && (!act.owner || (act.owner === '_none' ? o.vacant : !o.vacant && o.id === act.owner))
-          && (!act.gapOnly || r.rem.status === 'short' || r.rem.status === 'over')
-          && (!act.issuesOnly || r.issue);
+          && (!act.owner || (act.owner === '_none' ? o.vacant : !o.vacant && o.id === act.owner));
       });
+      // CR-28: แท็บตัวกรองพร้อมจำนวน (นับหลังตัวกรอง Channel และผู้รับผิดชอบ) · แท็บที่เป็น 0 ยังแสดงแต่สีจาง
+      var tabInfo = calc.actionTabs(base);
+      var tab = store.get('ui.statusFilter');
+      if (calc.ACTION_TABS.indexOf(tab) < 0) tab = 'all';
+      var rows = base.filter(function (r) { return calc.actionTabMatch(r, tab); });
+      var allInfo = calc.actionTabs(all);
       var filters = h('div', { class: 'rp-act-filters' },
         h('label', { class: 'rp-filter' }, h('span', { class: 'field-label' }, A.channel), C.select({
           label: A.channel, value: act.channel,
@@ -256,8 +268,26 @@
           options: [{ value: '', label: A.ownerAll }].concat(owners.map(function (o) { return { value: o.id, label: o.name }; }), [{ value: '_none', label: A.ownerNone }]),
           onChange: function (v) { act.owner = v; draw(); }
         })),
-        h('label', { class: 'rp-filter rp-check' }, h('input', { type: 'checkbox', checked: act.gapOnly, onChange: function (e) { act.gapOnly = e.target.checked; draw(); } }), A.gapOnly),
-        h('label', { class: 'rp-filter rp-check rp-switch' }, h('input', { type: 'checkbox', role: 'switch', checked: act.issuesOnly, onChange: function (e) { act.issuesOnly = e.target.checked; draw(); } }), A.issuesOnly));
+        C.segmented({
+          label: A.tabsLabel, value: tab,
+          options: tabInfo.tabs.map(function (t) {
+            return { value: t.id, className: 'rp-tab-' + t.id + (t.count ? '' : ' is-zero'), title: A.tabTips[t.id],
+              label: [A.tabs[t.id] + ' ', h('span', { class: 'rp-tab-count' }, fill(A.tabCount, { n: t.count }))] };
+          }),
+          onChange: function (v) { store.set('ui.statusFilter', v); draw(); }
+        }));
+      // CR-28: ส่วนต่าง = ข้อความคงเหลือเป็นล้านบาท + % ของเป้าหมายหน่วยขาย · จัดสรรครบ / ยังไม่กำหนด = ข้อความอย่างเดียว
+      function gapCell(r) {
+        var st = r.rem.status;
+        var text = C.remainingText(r.rem, mb);
+        return h('span', { class: 'rp-gap text-' + st }, (st === 'short' || st === 'over') && r.gapPct != null ? fill(page.gapWithPct, { text: text, pct: F.pct(r.gapPct, 1) }) : text);
+      }
+      // CR-28: การดำเนินการถัดไป = ปุ่มเล็ก ไปแก้ไข → (หน้าของขั้นที่ต้องทำ) / กำหนดผู้รับผิดชอบ → (หน้าผู้รับผิดชอบ) · ไม่มีประเด็น = –
+      function nextCell(r, ch, u) {
+        if (!r.next) return page.noIssue;
+        var label = r.next === 'assignOwner' ? page.goAssign : page.goFix;
+        return link(r.entry, label, ch.id, u.id, fill(page.nextTip, { page: pageTitle(r.entry), name: u.name }) + ' · ' + page.next[r.next], 'btn btn-secondary btn-sm rp-go');
+      }
       // สถานะ = ปุ่มเปิด Popover ประวัติ Workflow ของขั้นนั้น (ผู้ส่ง · วันที่ส่ง · ส่งกลับแก้ไข · ผู้อนุมัติ) + ลิงก์ไปหน้านั้น
       function statusCell(step, st, ch, u) {
         var entry = stepEntry(step);
@@ -302,15 +332,18 @@
             h('td', { class: 'rp-act-ch', title: ch.fullName }, ch.name),
             h('th', { scope: 'row' }, link('skuPlanning', u.name, ch.id, u.id, fill(page.openPlan, { name: u.name }))),
             h('td', { class: 'rp-owner' + (u.owner.vacant ? ' is-vacant' : ''), title: u.owner.title }, u.owner.vacant ? A.ownerNone : u.owner.name),
-            h('td', { class: 'num' }, gapText(r.rem)),
+            h('td', { class: 'num' }, gapCell(r)),
             AP_ON ? [h('td', { class: 'rp-status is-first' }, statusCell('phasing', u.phasing, ch, u)), approvalCells('phasing', u),
               h('td', { class: 'rp-status is-first' }, statusCell('sku', u.sku, ch, u)), approvalCells('sku', u)] : null,
-            h('td', null, r.next ? link(r.entry, page.next[r.next], ch.id, u.id, fill(page.nextTip, { page: pageTitle(r.entry), name: u.name }), 'rp-next') : page.noIssue));
+            h('td', { class: 'rp-next-cell' }, nextCell(r, ch, u)));
         }))))
-        : h('p', { class: 'rp-note rp-empty' }, act.issuesOnly && !acts.length ? page.actionsNone : page.actionsNoneFiltered);
+        : h('p', { class: 'rp-note rp-empty' }, page.actionsNoneFiltered);
+      // CR-28: ทุกหน่วยขายจัดสรรครบ = ข้อความพร้อมไอคอนเขียว
+      var done = allInfo.total && !allInfo.pending ? h('p', { class: 'rp-all-done alert-ok' }, h('span', { class: 'rp-done-icon', 'aria-hidden': 'true' }, '✓'), page.allDone) : null;
       return h('section', { class: 'card rp-section rp-actions no-print' },
-        h('div', { class: 'rp-act-head' }, h('h2', null, AP_ON ? page.actionsTitle : page.actionsTitleLite, h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: acts.length, total: all.length }))), filters),
-        body);
+        h('div', { class: 'rp-act-head' }, h('h2', null, AP_ON ? page.actionsTitle : page.actionsTitleLite,
+          h('span', { class: 'rp-count' }, fill(page.actionsCount, { n: allInfo.pending, total: allInfo.total }))), filters),
+        done, body);
     }
 
     // =====================================================================
@@ -324,10 +357,14 @@
       if (ver.draft) wrap.appendChild(watermark());
       wrap.appendChild(docHead(M, states, locked, ver, cur.fromSnapshot));
       wrap.appendChild(toolbar(M.rep));
+      // CR-27 ลำดับ: KPI → ที่มาของการเติบโต : สัดส่วน Channel (55 : 45) → ตาราง Channel และหน่วยขาย → เป้าหมายเทียบแผนรายเดือน (เต็มความกว้าง)
+      //   → สัดส่วนแผนตามกลุ่มสินค้า → แผนตามสินค้าและช่องทาง → เป้าหมายรายผู้รับผิดชอบ · พิมพ์ขึ้นหน้าใหม่ก่อน ตาราง · กลุ่มสินค้า · รายผู้รับผิดชอบ
       wrap.appendChild(kpis(M, locked));
-      wrap.appendChild(h('div', { class: 'rp-row2' }, monthly(M), growth(M)));
+      wrap.appendChild(h('div', { class: 'rp-row2 rp-growth-row' }, growth(M), shareCard(M)));
       wrap.appendChild(unitTable(M));
+      wrap.appendChild(monthly(M));
       wrap.appendChild(mix(M));
+      wrap.appendChild(pivotSection(M, live));
       wrap.appendChild(people(M));
       if (!ver.draft && BL_ON) {
         if (AP_ON) wrap.appendChild(approvals(M));
@@ -437,25 +474,30 @@
         }));
     }
 
-    // ---------- ที่มาของการเติบโต + สัดส่วน Channel ----------
+    // ---------- ที่มาของการเติบโต (Waterfall) ----------
     function growth(M) {
       var TD = P.topDown;
       var sub = { prior: M.prior, amount: M.target, children: M.channels, remaining: M.all ? M.rep.total.remaining : null };
       var wf = calc.growthWaterfall(sub);
-      var share = calc.channelShareRows(sub);
       var charts = SP.core.charts;
-      function parts(list) {
-        return list.map(function (p) { var ch = calc.findById(M.channels, p.id); return { id: p.id, value: p.share, colorToken: ch.color, title: fill(TD.shareTip, { name: ch.name, pct: F.pct(p.share, 1) }) }; });
-      }
       return h('section', { class: 'card rp-section rp-growth' }, h('h2', null, TD.wfTitle),
         charts.waterfall({
           start: { label: fill(TD.wfStart, { year: year - 1 }), value: wf.start }, end: { label: fill(TD.wfEnd, { year: year }), value: wf.end },
           steps: wf.steps.map(function (s) { return s.unallocated ? { id: '_rest', label: s.delta >= 0 ? TD.unallocated : TD.overAllocated, value: s.delta } : { id: s.id, label: s.name, value: s.delta, tag: s.isNew ? L.growthNew : null }; }),
           format: mb, signed: function (v) { return (v < 0 ? '−' : '+') + mb(Math.abs(v)); }, tick: axisText,
           axisNote: function (lo) { return fill(page.wfAxis, { value: F.number(lo / 1e6, 0) }); }
-        }),
-        h('h3', { class: 'rp-growth-share' }, fill(TD.shareTitle, { prior: year - 1, year: year })),
-        charts.stackedShare({
+        }));
+    }
+    // CR-27: สัดส่วน Channel L12M เทียบเป้าหมาย — การ์ดแยกคู่กับ Waterfall
+    function shareCard(M) {
+      var TD = P.topDown;
+      var sub = { prior: M.prior, amount: M.target, children: M.channels, remaining: M.all ? M.rep.total.remaining : null };
+      var share = calc.channelShareRows(sub);
+      function parts(list) {
+        return list.map(function (p) { var ch = calc.findById(M.channels, p.id); return { id: p.id, value: p.share, colorToken: ch.color, title: fill(TD.shareTip, { name: ch.name, pct: F.pct(p.share, 1) }) }; });
+      }
+      return h('section', { class: 'card rp-section rp-share' }, h('h2', null, fill(TD.shareTitle, { prior: year - 1, year: year })),
+        SP.core.charts.stackedShare({
           rows: [{ label: L.priorInfo.short, parts: parts(share.prior) }, { label: String(year), parts: parts(share.target) }],
           legend: M.channels.map(function (c) { return { id: c.id, label: c.name, colorToken: c.color }; })
         }));
@@ -533,6 +575,179 @@
       return h('section', { class: 'card rp-section rp-break rp-table-card' }, h('h2', null, page.tableTitle), h('div', { class: 'table-scroll' }, table), AP_ON ? legend : null);
     }
 
+    // ---------- CR-26: แผนตามสินค้าและช่องทาง (Pivot) ----------
+    function pivotCfg() {
+      var s = store.get('ui.summaryPivot') || {};
+      var f = s.filters || {};
+      var d = PIVOT_DEFAULT;
+      return { rows: s.rows || d.rows, cols: s.cols || d.cols, value: s.value || d.value, show: s.show || d.show,
+        filters: { series: f.series || [], channels: f.channels || [], units: f.units || [], statuses: f.statuses || [], q: f.q || '' } };
+    }
+    function pivotSection(M, live) {
+      var X = page.pivot;
+      var box = h('section', { class: 'card rp-section rp-pivot' });
+      var master = store.master();
+      function save(cfg) { store.set('ui.summaryPivot', cfg); paint(); }
+      function paint() {
+        // คงตำแหน่งเลื่อนของตารางเมื่อพับ / กางแถว
+        var old = box.querySelector('.pv-scroll');
+        var pos = old ? [old.scrollTop, old.scrollLeft] : null;
+        C.clear(box);
+        var cfg = pivotCfg();
+        // ตัวกรอง Channel ของหน้า (ด้านบนรายงาน) ใช้เมื่อยังไม่ได้เลือก Channel ในตารางนี้
+        var f = { series: cfg.filters.series, channels: cfg.filters.channels.length ? cfg.filters.channels : channelFilter, units: cfg.filters.units, statuses: cfg.filters.statuses, q: cfg.filters.q };
+        var pv = R.pivotPlan({ rows: cfg.rows, cols: cfg.cols, value: cfg.value, show: cfg.show, filters: f }, live);
+        var money = cfg.value !== 'units';
+        var pct = cfg.show !== 'value';
+        var unitText = pct ? X.showOptions[cfg.show] : money ? fill(X.moneyUnit, { value: X.valueOptions[cfg.value] }) : X.valueOptions.units;
+        function setKey(k, v) { var c = pivotCfg(); c[k] = v; save(c); }
+        function setFilter(k, v) { var c = pivotCfg(); c.filters[k] = v; save(c); }
+        function sel(k, opts) {
+          return h('label', { class: 'field' }, h('span', { class: 'field-label' }, X[k + 'Label']),
+            C.select({ label: X[k + 'Label'], value: cfg[k], className: 'pv-' + k, options: opts.map(function (o) { return { value: o, label: X[k + 'Options'][o] }; }), onChange: function (v) { setKey(k, v); } }));
+        }
+        var seriesOptions = calc.seriesList(master.taxonomy, master.products).filter(function (o) { return !o.depth; });
+        var unitOptions = M.rep.units.map(function (u) { var ch = M.rep.channels.filter(function (c) { return c.id === u.channelId; })[0]; return { value: u.id, label: (ch ? ch.name + ' · ' : '') + u.name }; });
+        var search = h('input', { type: 'search', class: 'search-input pv-search', placeholder: X.search, 'aria-label': X.search, value: cfg.filters.q });
+        search.addEventListener('change', function () { setFilter('q', search.value.trim()); });
+        var anyOpen = Object.keys(pivotOpen).some(function (k) { return pivotOpen[k]; });
+        var toggleAll = h('button', { type: 'button', class: 'btn btn-ghost btn-sm pv-toggle-all', onClick: function () {
+          if (anyOpen) pivotOpen = {};
+          else (function walk(nodes) { nodes.forEach(function (n) { if (n.children.length) { pivotOpen[n.path] = true; walk(n.children); } }); })(pv.rows);
+          paint();
+        } }, anyOpen ? X.collapseAll : X.expandAll);
+        var exportBtn = C.exportButton({ build: function () { return pivotExport(pv, cfg, unitText, M); } });
+        box.appendChild(h('div', { class: 'rp-pivot-head' }, h('h2', null, fill(X.title, { unit: unitText })), h('span', { class: 'rp-pivot-tools no-print' }, toggleAll, exportBtn)));
+        box.appendChild(h('div', { class: 'tool-row rp-pivot-controls no-print' },
+          sel('rows', ['series', 'category', 'status']), sel('cols', ['channel', 'unit', 'month', 'quarter']),
+          sel('value', ['net', 'sale', 'units']), sel('show', ['value', 'rowPct', 'colPct']),
+          C.seriesFilter({ options: seriesOptions, value: cfg.filters.series, onChange: function (v) { setFilter('series', v); } }),
+          C.multiSelect({ label: X.channelFilter, allLabel: X.all, selected: X.selected, clear: L.series.clear, empty: L.series.empty, value: cfg.filters.channels,
+            options: M.rep.channels.map(function (c) { return { value: c.id, label: c.name }; }), onChange: function (v) { setFilter('channels', v); } }),
+          C.multiSelect({ label: X.unitFilter, allLabel: X.all, selected: X.selected, clear: L.series.clear, empty: L.series.empty, value: cfg.filters.units, search: X.unitSearch,
+            options: unitOptions, onChange: function (v) { setFilter('units', v); } }),
+          C.multiSelect({ label: X.statusFilter, allLabel: X.all, selected: X.selected, clear: L.series.clear, empty: L.series.empty, value: cfg.filters.statuses,
+            options: ['active', 'new', 'clearance', 'discontinued', 'planned'].map(function (s) { return { value: s, label: L.status[s] }; }), onChange: function (v) { setFilter('statuses', v); } }),
+          search));
+        // ตอนพิมพ์: บอกมุมมองที่พิมพ์แทนตัวควบคุม
+        box.appendChild(h('p', { class: 'rp-note print-only' }, fill(X.printView, { view: pivotView(cfg) })));
+        if (!pv.count) { box.appendChild(h('p', { class: 'grid-empty' }, X.empty)); return; }
+        var tableBox = pivotTable(pv, cfg, money, pct, M, paint);
+        box.appendChild(tableBox);
+        if (pos) { tableBox.scrollTop = pos[0]; tableBox.scrollLeft = pos[1]; }
+        box.appendChild(h('div', { class: 'rp-pivot-legend' }, h('span', null, X.legendLow), h('span', { class: 'pv-legend-bar', 'aria-hidden': 'true' }), h('span', null, X.legendHigh),
+          h('span', { class: 'muted small' }, X.legendNote), cfg.cols === 'unit' ? h('span', { class: 'muted small no-print' }, X.clickNote) : null));
+      }
+      paint();
+      return box;
+    }
+    function pivotView(cfg) {
+      var X = page.pivot;
+      return fill(X.viewText, { rows: X.rowsOptions[cfg.rows], cols: X.colsOptions[cfg.cols], value: X.valueOptions[cfg.value], show: X.showOptions[cfg.show] });
+    }
+    function pivotColLabel(cfg, c, M) {
+      if (cfg.cols === 'month') return F.MONTHS[c.id];
+      if (cfg.cols === 'quarter') return fill(page.pivot.quarter, { n: c.id + 1 });
+      if (cfg.cols === 'unit') { var u = M.units.filter(function (x) { return x.id === c.id; })[0] || M.rep.units.filter(function (x) { return x.id === c.id; })[0]; return u ? u.name : c.id; }
+      var ch = M.rep.channels.filter(function (x) { return x.id === c.id; })[0];
+      return ch ? ch.name : c.id;
+    }
+    function pivotRowLabel(cfg, n) {
+      var X = page.pivot;
+      if (n.kind === 'sku') return n.label;
+      if (cfg.rows === 'status') return L.status[n.id] || X.none;
+      if (n.kind === 'sub') return n.label || X.noSub;
+      return n.label || (cfg.rows === 'category' ? X.noCategory : X.noSeries);
+    }
+    function pivotFmt(v, money, pct) {
+      if (!v) return '';
+      if (pct) return F.pct(v, 1);
+      return money ? mb(v) : F.units(v);
+    }
+    function pivotTable(pv, cfg, money, pct, M0, repaint) {
+      var X = page.pivot;
+      var unitMode = cfg.cols === 'unit';
+      var head;
+      var corner = h('th', { scope: 'col', class: 'pv-corner', rowspan: unitMode ? '2' : null }, X.rowsOptions[cfg.rows]);
+      if (unitMode) {
+        var groups = [];
+        pv.cols.forEach(function (c) { var g = groups[groups.length - 1]; if (g && g.id === c.group) g.n++; else groups.push({ id: c.group, n: 1 }); });
+        head = h('thead', null,
+          h('tr', { class: 'pv-group-row' }, corner, groups.map(function (g) {
+            var ch = M0.rep.channels.filter(function (x) { return x.id === g.id; })[0];
+            return h('th', { scope: 'colgroup', colspan: String(g.n), class: 'pv-group', style: { '--c': ch ? C.tokenVar(ch.color) : null } }, ch ? ch.name : g.id);
+          }), h('th', { scope: 'col', class: 'num pv-total', rowspan: '2' }, X.total)),
+          h('tr', null, pv.cols.map(function (c) { return h('th', { scope: 'col', class: 'num' }, pivotColLabel(cfg, c, M0)); })));
+      } else {
+        head = h('thead', null, h('tr', null, corner, pv.cols.map(function (c) { return h('th', { scope: 'col', class: 'num' }, pivotColLabel(cfg, c, M0)); }),
+          h('th', { scope: 'col', class: 'num pv-total' }, X.total)));
+      }
+      var body = h('tbody');
+      function heat(v, level) {
+        var mx = pv.max[level] || 0;
+        return mx && v ? Math.round(Math.min(1, Math.abs(v) / mx) * 45) + '%' : null;
+      }
+      function row(n, visible) {
+        var open = !!pivotOpen[n.path];
+        var isSku = n.kind === 'sku';
+        var label = isSku ? h('span', { class: 'pv-sku' }, h('span', { class: 'pv-sku-name' }, n.label), h('span', { class: 'pv-sku-code' }, n.id))
+          : h('button', { type: 'button', class: 'pv-toggle', 'aria-expanded': open ? 'true' : 'false', onClick: function () { pivotOpen[n.path] = !open; repaint(); } },
+            h('span', { class: 'pv-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'), pivotRowLabel(cfg, n), h('span', { class: 'pv-count' }, fill(X.count, { n: countSku(n) })));
+        var tr = h('tr', { class: 'pv-row pv-level-' + n.level + (isSku ? ' is-sku' : ''), hidden: !visible },
+          h('th', { scope: 'row', class: 'pv-label', style: { '--indent': String(n.level) } }, label),
+          n.show.map(function (v, i) {
+            var c = pv.cols[i];
+            var text = pivotFmt(v, money, pct);
+            var td = h('td', { class: 'num pv-cell', style: { '--heat': heat(v, n.level) } });
+            if (isSku && unitMode && n.values[i]) {
+              td.appendChild(h('a', { class: 'pv-go', href: SP.core.paths.to(reg.byId('skuPlanning').path), title: fill(X.clickTip, { unit: pivotColLabel(cfg, c, M0), sku: n.label }),
+                onClick: function (e) { e.preventDefault(); store.set('ui.selection', { channel: c.group, unit: c.id }); store.set('ui.skuSearchHandoff', n.id); location.href = SP.core.paths.to(reg.byId('skuPlanning').path); } }, text));
+            } else td.appendChild(document.createTextNode(text));
+            return td;
+          }),
+          h('td', { class: 'num pv-total' }, pivotFmt(n.showTotal, money, pct)));
+        body.appendChild(tr);
+        n.children.forEach(function (ch) { row(ch, visible && open); });
+      }
+      function countSku(n) { return n.kind === 'sku' ? 1 : n.children.reduce(function (s, c) { return s + countSku(c); }, 0); }
+      pv.rows.forEach(function (r) { row(r, true); });
+      var foot = h('tfoot', null, h('tr', { class: 'pv-total-row' }, h('th', { scope: 'row', class: 'pv-label' }, X.total),
+        pv.total.show.map(function (v) { return h('td', { class: 'num' }, pivotFmt(v, money, pct)); }), h('td', { class: 'num pv-total' }, pivotFmt(pv.total.showTotal, money, pct))));
+      return h('div', { class: 'table-scroll pv-scroll' }, h('table', { class: 'data-table pv-table' + (unitMode ? ' is-units' : '') }, head, body, foot));
+    }
+    // ส่งออกตามมุมมองปัจจุบัน: 1 แถวต่อ SKU พร้อมคอลัมน์ระดับบน (ไม่ Merge cell) · % = ทศนิยม · เงินเป็นบาท
+    function pivotExport(pv, cfg, unitText, M0) {
+      var X = page.pivot;
+      var E = X.exportSpec;
+      var money = cfg.value !== 'units';
+      var type = cfg.show !== 'value' ? 'pct' : money ? 'money' : 'number';
+      var rows = [];
+      (function walk(nodes, up) {
+        nodes.forEach(function (n) {
+          if (n.kind === 'sku') {
+            var r = { group: up[0] || '', sub: up[1] || '', sku: n.id, name: n.label, total: n.showTotal };
+            n.show.forEach(function (v, i) { r['c' + i] = v; });
+            rows.push(r);
+          } else walk(n.children, up.concat([pivotRowLabel(cfg, n)]));
+        });
+      })(pv.rows, []);
+      var columns = [{ key: 'group', label: cfg.rows === 'category' ? E.cols.category : cfg.rows === 'status' ? E.cols.status : E.cols.series }]
+        .concat(cfg.rows === 'category' ? [{ key: 'sub', label: E.cols.sub }] : [])
+        .concat([{ key: 'sku', label: E.cols.sku }, { key: 'name', label: E.cols.name, width: 36 }])
+        .concat(pv.cols.map(function (c, i) {
+          var label = pivotColLabel(cfg, c, M0);
+          if (cfg.cols === 'unit') { var ch = M0.rep.channels.filter(function (x) { return x.id === c.group; })[0]; if (ch) label = ch.name + ' · ' + label; }
+          return { key: 'c' + i, label: label, type: type };
+        }))
+        .concat([{ key: 'total', label: X.total, type: type }]);
+      var stamp = C.exportStamp(null);
+      var view = pivotView(cfg);
+      return {
+        filename: fill(E.file, { year: year, date: stamp.date }),
+        sheets: [{ name: E.sheet, header: C.exportHeader(year, null, [[E.headerView, view], [E.headerUnit, unitText]]), columns: columns, rows: rows }]
+      };
+    }
+
     // ---------- สัดส่วนแผนตามกลุ่มสินค้า ----------
     function mix(M) {
       var total = M.plan;
@@ -541,15 +756,28 @@
           return { label: labelOf(x), value: x.value, colorToken: tokenOf(x.key), text: fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }) };
         });
       }
-      var byStatus = items(calc.mergeMix(M.units.map(function (u) { return u.mix.status; }), 'status'), function (x) { return L.status[x.key] || x.key; }, function (k) { return STATUS_TOKENS[k] || '--c-bar'; });
+      // CR-27: ตาม Status = แท่งซ้อน 100% แท่งเดียว (ตัวเลข · % ในแต่ละช่วง)
+      var statusMix = calc.mergeMix(M.units.map(function (u) { return u.mix.status; }), 'status').filter(function (x) { return x.value > 0.5; });
+      var statusBar = SP.core.charts.stackedShare({
+        rows: [{ label: '', parts: statusMix.map(function (x) {
+          return { id: x.key, value: total ? x.value / total : 0, colorToken: STATUS_TOKENS[x.key] || '--c-bar', text: fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }),
+            title: (L.status[x.key] || x.key) + ' · ' + fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }) };
+        }) }],
+        // Legend แสดง Active · New · Clearance เสมอ (Status ที่ไม่มีแผน = "{Status} · 0%") + Status อื่นที่มีแผน
+        legend: MIX_STATUSES.concat(statusMix.map(function (x) { return x.key; }).filter(function (k) { return MIX_STATUSES.indexOf(k) < 0; })).map(function (k) {
+          var has = statusMix.some(function (x) { return x.key === k; });
+          return { id: k, label: has ? L.status[k] || k : fill(page.mixStatusZero, { status: L.status[k] || k }), colorToken: STATUS_TOKENS[k] || '--c-bar' };
+        }),
+        minLabel: 0.1
+      });
       var kind = mixBy === 'category' ? 'category' : 'series';
       var byGroup = items(calc.mergeMix(M.units.map(function (u) { return u.mix[kind]; }), kind, 8), function (x) {
         return x.key === null ? page.mixOther : x.label || (kind === 'series' ? L.series.none : page.mixNoCategory);
       }, function () { return '--c-bar'; });
       return h('section', { class: 'card rp-section rp-break rp-mix' }, h('h2', null, page.mixTitle),
-        h('div', { class: 'grid-2 rp-mix-grid' },
-          h('div', null, h('h3', null, page.mixByStatus), SP.core.charts.hbars({ items: byStatus })),
-          h('div', null,
+        h('div', { class: 'rp-mix-grid' },
+          h('div', { class: 'rp-mix-status' }, h('h3', null, page.mixByStatus), statusBar),
+          h('div', { class: 'rp-mix-group' },
             h('div', { class: 'rp-mix-head' }, h('h3', null, page.mixGroupLabel),
               h('span', { class: 'no-print' }, C.segmented({ label: page.mixGroupLabel, value: kind, options: ['series', 'category'].map(function (v) { return { value: v, label: page.mixBy[v] }; }),
                 onChange: function (v) { mixBy = v; draw(); } })),
@@ -563,6 +791,30 @@
       var targets = {}, plans = {}, names = {};
       M.units.forEach(function (u) { targets[u.id] = u.targetM; plans[u.id] = u.planM; names[u.id] = u.name; });
       var assignments = M.rep.assignments, salespeople = M.rep.salespeople;
+      // CR-29: ผลงาน YTD ณ เดือนปิดล่าสุด (SP.core.clock) เฉพาะเดือนที่รับผิดชอบ (calc.personYtd · ตัวเลขเดียวกับตารางผลงานรายบุคคลเดิม)
+      //   ปีแผนยังไม่เริ่ม = – · ดูผลงานปีปัจจุบัน = Actual จากยอดขายจริงของหน่วย (ไม่มีเป้าหมายปีนั้นในข้อมูล = เป้าหมายและ % เป็น –)
+      var lc = SP.core.clock.lastClosedMonth();
+      var lcYear = Number(lc.slice(0, 4)), lcIdx = Number(lc.slice(5, 7)) - 1;
+      var planUpto = lcYear === year ? lcIdx : lcYear > year ? 11 : -1;
+      var Y = page.ytd;
+      var data = store.data();
+      var actualsPlan = {}, actualsCur = {};
+      M.units.forEach(function (u) {
+        if (planUpto >= 0) actualsPlan[u.id] = calc.actualNetByUnit(data, store.master(), u.id, year, planUpto);
+        var hy = data.history && data.history.years[lcYear];
+        actualsCur[u.id] = hy && hy.monthly && hy.monthly[u.id] ? hy.monthly[u.id] : [];
+      });
+      function ytd(id) {
+        if (!id) return { target: null, actual: null, pct: null };
+        if (ytdMode === 'current') return { target: null, actual: calc.personYtd(assignments, salespeople, id, lcYear, actualsCur, lcIdx), pct: null };
+        var t = calc.personYtd(assignments, salespeople, id, year, targets, planUpto);
+        var a = planUpto >= 0 ? calc.personYtd(assignments, salespeople, id, year, actualsPlan, planUpto) : null;
+        return { target: t, actual: a, pct: t > 0 && a != null ? a / t : null };
+      }
+      var ytdTip = ytdMode === 'current' ? fill(Y.tipCurrent, { month: F.date(lc), year: lcYear })
+        : planUpto < 0 ? fill(Y.tipNone, { year: year }) : fill(Y.tipAt, { month: F.date(calc.monthKey(year, planUpto)) });
+      function money(v) { return v == null ? '–' : mb(v); }
+      function pctCell(v) { return v == null ? h('span', { class: 'muted' }, '–') : h('span', { class: v >= 1 ? 'text-ok' : 'text-short' }, F.pct(v, 1)); }
       var rows = [];
       salespeople.concat([null]).forEach(function (p) {
         var id = p ? p.id : null;
@@ -570,25 +822,43 @@
         if (!t.units.length) return;
         var pl = calc.performanceByPerson(assignments, salespeople, id, year, plans);
         var status = p ? calc.personStatus(p, calc.monthKey(year, 11)) : null;
+        var y = ytd(id);
         rows.push({
           name: p ? p.name : page.vacantRow, vacant: !p,
           tag: status === 'resigned' || status === 'leaving' ? fill(page.resignedTag, { month: F.date(p.endMonth) }) : null,
           units: t.units.map(function (x) { return names[x.unitId]; }).join(', '),
-          target: t.total, plan: pl.total
+          target: t.total, plan: pl.total, ytdTarget: y.target, ytdActual: y.actual, ytdPct: y.pct
         });
       });
-      var body = h('tbody', null, rows.map(function (r) {
+      // CR-27: เรียงตามเป้าหมายมากไปน้อย · แท่งเป้าหมายเทียบแผน (ความยาว = เป้าหมาย · ขีด = แผน · สีตามสถานะ · สเกลร่วมเริ่มที่ 0)
+      var bars = calc.targetPlanBars(rows);
+      var BAR_TOKENS = { short: '--status-short', over: '--status-over', ok: '--status-complete', empty: '--status-empty' };
+      var body = h('tbody', null, bars.rows.map(function (r) {
         return h('tr', { class: r.vacant ? 'is-vacant' : '' },
           h('th', { scope: 'row' }, r.name, r.tag ? h('span', { class: 'badge tag-muted rp-tag' }, r.tag) : null),
           h('td', { class: 'rp-units' }, r.units),
           h('td', { class: 'num' }, mb(r.target)), h('td', { class: 'num' }, mb(r.plan)),
-          h('td', null, gapText(calc.remaining(r.target, r.plan))));
+          h('td', { class: 'rp-vly rp-tp' }, SP.core.charts.vsLastYearBar(r.target, r.plan, bars.scaleMax, { colorToken: BAR_TOKENS[r.status] || '--c-bar', newTag: false,
+            title: fill(page.peopleBarTip, { target: mb(r.target), plan: mb(r.plan), status: C.remainingText(calc.remaining(r.target, r.plan), mb) }) })),
+          h('td', null, gapText(calc.remaining(r.target, r.plan))),
+          h('td', { class: 'num rp-ytd' }, money(r.ytdTarget)), h('td', { class: 'num rp-ytd' }, money(r.ytdActual)), h('td', { class: 'num rp-ytd' }, pctCell(r.ytdPct)));
       }));
-      return h('section', { class: 'card rp-section rp-people' }, h('h2', null, page.peopleTitle),
-        h('p', { class: 'rp-note' }, page.peopleNote),
+      var modeCtl = h('span', { class: 'rp-ytd-mode no-print' }, C.segmented({
+        label: Y.label, value: ytdMode,
+        options: [{ value: 'plan', label: fill(Y.plan, { year: year }) }, { value: 'current', label: fill(Y.current, { year: lcYear }) }],
+        onChange: function (v) { ytdMode = v; draw(); }
+      }));
+      return h('section', { class: 'card rp-section rp-break rp-people' }, h('div', { class: 'rp-people-head' }, h('h2', null, page.peopleTitle), modeCtl,
+          h('span', { class: 'print-only rp-ytd-print' }, ytdMode === 'current' ? fill(Y.current, { year: lcYear }) : fill(Y.plan, { year: year }))),
+        h('p', { class: 'rp-note' }, page.peopleNote + ' · ' + ytdTip),
         h('div', { class: 'table-scroll' }, h('table', { class: 'data-table rp-people-table' },
           h('thead', null, h('tr', null, h('th', { scope: 'col' }, PC.name), h('th', { scope: 'col' }, PC.units),
-            h('th', { scope: 'col', class: 'num' }, PC.target), h('th', { scope: 'col', class: 'num' }, PC.plan), h('th', { scope: 'col' }, PC.gap))),
+            h('th', { scope: 'col', class: 'num' }, PC.target), h('th', { scope: 'col', class: 'num' }, PC.plan),
+            h('th', { scope: 'col', class: 'rp-vly-head rp-tp-head', title: page.peopleBarHeadTip }, h('span', { class: 'has-tip' }, PC.bar), SP.core.charts.vsLastYearAxis(bars.scaleMax)),
+            h('th', { scope: 'col' }, PC.gap),
+            h('th', { scope: 'col', class: 'num rp-ytd', title: ytdTip }, h('span', { class: 'has-tip' }, PC.ytdTarget)),
+            h('th', { scope: 'col', class: 'num rp-ytd', title: ytdTip }, h('span', { class: 'has-tip' }, PC.ytdActual)),
+            h('th', { scope: 'col', class: 'num rp-ytd', title: ytdTip }, h('span', { class: 'has-tip' }, PC.ytdPct)))),
           body)));
     }
 

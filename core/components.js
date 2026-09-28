@@ -18,6 +18,9 @@
  *   Product Master: productThumb (รูปย่อ / ตัวอักษรย่อของ Series), resizeImage (ย่อรูปด้วย Canvas), completenessBadge,
  *   statusStrip (เส้นเวลา Status 12 เดือน), cascadeSelect (Dropdown หมวดสินค้า/Series แบบลำดับชั้น), drawer (แผงด้านขวา),
  *   hoverTip (Tooltip ทั่วไป), choiceDialog, exportButton (ส่งออก ▾ Excel / CSV ผ่าน SP.core.export), priorLabel (ยอดขายปี {ปี} ⓘ)
+ *   CR-28: flowDiagram (แผนภาพลำดับงานของหน้าคู่มือ · HTML + SVG) · pageHelp (ปุ่ม ? ต่อท้ายชื่อหน้า เนื้อหาจาก data/guide.js)
+ *   CR-29: checksChip (Chip ข้อมูลที่ต้องตรวจ + Popover) · historyList (ประวัติจาก master.audit) · ownerTimeline (ผู้รับผิดชอบ n เดือนต่อกัน) ·
+ *          personLink (ชื่อคน → Drawer ของคนนั้นที่หน้าบุคลากรและทีม)
  *   CR-11: gridKeys (คีย์บอร์ด เลือกช่วง คัดลอก/วางกับ Excel เติมลง/ขวา ล้างค่า ย้อนกลับ ไฮไลต์แถวและคอลัมน์ ของตารางกรอกตัวเลข),
  *   undoStack (ประวัติสำหรับ Ctrl+Z ภายในรอบแก้ไข), promptNumber (กล่องกรอกตัวเลข), dialog opts.body (เนื้อหาเพิ่มเติม)
  */
@@ -328,6 +331,16 @@
     return h('span', { class: 'growth ' + cls }, F.growth(g, labels().growthNew));
   }
 
+  // CR-27: การเติบโตของเป้าหมายเทียบ L12M — ติดลบ = ▼ เล็ก + Tooltip เป้าหมายต่ำกว่ายอดขาย 12 เดือนล่าสุด (ไม่บล็อกการบันทึก)
+  function targetGrowth(g) {
+    var el = growthText(g);
+    if (typeof g !== 'number' || !(g < 0)) return el;
+    var tip = labels().growthBelowL12m;
+    el.appendChild(h('span', { class: 'growth-warn', title: tip, 'aria-label': tip, role: 'img' }, '▼'));
+    el.title = tip;
+    return el;
+  }
+
   // options = [{ value, label, group }]
   function select(opts) {
     var el = h('select', { class: 'select' + (opts.className ? ' ' + opts.className : ''), 'aria-label': opts.label, disabled: opts.disabled, onChange: function () { opts.onChange(el.value); } });
@@ -349,7 +362,7 @@
     opts.options.forEach(function (o) {
       wrap.appendChild(h('button', {
         type: 'button',
-        class: 'seg' + (o.value === opts.value ? ' is-active' : ''),
+        class: 'seg' + (o.value === opts.value ? ' is-active' : '') + (o.className ? ' ' + o.className : ''),   // CR-28 o.className (เช่น is-zero)
         'aria-pressed': o.value === opts.value ? 'true' : 'false',
         title: o.title, disabled: o.disabled,
         onClick: function () { if (o.value !== opts.value) opts.onChange(o.value); }
@@ -700,6 +713,7 @@
   // ไอคอน SVG เส้น (ไม่มีสีใน JS ใช้ currentColor)
   var ICONS = {
     trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7',
+    lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2',
     'person-off': 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20a7 7 0 0 1 14 0M4 4l16 16'
   };
   function icon(name) {
@@ -715,6 +729,19 @@
   }
 
   // ปุ่มไอคอนถังขยะ + Tooltip + กล่องยืนยัน opts: { label, confirmTitle, lines, onConfirm, disabled, disabledTitle }
+  // CR-33: Toast ทันทีหลังบันทึก (รูปแบบเดียวกับ Toast หลังโหลดหน้าใน core/layout.js) · หายเองหลัง 4.5 วินาที หรือกดปิด · แสดงทีละ 1 ข้อความ
+  function toast(text) {
+    if (!text) return null;
+    Array.prototype.forEach.call(document.querySelectorAll('.toast.is-now'), function (x) { if (x.parentNode) x.parentNode.removeChild(x); });
+    var box = h('div', { class: 'toast is-now', role: 'status', 'aria-live': 'polite' },
+      h('span', { class: 'toast-text' }, text),
+      h('button', { type: 'button', class: 'toast-close', 'aria-label': SP.data.content.site.toastClose, onClick: function () { close(); } }, '×'));
+    function close() { if (box.parentNode) box.parentNode.removeChild(box); }
+    document.body.appendChild(box);
+    setTimeout(function () { box.classList.add('is-leaving'); setTimeout(close, 300); }, 4500);
+    return box;
+  }
+
   function trashButton(opts) {
     var title = opts.disabled ? opts.disabledTitle || opts.label : opts.label;
     return h('button', {
@@ -948,7 +975,7 @@
       }).map(function (t) {
         return { value: t.node.id, label: upLevel && !up.length ? t.path.join(' › ') : t.node.name };
       });
-      var name = X.levels[level];
+      var name = (opts.labels && opts.labels[level]) || X.levels[level];   // CR-30: opts.labels = ป้ายแทนชื่อระดับ (ไม่ระบุ = ชื่อระดับ)
       wrap.appendChild(multiSelect({
         label: name, allLabel: fill(X.filter.all, { level: name }), selected: X.filter.selected, clear: X.filter.clear,
         empty: X.filter.empty, search: X.filter.search, options: options, value: value[level] || [], guard: opts.guard,
@@ -968,6 +995,85 @@
           h('button', { type: 'button', class: 'filter-chip-x', title: fill(X.remove, { name: it.label }), 'aria-label': fill(X.remove, { name: it.label }), onClick: it.onRemove }, '×'));
       }),
       onClear ? h('button', { type: 'button', class: 'link-btn filter-chips-clear', onClick: onClear }, X.clearAll) : null);
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-30 เลือกคอลัมน์ + Preset ส่วนตัว (ใช้ซ้ำกับตารางอื่นได้ · ข้อความจาก labels.columnPicker)
+  // opts = { label (ป้ายปุ่ม), fixedNote (คอลัมน์ที่แสดงเสมอ), columns: [{ key, label }] (คอลัมน์ที่เลือกได้),
+  //          state() → { value: [keys ตามลำดับที่แสดง], presets: [{ id, name, columns, system }], defaultId },
+  //          onChange(keys), onPreset(action, arg) — action: 'pick' (id) | 'save' (ชื่อ) | 'remove' (id) | 'default' (id) | 'reset' }
+  //   ติ๊กเพื่อแสดง · ลาก (หรือปุ่ม ▲ ▼) เพื่อเรียงลำดับ · Preset ที่ตรงกับคอลัมน์ปัจจุบันถูกเลือกไว้ · ของระบบลบไม่ได้
+  // → ปุ่ม (Popover อยู่ใต้ปุ่ม ปิดด้วยคลิกข้างนอก / Esc) — Module ควรวาดเฉพาะตารางใหม่เมื่อ onChange (ไม่วาดปุ่มใหม่)
+  // ---------------------------------------------------------------------
+  function columnPicker(opts) {
+    var X = labels().columnPicker;
+    var btn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm col-picker-btn' }, opts.label || X.button);
+    var drag = null;
+    function labelOf(k) { var c = opts.columns.filter(function (x) { return x.key === k; })[0]; return c ? c.label : k; }
+    function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+    var ctl = popover(btn, function (close) {
+      var box = h('div', { class: 'col-picker' });
+      function redraw() {
+        var st = opts.state();
+        var value = st.value.filter(function (k) { return opts.columns.some(function (c) { return c.key === k; }); });
+        var rest = opts.columns.map(function (c) { return c.key; }).filter(function (k) { return value.indexOf(k) < 0; });
+        var active = st.presets.filter(function (p) { return same(p.columns.filter(function (k) { return opts.columns.some(function (c) { return c.key === k; }); }), value); })[0];
+        function change(next) { opts.onChange(next); redraw(); }
+        function move(k, to) {
+          var list = value.slice();
+          var i = list.indexOf(k);
+          if (i < 0 || to < 0 || to >= list.length) return;
+          list.splice(i, 1);
+          list.splice(to, 0, k);
+          change(list);
+        }
+        var pick = select({ label: X.preset, value: active ? active.id : '', className: 'select-sm col-picker-preset',
+          options: (active ? [] : [{ value: '', label: X.custom }]).concat(st.presets.map(function (p) {
+            return { value: p.id, label: p.name + (p.system ? ' · ' + X.system : '') + (st.defaultId === p.id ? ' · ' + X.isDefault : '') };
+          })),
+          onChange: function (id) { if (id) { opts.onPreset('pick', id); redraw(); } } });
+        var mine = active && !active.system;
+        clear(box);
+        box.appendChild(h('h3', { class: 'popover-title' }, X.title));
+        box.appendChild(h('div', { class: 'col-picker-presets' }, h('span', { class: 'field-label' }, X.preset), pick,
+          h('button', { type: 'button', class: 'btn btn-ghost btn-sm col-picker-default', disabled: !active || st.defaultId === active.id,
+            onClick: function () { opts.onPreset('default', active.id); redraw(); } }, X.setDefault),
+          mine ? h('button', { type: 'button', class: 'btn btn-ghost btn-sm col-picker-remove', onClick: function () { opts.onPreset('remove', active.id); redraw(); } }, X.remove) : null));
+        box.appendChild(h('p', { class: 'muted small col-picker-fixed' }, opts.fixedNote || X.fixed));
+        box.appendChild(h('ul', { class: 'col-picker-list' }, value.concat(rest).map(function (k) {
+          var on = value.indexOf(k) >= 0;
+          var i = value.indexOf(k);
+          var cb = h('input', { type: 'checkbox', checked: on, 'aria-label': labelOf(k) });
+          cb.addEventListener('change', function () { change(cb.checked ? value.concat([k]) : value.filter(function (x) { return x !== k; })); });
+          var li = h('li', { class: 'col-picker-item' + (on ? ' is-on' : ''), draggable: on ? 'true' : null, dataset: { key: k }, title: on ? X.dragHint : null },
+            h('span', { class: 'col-picker-grip', 'aria-hidden': 'true' }, on ? '⋮⋮' : ''),
+            h('label', { class: 'col-picker-label' }, cb, h('span', null, labelOf(k))),
+            on ? h('span', { class: 'col-picker-move' },
+              h('button', { type: 'button', class: 'icon-btn col-up', title: X.up, 'aria-label': X.up + ' ' + labelOf(k), disabled: i === 0, onClick: function () { move(k, i - 1); } }, '▲'),
+              h('button', { type: 'button', class: 'icon-btn col-down', title: X.down, 'aria-label': X.down + ' ' + labelOf(k), disabled: i === value.length - 1, onClick: function () { move(k, i + 1); } }, '▼')) : null);
+          if (on) {
+            li.addEventListener('dragstart', function (e) { drag = k; li.classList.add('is-dragging'); if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', k); } });
+            li.addEventListener('dragend', function () { drag = null; li.classList.remove('is-dragging'); });
+            li.addEventListener('dragover', function (e) { if (drag && drag !== k) { e.preventDefault(); li.classList.add('is-drop'); } });
+            li.addEventListener('dragleave', function () { li.classList.remove('is-drop'); });
+            li.addEventListener('drop', function (e) { e.preventDefault(); li.classList.remove('is-drop'); if (drag && drag !== k) move(drag, value.indexOf(k)); });
+          }
+          return li;
+        })));
+        box.appendChild(h('div', { class: 'col-picker-actions' },
+          h('button', { type: 'button', class: 'btn btn-secondary btn-sm col-picker-save', onClick: function () {
+            close();
+            promptText({ title: X.saveTitle, label: X.saveLabel, confirmLabel: X.save, value: mine ? active.name : '',
+              validate: function (v) { return v ? null : X.nameRequired; } }).then(function (r) { if (r && r.ok && r.value) opts.onPreset('save', r.value); });
+          } }, X.saveAs),
+          h('button', { type: 'button', class: 'btn btn-ghost btn-sm col-picker-reset', onClick: function () { opts.onPreset('reset'); redraw(); } }, X.reset)));
+        box.appendChild(h('p', { class: 'muted small' }, X.storeNote));
+      }
+      redraw();
+      return box;
+    }, { className: 'col-picker-popover', label: X.title, align: 'right' });
+    btn.picker = ctl;
+    return btn;
   }
 
   // Filter Series: options = calc.seriesList(taxonomy, products) [{ value, label, depth, count }]
@@ -1013,7 +1119,7 @@
 
   // ---------------------------------------------------------------------
   // ⓘ วิธีคำนวณ (Popover): สูตร / แถบแบ่งเงินของหน่วยทั้งปี / ค่า GP และ VAT ที่ใช้
-  // info() → { unitName, split (calc.moneySplit), gp (null = ยังไม่มี), gpLabel, hasGP, priceBasis ('RSP' | 'SELL_IN'), sellOutMethod }
+  // info() → { unitName, split (calc.moneySplit), gp (null = ยังไม่มี), gpLabel, hasGP, priceBasis ('RSP' | 'TT_DEALER'), sellOutMethod }
   //   CR-18: สูตรตาม Channel (มี GP: ÷ VAT × (1 − {gpLabel}) · ไม่มี GP: ÷ VAT) · ลำดับราคา · ไม่มีวันที่มีผลของ GP / Promotion ตาม Flag
   // ---------------------------------------------------------------------
   function calcExplainer(info) {
@@ -1031,8 +1137,7 @@
       return [
         h('h3', { class: 'popover-title' }, X.title),
         h('dl', { class: 'explain-formulas' }, rows.map(function (f) { return [h('dt', null, f[0]), h('dd', null, fill(f[1], { vatFactor: vatFactor, gpLabel: gpLabel }))]; })),
-        h('p', { class: 'explain-note' }, o.priceBasis === 'SELL_IN' ? X.priceOrderDealer : X.priceOrder),
-        SP.core.features.isOn('promotionCalendar') ? h('p', { class: 'explain-note' }, X.promoNote) : null,
+        h('p', { class: 'explain-note' }, o.priceBasis && o.priceBasis !== 'RSP' ? X.priceOrderDealer : X.priceOrder),
         h('h3', null, fill(X.splitTitle, { unit: o.unitName })),
         split || h('p', { class: 'explain-note text-short' }, fill(X.gpMissing, { gpLabel: gpLabel, unit: o.unitName })),
         h('h3', null, X.valuesTitle),
@@ -1629,8 +1734,9 @@
       dlg.appendChild(h('div', { class: 'dlg-body' },
         h('h2', { class: 'dlg-title' }, opts.title),
         opts.lines && opts.lines.length ? h('ul', { class: 'dlg-lines' }, opts.lines.map(function (l) { return h('li', null, l); })) : null,
+        opts.body || null,   // CR-32: เนื้อหาเพิ่ม (เช่น ช่องติ๊ก) ไม่ส่ง = เหมือนเดิม
         h('div', { class: 'dlg-actions' },
-          h('button', { type: 'button', class: 'btn btn-ghost dlg-cancel', onClick: function () { done(null); } }, D.cancel),
+          h('button', { type: 'button', class: 'btn btn-ghost dlg-cancel', onClick: function () { done(null); } }, opts.cancelLabel || D.cancel),
           opts.choices.map(function (c) {
             return h('button', { type: 'button', class: 'btn dlg-choice dlg-choice-' + c.value + (c.primary ? ' btn-primary dlg-confirm' : ' btn-secondary'), onClick: function () { done(c.value); } }, c.label);
           }))));
@@ -1639,6 +1745,204 @@
       if (typeof dlg.showModal === 'function') dlg.showModal();
       else { finished = true; dlg.parentNode.removeChild(dlg); resolve(opts.choices[0].value); }
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-28: แผนภาพลำดับงาน (หน้าคู่มือ) — การ์ดขั้นเรียงแนวนอนต่อด้วยลูกศร SVG · ลูกศรวนกลับที่การ์ด loopIndex · การ์ดข้อมูลที่ต้องมีก่อนด้านล่าง
+  //   o = { steps: [{ n, title, roles: [{ id, name, token }], allRoles, does: [], result, href | null, mine, goTip, disabledTip }],
+  //         loopIndex, loopText, loopTip, note, mastersLabel, masters: [{ title, roles (ข้อความ), href | null, goTip, disabledTip }],
+  //         labels: { step, result, yourRole, go } }
+  //   href null = บทบาทปัจจุบันไม่เห็นหน้านั้น → ปุ่มกดไม่ได้ · mine = บทบาทปัจจุบันเป็นผู้แก้ไข (ไฮไลต์ + ป้าย)
+  // ---------------------------------------------------------------------
+  function flowArrow() {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 28 16');
+    svg.setAttribute('class', 'flow-arrow-svg');
+    svg.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', 'M1 8 H24 M18 2 L25 8 L18 14');
+    svg.appendChild(p);
+    return svg;
+  }
+  function flowLoop() {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 20 20');
+    svg.setAttribute('class', 'flow-loop-svg');
+    svg.setAttribute('aria-hidden', 'true');
+    var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', 'M16 10 A6 6 0 1 1 13 4.8 M13 1 V5 H17');
+    svg.appendChild(p);
+    return svg;
+  }
+  function flowGo(item, label, cls) {
+    return item.href
+      ? h('a', { class: 'btn btn-secondary btn-sm ' + cls, href: item.href, title: item.goTip || null }, label)
+      : h('button', { type: 'button', class: 'btn btn-secondary btn-sm ' + cls, disabled: true, title: item.disabledTip || null }, label);
+  }
+  function flowDiagram(o) {
+    var L = o.labels || {};
+    var row = h('div', { class: 'flow-steps', style: { '--flow-n': String(o.steps.length) } });
+    o.steps.forEach(function (s, i) {
+      if (i) row.appendChild(h('div', { class: 'flow-arrow' }, flowArrow()));
+      var loop = i === o.loopIndex;
+      row.appendChild(h('section', { class: 'flow-card' + (s.mine ? ' is-mine' : '') + (loop ? ' has-loop' : ''), dataset: { page: s.pageId || '' } },
+        h('div', { class: 'flow-head' },
+          h('span', { class: 'flow-n', 'aria-label': fill(L.step, { n: s.n }) }, String(s.n)),
+          h('strong', { class: 'flow-title' }, s.title),
+          s.mine ? h('span', { class: 'flow-mine' }, L.yourRole) : null),
+        h('div', { class: 'flow-roles' }, s.roles.length
+          ? s.roles.map(function (r) { return h('span', { class: 'role-chip', style: { '--c': tokenVar(r.token) } }, r.name); })
+          : h('span', { class: 'role-chip is-all' }, s.allRoles)),
+        h('ul', { class: 'flow-does' }, s.does.map(function (t) { return h('li', null, t); })),
+        loop && o.loopText ? h('div', { class: 'flow-loop', title: o.loopTip || null }, flowLoop(), h('span', null, o.loopText)) : null,
+        h('div', { class: 'flow-foot' }, h('p', { class: 'flow-result' }, h('span', { class: 'flow-result-label' }, L.result), s.result), flowGo(s, L.go, 'flow-go'))));
+    });
+    return h('div', { class: 'flow' }, row,
+      h('div', { class: 'flow-masters' },
+        o.masters && o.masters.length ? [h('span', { class: 'flow-masters-label' }, o.mastersLabel),
+          o.masters.map(function (m) {
+            return h('div', { class: 'flow-master' }, h('strong', null, m.title), h('span', { class: 'flow-master-roles' }, m.roles), flowGo(m, L.go, 'flow-master-go'));
+          })] : null,
+        o.note ? h('p', { class: 'flow-note' }, o.note) : null));
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-28: ปุ่ม ? ต่อท้ายชื่อหน้า — Popover หน้านี้ใช้ทำอะไร · ผู้แก้ไข (จากสิทธิ์จริง core/guide.js pageEditors) · ขั้นตอนหลัก (≤ 3) · ดูคู่มือทั้งหมด
+  //   opts.extras() → [{ label, build() → node }] หัวข้อเพิ่มของหน้า (เช่น กฎ Status ของ SKU Planning) กดแล้วแสดงในกล่องเดิม + ← กลับ
+  //   ไม่มีเนื้อหาของหน้าใน data/guide.js (pages.<id>) → null (ไม่แสดงปุ่ม)
+  // ---------------------------------------------------------------------
+  function pageHelp(pageId, opts) {
+    opts = opts || {};
+    var G = SP.data.guide && SP.data.guide.pages ? SP.data.guide.pages[pageId] : null;
+    if (!G) return null;
+    var X = SP.data.content.site.help;
+    var btn = h('button', { type: 'button', class: 'icon-btn help-btn page-help-btn no-print', title: X.button, 'aria-label': X.button }, '?');
+    popover(btn, function () {
+      var box = h('div', { class: 'page-help' });
+      function main() {
+        clear(box);
+        var eds = SP.core.guide.pageEditors(pageId);
+        var guide = SP.core.registry.byId('aboutPrototype');
+        var extras = opts.extras ? opts.extras() : [];
+        append(box, [
+          h('h3', { class: 'popover-title' }, X.purpose), h('p', { class: 'page-help-text' }, G.purpose),
+          h('h3', { class: 'popover-title' }, X.editors), h('p', { class: 'page-help-text page-help-editors' }, eds.length ? eds.map(function (r) { return r.name; }).join(' · ') : X.viewOnly),
+          G.steps && G.steps.length ? [h('h3', { class: 'popover-title' }, X.steps), h('ol', { class: 'page-help-steps' }, G.steps.slice(0, 3).map(function (t) { return h('li', null, t); }))] : null,
+          h('div', { class: 'page-help-links' },
+            extras.map(function (x) {
+              return h('button', { type: 'button', class: 'link-btn page-help-extra', onClick: function () {
+                clear(box);
+                append(box, [h('button', { type: 'button', class: 'link-btn page-help-back', onClick: main }, X.back), x.build()]);
+              } }, x.label);
+            }),
+            guide ? h('a', { class: 'page-help-all', href: SP.core.paths.to(guide.path) }, X.all) : null)
+        ]);
+      }
+      main();
+      return box;
+    }, { className: 'page-help-popover', label: X.button });
+    return btn;
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-29: Chip "ข้อมูลที่ต้องตรวจ (n)" ของ Account Master · กดแล้วเปิด Popover (build(close) → เนื้อหา) · n = 0 = Chip สีจาง กดดูได้
+  // ---------------------------------------------------------------------
+  function checksChip(opts) {
+    var n = opts.count || 0;
+    var btn = h('button', { type: 'button', class: 'checks-chip no-print' + (n ? ' has-issues' : ''), title: opts.title || null }, fill(opts.label, { n: n }));
+    popover(btn, function (close) { return h('div', { class: 'checks-pop' }, opts.build(close)); }, { className: 'checks-popover', label: opts.title || opts.label });
+    return btn;
+  }
+  // CR-32: ข้อมูลที่ต้องตรวจ มาตรฐานใหม่ (ใช้ซ้ำได้ทุกหน้า · ข้อความจาก labels.dataCheck)
+  //   opts = { title (หัว Popover), groups: [{ key, label, items: [{ text, go() }], more() (ไม่บังคับ · ปุ่มกรองตารางตามเกณฑ์) }], criteria: [ชื่อเกณฑ์ทั้งหมดของหน้า],
+  //            limit (รายการต่อกลุ่มที่แสดง · ค่าตั้งต้น 6), moreLabel }
+  //   → ปุ่ม Chip: มีรายการ = เหลือง "ข้อมูลที่ต้องตรวจ (n)" · ไม่มี = เทา "ข้อมูลครบ" · Popover จัดกลุ่ม "<เกณฑ์> (n)" แต่ละรายการมีปุ่ม ไปที่รายการ
+  //     (ปิด Popover แล้วเรียก go) · ท้าย Popover = "เกณฑ์ที่ตรวจ:" + รายชื่อเกณฑ์ทั้งหมด (แสดงแม้ n = 0)
+  function dataCheck(opts) {
+    var X = labels().dataCheck;
+    var groups = (opts.groups || []).filter(function (g) { return g.items && g.items.length; });
+    var n = groups.reduce(function (s, g) { return s + g.items.length; }, 0);
+    var limit = opts.limit || 6;
+    var btn = h('button', { type: 'button', class: 'data-check no-print' + (n ? ' has-issues' : ' is-ok'), title: opts.title || null, dataset: { count: String(n) } },
+      n ? fill(X.chip, { n: n }) : X.ok);
+    popover(btn, function (close) {
+      var body = [h('h3', { class: 'popover-title' }, opts.title || X.chip.replace(' ({n})', ''))];
+      if (!groups.length) body.push(h('p', { class: 'muted data-check-none' }, X.none));
+      groups.forEach(function (g) {
+        body.push(h('section', { class: 'data-check-group', dataset: { key: g.key } },
+          h('h4', { class: 'data-check-head' }, fill(X.group, { label: g.label, n: g.items.length }),
+            g.more ? h('button', { type: 'button', class: 'link-btn data-check-all', onClick: function () { close(); g.more(); } }, opts.moreLabel || X.go) : null),
+          h('ul', { class: 'data-check-list' }, g.items.slice(0, limit).map(function (it) {
+            return h('li', null, h('span', { class: 'data-check-text' }, it.text),
+              h('button', { type: 'button', class: 'link-btn data-check-go', onClick: function () { close(); it.go(); } }, X.go));
+          }), g.items.length > limit ? h('li', { class: 'muted' }, fill(X.more, { n: g.items.length - limit })) : null)));
+      });
+      body.push(h('p', { class: 'data-check-criteria' }, h('span', { class: 'data-check-criteria-label' }, X.criteria), ' ', (opts.criteria || []).join(' · ')));
+      return h('div', { class: 'data-check-pop' }, body);
+    }, { className: 'data-check-popover', label: opts.title || X.chip });
+    return btn;
+  }
+  // CR-32: เลื่อนให้เห็นแล้วไฮไลต์แถว 2 วินาที (ปุ่ม ไปที่รายการ)
+  function flashRow(el) {
+    if (!el) return;
+    try { el.scrollIntoView({ block: 'center' }); } catch (e) { /* ignore */ }
+    el.classList.remove('is-flash');
+    void el.offsetWidth;
+    el.classList.add('is-flash');
+    setTimeout(function () { el.classList.remove('is-flash'); }, 2000);
+  }
+
+  // CR-29: ชื่อคน / ทีม → ลิงก์ไป Drawer ของคนนั้น (หน้าบุคลากรและทีม · #person-<id>) · บทบาทที่ไม่เห็นหน้านั้น = ลิงก์ถูกซ่อน (layout) จึงแสดงข้อความแทน
+  function personLink(people, id, text) {
+    var name = text || personName(people, id);
+    var e = SP.core.registry && SP.core.registry.byId('people');
+    if (!id || !e || !SP.core.permissions.pageVisible(SP.core.permissions.user(), 'people')) return h('span', { class: 'person-text' }, name);
+    return h('a', { class: 'person-link', href: SP.core.paths.to(e.path) + '#person-' + encodeURIComponent(id), title: fill(labels().masterData.personLink, { name: name }) }, name);
+  }
+  // CR-29: ประวัติการเปลี่ยนแปลง (master.audit ใหม่สุดก่อน) · opts.value(entry, which) → ข้อความของค่า (ไม่ส่ง = แปลงค่าพื้นฐานเอง)
+  function historyList(entries, opts) {
+    opts = opts || {};
+    var X = labels().masterHistory;
+    if (!entries || !entries.length) return h('p', { class: 'muted history-empty' }, X.empty);
+    function plain(v) {
+      if (v == null || v === '') return '–';
+      if (typeof v === 'boolean') return v ? '✓' : '✗';
+      if (Array.isArray(v)) return v.length ? v.map(function (x) { return typeof x === 'object' ? JSON.stringify(x) : String(x); }).join(', ') : '–';
+      return typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+    function val(e, which) { var t = opts.value ? opts.value(e, which) : null; return t != null ? t : plain(which === 'old' ? e.oldValue : e.newValue); }
+    return h('ol', { class: 'history-list' }, entries.map(function (e) {
+      var field = X.fields[e.field] || e.field;
+      var text = e.field === '_new' ? fill(X.added, { field: field, to: val(e, 'new') }) : e.field === '_removed' ? fill(X.added, { field: field, to: val(e, 'old') })
+        : fill(X.change, { field: field, from: val(e, 'old'), to: val(e, 'new') });
+      return h('li', { class: 'history-item' }, h('span', { class: 'history-text' }, text),
+        h('span', { class: 'history-meta muted' }, fill(X.by, { at: e.at ? F.dateTime(e.at) : '–', by: e.by || '–' })));
+    }));
+  }
+  // CR-29: ผู้รับผิดชอบ n เดือนต่อกันตั้งแต่ fromMonth (core/master.js ownerRun) → แถบเดือน + แถบผู้รับผิดชอบ (ชื่อเป็นลิงก์ไปข้อมูลของคน)
+  //   opts = { n (12), current (เดือนปัจจุบัน · เส้นใต้), labels: { none, ended } }
+  function ownerTimeline(data, unitId, fromMonth, opts) {
+    opts = opts || {};
+    var n = opts.n || 12;
+    var calc = SP.core.calc;
+    var O = labels().owner;
+    var runs = SP.core.master.ownerRun(data.assignments, data.salespeople, unitId, fromMonth, n);
+    var months = [];
+    for (var i = 0; i < n; i++) months.push(calc.addMonths(fromMonth, i));
+    var head = months.map(function (k) {
+      var m = Number(k.slice(5, 7)) - 1;
+      return h('span', { class: 'otl-month' + (k === opts.current ? ' is-current' : ''), title: F.date(k) }, F.MONTHS[m] + (m === 0 || k === fromMonth ? ' ' + k.slice(2, 4) : ''));
+    });
+    var segs = runs.map(function (r) {
+      var span = r.to - r.from + 1;
+      var style = { gridColumn: 'span ' + span };
+      var name, cls;
+      if (r.state === 'owner') { name = personLink(data.salespeople, r.personId); style['--seg'] = tokenVar(personColor(data.salespeople, r.personId)); cls = 'is-owner'; }
+      else if (r.state === 'ended') { name = fill((opts.labels && opts.labels.ended) || O.resigned, { name: personName(data.salespeople, r.assignedId) }); cls = 'is-ended'; }
+      else { name = (opts.labels && opts.labels.none) || O.none; cls = 'is-vacant'; }
+      return h('div', { class: 'otl-seg owner-seg ' + cls, style: style, title: (typeof name === 'string' ? name : name.textContent) + ' · ' + F.keyRange(r.fromMonth, r.toMonth) }, h('span', { class: 'otl-name' }, name));
+    });
+    return h('div', { class: 'otl', style: { '--otl-n': String(n) } }, h('div', { class: 'otl-row otl-head' }, head), h('div', { class: 'otl-row' }, segs));
   }
 
   // ปุ่ม "ส่งออก ▾" (Excel / CSV) ในแถวหัวหน้า
@@ -1716,6 +2020,28 @@
     var cls = 'perm-chip is-' + lv.toLowerCase() + (opts.action ? ' is-action' : '') + (opts.changed ? ' is-changed' : '');
     var aria = (opts.action ? (lv === 'EDIT' ? X.allowedText : X.deniedText) : X.levels[lv]) + (lv === 'EDIT' && opts.scope === 'TEAM' ? ' · ' + X.teamText : '') + (opts.changed ? ' · ' + X.changed : '');
     return h('span', { class: cls, title: opts.title || aria, 'aria-label': aria }, text);
+  }
+
+  // CR-31 ช่องสิทธิ์ (หน้า Permissions และ Users ใช้ร่วมกัน · ไม่มีพื้นสีในช่อง · ห้ามใช้สัญลักษณ์ ✓ ✕ –)
+  //   level 'NONE' | 'VIEW' | 'EDIT' · scope 'ALL' | 'TEAM' · kind 'page' | 'action' (ปุ่มเฉพาะ)
+  //   แก้ไข / อนุญาต = ตัวหนาสีหลัก (+ เฉพาะทีม ตัวเล็กจาง) · ดู = ปกติสีจาง · ไม่เห็น / ไม่อนุญาต = ว่าง (aria-label บอกระดับ)
+  //   options = { title, dirty (แก้ในรอบนี้ = ขอบล่างสีหลัก) }
+  function permissionCell(level, scope, kind, options) {
+    var X = labels().perm.cell;
+    var o = options || {};
+    var lv = level || 'NONE';
+    var action = kind === 'action';
+    var team = lv === 'EDIT' && scope === 'TEAM';
+    var text = lv === 'EDIT' ? (action ? X.allow : X.edit) : lv === 'VIEW' && !action ? X.view : '';
+    var aria = lv === 'EDIT' ? text + (team ? ' ' + X.team : '') : lv === 'VIEW' && !action ? X.view : action ? X.deny : X.none;
+    return h('span', { class: 'perm-cell is-' + (text ? lv.toLowerCase() : 'none') + (o.dirty ? ' is-dirty' : ''), title: o.title || aria, 'aria-label': aria },
+      text ? h('span', { class: 'perm-cell-text' }, text) : null, team ? h('small', { class: 'perm-cell-team' }, X.team) : null);
+  }
+  // Legend บรรทัดเดียว: แก้ไข · ดู · ว่าง = ไม่เห็น (แสดงด้วยรูปแบบจริงของแต่ละค่า)
+  function permissionLegend() {
+    var X = labels().perm.cell;
+    return h('span', { class: 'perm-legend' }, permissionCell('EDIT', 'ALL', 'page'), h('span', { class: 'perm-legend-sep' }, '·'),
+      permissionCell('VIEW', 'ALL', 'page'), h('span', { class: 'perm-legend-sep' }, '·'), h('span', { class: 'perm-legend-empty' }, X.legendEmpty));
   }
 
   // แถวหัวไฟล์ส่งออก (Excel เท่านั้น): ปีแผน · สถานะ · วันเวลาที่ส่งออก · มุมมองผู้ใช้ (+ extra = [[ป้าย, ค่า]])
@@ -2118,11 +2444,18 @@
     percentAmountInput: percentAmountInput,
     accountPicker: accountPicker,
     growthText: growthText,
+    targetGrowth: targetGrowth,
     select: select,
     segmented: segmented,
     card: card,
     callout: callout,
     approveBox: approveBox,
+    flowDiagram: flowDiagram,
+    pageHelp: pageHelp,
+    checksChip: checksChip,
+    personLink: personLink,
+    historyList: historyList,
+    ownerTimeline: ownerTimeline,
     barChart: barChart,
     statusDot: statusDot,
     searchSelect: searchSelect,
@@ -2132,11 +2465,13 @@
     ownerStrip: ownerStrip,
     subChannelPicker: subChannelPicker,
     dialog: dialog,
+    toast: toast,
     popover: popover,
     menuButton: menuButton,
     seriesFilter: seriesFilter,
     categoryFilter: categoryFilter,
     filterChips: filterChips,
+    columnPicker: columnPicker,
     rulesContent: rulesContent,
     rulesPanel: rulesPanel,
     rulesButton: rulesButton,
@@ -2162,6 +2497,10 @@
     roleName: roleName,
     roleTitle: roleTitle,
     permChip: permChip,
+    dataCheck: dataCheck,
+    flashRow: flashRow,
+    permissionCell: permissionCell,
+    permissionLegend: permissionLegend,
     exportHeader: exportHeader,
     exportStamp: exportStamp,
     fileSafe: fileSafe,

@@ -4,7 +4,7 @@
  * boot() ถูกเรียกจาก loader.js เมื่อโหลดไฟล์ครบ:
  *   1. หา Module ของหน้านี้จาก registry (เทียบ Path) และจาก SP.modules
  *      index.html ที่ Root (ไม่มี Module) → พาไปหน้าแรกของ Sales Planning ตามลำดับ Tour ใน registry
- *   2. Header แถวเดียว: ชื่อระบบ + Prototype · มุมมองผู้ใช้ (จำลอง) · เกี่ยวกับ Prototype · รีเซ็ตข้อมูล (+ ☰ เมื่อจอแคบกว่า 1024px)
+ *   2. Header แถวเดียว: ชื่อระบบ + Prototype · มุมมองผู้ใช้ (จำลอง) · คู่มือ (CR-28) · รีเซ็ตข้อมูล (+ ☰ เมื่อจอแคบกว่า 1024px)
  *      ปีแผนไม่อยู่ใน Header (CR-10): อยู่ต่อท้ายชื่อหน้า (components.planYearPicker) เฉพาะหน้าที่ registry ตั้ง year: true
  *   3. Side Menu ซ้าย 4 กลุ่มจาก registry (group) พับเหลือไอคอนได้ (ui.sidebarCollapsed)
  *      CR-24: ไม่พับเองในหน้าใด (เลิกกฎพับหน้าวางแผน SKU ของ CR-11) / ไอคอนสถานะ Workflow ข้างหน้าใน Sales Planning
@@ -18,10 +18,13 @@
  *   CR-21: รายชื่อจาก master.users จัดกลุ่มตามบทบาทแรก / เมนูข้าง Stepper ก่อนหน้า-ถัดไป และหน้าแรกของ Tour นับเฉพาะหน้าที่ผู้ใช้เห็น
  *     (permissions.pageVisible) / เปิดหน้าที่ไม่เห็นตรงด้วย URL = "ไม่มีสิทธิ์เข้าถึงหน้านี้" (ไม่เรียก Module) / ลิงก์ไปหน้าที่ไม่เห็นซ่อนอัตโนมัติ
  *     (MutationObserver ทั้งหน้า) / ไม่มีสิทธิ์ export = body.perm-no-export (styles/components.css ซ่อนปุ่มส่งออก CSV และพิมพ์)
+ *   CR-28: ลิงก์ Header คู่มือ (หน้า aboutPrototype = คู่มือการใช้งาน) · ปุ่ม ? ต่อท้ายชื่อหน้า (components.pageHelp · ยกเว้นหน้าคู่มือ ·
+ *     Module เพิ่มหัวข้อใน Popover ได้ด้วย ctx.addHelp(label, build)) · รีเซ็ตข้อมูลคง Key uat.* (core/guide.js keepOnReset) ·
+ *     แถบลอยมุมล่างขวา กำลังทดสอบ {id} · ขั้นที่ x/y + กลับไปบันทึกผล เมื่อ uat.results.active มีค่า (ทุกหน้ายกเว้นคู่มือ · ไม่พิมพ์)
  *   CR-25: กลุ่ม Role Management (Permissions · Roles · Users) · กลุ่มที่ไม่เหลือหน้าไม่มีหัวกลุ่ม · เกี่ยวกับ Prototype เห็นเสมอ ·
- *     เลขขั้นคงที่ (registry.step) ปุ่มก่อนหน้า/ถัดไปและลูกศรข้ามขั้นที่มองไม่เห็น · index.html / ไม่มีสิทธิ์ → หน้าเริ่มต้นของบทบาท (permissions.homePage) ·
+ *     เลขขั้นคงที่ (registry.step) ปุ่มก่อนหน้า/ถัดไปและลูกศรข้ามขั้นที่มองไม่เห็น · CR-27 ไม่มีเลขขั้นในหัวข้อ (เฉพาะเมนูข้าง) · index.html / ไม่มีสิทธิ์ → หน้าเริ่มต้นของบทบาท (permissions.homePage) ·
  *     สลับมุมมองผู้ใช้แล้วหน้าปัจจุบันถูกซ่อน → ไปหน้าเริ่มต้น + Toast (ข้อความพักที่ ui.toast แสดงหลังโหลดหน้าใหม่ครั้งเดียว)
- * store อ่าน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection, ui.planMode, ui.toast, plan.<ปี>.workflow.*, master.salespeople, master.teams,
+ * store อ่าน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection, ui.planMode, ui.toast, uat.results, plan.<ปี>.workflow.*, master.salespeople, master.teams,
  *             master.users, master.roles, master.permissions (ผ่าน core/permissions.js)
  * store เขียน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection (เลือก Sales Manager / Officer → หน่วยขายแรกของทีม), ui.toast
  */
@@ -32,6 +35,7 @@
   var h = C.h;
   var menuState = { entry: null, links: {} };
   var currentEntry = null;
+  var helpExtras = [];   // CR-28: หัวข้อเพิ่มใน Popover ของปุ่ม ? (ctx.addHelp)
 
   function link(entry) { return SP.core.paths.to(entry.path); }
 
@@ -81,9 +85,17 @@
       }
     });
     select.title = current ? C.roleName(current) : '';
+    // ข้อความ (จำลองสำหรับการนำเสนอ) อยู่ใน Tooltip ของป้าย เพื่อให้ Dropdown แสดงชื่อได้ครบ
     return h('div', { class: 'role-picker' },
-      h('label', { class: 'role-field' }, h('span', { class: 'field-label' }, site.roleLabel), select),
-      h('span', { class: 'role-note' }, site.roleNote));
+      h('label', { class: 'role-field' }, h('span', { class: 'field-label has-tip', title: site.roleNote }, site.roleLabel), select));
+  }
+
+  // CR-28: รีเซ็ตข้อมูล = ล้าง store ทั้งหมด แต่คงผลการทดสอบ (Key uat.* · ทดสอบหลายรอบโดยรีเซ็ตข้อมูลระหว่างสถานการณ์ได้)
+  function resetData() {
+    var store = SP.core.store;
+    var keep = SP.core.guide.keepOnReset(store.keys()).map(function (k) { return [k, store.get(k)]; });
+    store.reset();
+    keep.forEach(function (kv) { store.set(kv[0], kv[1]); });
   }
 
   // หน่วยขายแรกของ Channel ในแผนปีนี้ (ไม่มี = หน่วยแรกใน Master) → ui.selection (หน้าเป้าหมายรายเดือนและวางแผน SKU ใช้ร่วมกัน)
@@ -104,7 +116,7 @@
     var reset = h('button', {
       type: 'button', class: 'btn btn-ghost btn-sm header-reset',
       onClick: function () {
-        if (window.confirm(site.resetConfirm)) { C.guardUnsaved(null); store.reset(); location.reload(); }
+        if (window.confirm(site.resetConfirm)) { C.guardUnsaved(null); resetData(); location.reload(); }
       }
     }, site.reset);
 
@@ -248,9 +260,12 @@
     var site = SP.data.content.site;
     var title = page.title || (entry && entry.title);
     if (!title) return null;
+    // CR-27: หัวข้อไม่มีเลขขั้น (ขั้นที่ x/4) — เลขขั้นอยู่ในเมนูข้างและปุ่มก่อนหน้า/ถัดไป
+    // CR-28: ปุ่ม ? ต่อท้ายชื่อหน้า (เนื้อหาจาก data/guide.js · หน้าไม่มีเนื้อหา / หน้าคู่มือ = ไม่มีปุ่ม)
+    var help = entry && entry.id !== 'aboutPrototype' ? C.pageHelp(entry.id, { extras: function () { return helpExtras.slice(); } }) : null;
     var line = h('div', { class: 'intro-line' },
-      step ? h('span', { class: 'eyebrow' }, C.fill(site.stepOf, { n: step.n, total: step.total })) : null,
       h('h1', { title: page.titleTip || null }, fillTitle(title)),
+      help,
       entry && entry.year ? C.planYearPicker() : null);
     var intro = h('div', { class: 'page-intro' }, line, (page.lead || []).slice(0, 1).map(function (t) { return h('p', { class: 'lead' }, fillTitle(t)); }));
     intro.line = line;
@@ -346,6 +361,8 @@
     root.appendChild(body);
     if (page.approve && page.approve.length) root.appendChild(C.approveBox(page.approve, page.approveTitle));
     if (step) mainCol.appendChild(buildTourNav(step, entry));
+    var uatBar = buildUatBar(entry, !!step);
+    if (uatBar) document.body.appendChild(uatBar);
 
     bindKeyboard(step);
     refreshMenu();
@@ -355,8 +372,24 @@
     watchLinks();
     if (denied) { body.appendChild(accessDenied()); return; }
     if (mod && typeof mod.render === 'function') {
-      mod.render(body, { entry: entry, page: page, content: content, year: store.year(), intro: intro ? intro.line : null, refreshMenu: refreshMenu });
+      mod.render(body, { entry: entry, page: page, content: content, year: store.year(), intro: intro ? intro.line : null, refreshMenu: refreshMenu,
+        addHelp: function (label, build) { helpExtras.push({ label: label, build: build }); } });
     }
+  }
+
+  // CR-28: แถบลอยมุมล่างขวาระหว่างทดสอบสถานการณ์ (uat.results.active) · หน้าคู่มือไม่แสดง · ปุ่มกลับไปบันทึกผล = แท็บ UAT ของสถานการณ์นั้น
+  function buildUatBar(entry, hasTour) {
+    var G = SP.core.guide;
+    var results = G.uatNormalize(SP.core.store.get('uat.results'));
+    if (!results.active || (entry && entry.id === 'aboutPrototype')) return null;
+    var sc = ((SP.data.guide && SP.data.guide.scenarios) || []).filter(function (s) { return s.id === results.active; })[0];
+    var guide = SP.core.registry.byId('aboutPrototype');
+    if (!sc || !guide) return null;
+    var site = SP.data.content.site;
+    var info = G.uatStepInfo(results, sc);
+    return h('div', { class: 'uat-bar no-print' + (hasTour ? ' has-tour' : ''), role: 'status' },
+      h('span', { class: 'uat-bar-text', title: sc.title }, C.fill(site.uatBar, { id: sc.id, n: info.current, total: info.total })),
+      h('a', { class: 'btn btn-primary btn-sm uat-bar-back', href: link(guide) + '#uat-' + sc.id }, site.uatBack));
   }
 
   // CR-25: หน้าเริ่มต้นของผู้ใช้ปัจจุบัน (permissions.homePage) → entry | null
@@ -412,5 +445,8 @@
   // id ของหน้าที่เปิดอยู่ (registry) — workflowBar ใช้หาสิทธิ์ของหน้า (core/permissions.js pageModules) / หน้า Test = null
   function currentPage() { return currentEntry ? currentEntry.id : null; }
 
-  SP.core.layout = { boot: boot, refreshMenu: refreshMenu, currentPage: currentPage };
+  // CR-28: ชื่อหน้าของ id (เต็ม / ย่อ) สำหรับหน้าคู่มือ → ข้อความ | id เมื่อไม่พบ
+  function pageLabel(id, short) { var e = SP.core.registry.byId(id); return e ? (short ? shortLabel(e) : fullLabel(e)) : id; }
+
+  SP.core.layout = { boot: boot, refreshMenu: refreshMenu, currentPage: currentPage, resetData: resetData, pageLabel: pageLabel };
 })(window.SP);

@@ -16,6 +16,10 @@
  * CR-19: data/teams.js (ทีมขายต่อ Channel) หลัง data/salespeople.js · core/permissions.js (สิทธิ์) หลัง core/workflow.js
  * CR-21: data/permissions.js (บทบาท + ค่าตั้งต้นของสิทธิ์) · data/users.js (ผู้ใช้จำลอง) หลัง data/teams.js
  * CR-24: core/clock.js (เดือนปัจจุบันกลาง · L12M) หลัง core/features.js
+ * CR-29: core/master.js (ฟังก์ชันล้วนของ Account Master) หลัง core/guide.js
+ * CR-28: data/guide.js (คู่มือ · สถานการณ์ทดสอบ · ปุ่ม ? ของแต่ละหน้า) หลัง data/content.js · core/guide.js (ฟังก์ชันล้วนของคู่มือและ UAT) หลัง core/registry.js
+ * CR-32: data/seed/seed-mt-branches.js (คู่ค้าของ Account / Platform ตัวอย่าง) หลัง data/stores.js · core/units.js (หน่วยขายและคู่ค้า) หลัง core/seed.js
+ *   (แบ่งยอดอ้างอิงของคู่ค้าจากยอด L12M ของหน่วยขาย จึงต้องมี history ก่อน)
  *   (ยอดขายปีก่อนของเขตต้องมีก่อน core/seed.js สร้างยอดขายปีก่อนราย SKU ของเขต)
  */
 (function () {
@@ -37,12 +41,12 @@
     'data/assignments.js',
     'data/seed/seed-tt-stores.js',
     'data/stores.js',
+    'data/seed/seed-mt-branches.js',
     'data/taxonomy.js',
     'data/seed/seed-charmiss.js',
     'data/products.js',
     'data/listings.js',
     'data/pricing.js',
-    'data/promotions.js',
     'data/npd.js',
     'data/targets.js',
     'data/history.js',
@@ -50,13 +54,18 @@
     'data/plan-seeds.js',
     'data/erp-snapshot.js',
     'data/content.js',
+    'data/guide.js',
     'core/calc.js',
+    'core/catalog.js',
     'core/stores.js',
     'core/seed.js',
+    'core/units.js',
     'core/taxonomy.js',
     'core/workflow.js',
     'core/permissions.js',
     'core/registry.js',
+    'core/guide.js',
+    'core/master.js',
     'core/store.js',
     'core/components.js',
     'core/charts.js',

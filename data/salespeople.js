@@ -9,6 +9,8 @@
  * CR-16: Sales Person ของ TT (4 คน + อัมพร สีดาเสถียร ลาออก ก.ค. 2026) มาจาก data/seed/seed-tt-stores.js (core/stores.js นำเข้าตอนโหลด)
  *   แทน Sales Person TT สมมติเดิม
  * CR-19: เพิ่ม Sales Manager ของ ECOM (ณัฐวุฒิ) และ TT (ประเสริฐ) ชื่อสมมติ / ทีมขายต่อ Channel อยู่ใน data/teams.js
+ * CR-29: type = 'person' (ค่าตั้งต้น) | 'team' (ทีมที่รับผิดชอบหน่วยขายได้เหมือนบุคคล เช่น ทีม KAM กลาง) · หน้าจอไม่แสดงเริ่มงาน / ลาออกแล้ว
+ *   endMonth = เดือนสุดท้ายที่รับผิดชอบ (ปุ่มสิ้นสุดการรับผิดชอบ) · startMonth คงไว้ในข้อมูล (เดือนแรกที่มอบหมายได้)
  */
 (function (SP) {
   'use strict';
@@ -21,6 +23,6 @@
     { id: 'sp-ton',   name: 'ต้นกล้า รักเรียน',   channelId: 'ecom', startMonth: '2025-01', endMonth: null },
     { id: 'sp-nat',   name: 'ณัฐวุฒิ ปัญญาดี',    channelId: 'ecom', startMonth: '2024-06', endMonth: null },
     { id: 'sp-pra',   name: 'ประเสริฐ วงศ์ไทย',   channelId: 'tt',   startMonth: '2023-04', endMonth: null },
-    { id: 'sp-kam',   name: 'ทีม KAM กลาง',      channelId: null,   startMonth: '2020-01', endMonth: null }
+    { id: 'sp-kam',   name: 'ทีม KAM กลาง',      channelId: null,   startMonth: '2020-01', endMonth: null, type: 'team' }
   ];
 })(window.SP);

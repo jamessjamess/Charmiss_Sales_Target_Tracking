@@ -69,6 +69,11 @@
     var draftTD = clone(savedTD);
     var editing = false;
     var draftPhasing = {};   // หน่วยขายที่แก้รายเดือนในรอบนี้ → monthPct
+    // CR-27: หมายเหตุต่อหน่วยขาย plan.<ปี>.unitNotes = { <unitId>: ข้อความ } (ไม่บังคับ · บันทึกพร้อมหน้า)
+    var notesKey = store.planKey('unitNotes');
+    var savedNotes = store.get(notesKey) || {};
+    var draftNotes = clone(savedNotes);
+    var master = store.master();
     var removed = [];        // หน่วยขายที่นำออกในรอบนี้ (ลบเป้าหมายรายเดือนตอนบันทึก)
     var chartMode = 'stack';
     var unitsOpen = false;
@@ -93,6 +98,8 @@
         if (JSON.stringify(savedTD.units[c] || []) !== JSON.stringify(draftTD.units[c] || [])) n++;
       });
       Object.keys(ids).forEach(function (id) { if (Math.abs((savedTD.pct[id] || 0) - (draftTD.pct[id] || 0)) > 1e-12) n++; });
+      Object.keys(savedNotes).concat(Object.keys(draftNotes)).filter(function (k, i, a) { return a.indexOf(k) === i; })
+        .forEach(function (id) { if ((savedNotes[id] || '') !== (draftNotes[id] || '')) n++; });
       Object.keys(draftPhasing).forEach(function (id) {
         if (removed.indexOf(id) >= 0) return;
         var cur = savedPhasing(id);
@@ -111,7 +118,7 @@
     function select(channelId, unitId, aggregate) {
       store.set('ui.selection', aggregate ? { channel: channelId, unit: unitId, aggregate: 'channel' } : { channel: channelId, unit: unitId });
     }
-    function leaveEdit() { editing = false; draftTD = clone(savedTD); draftPhasing = {}; removed = []; }
+    function leaveEdit() { editing = false; draftTD = clone(savedTD); draftPhasing = {}; removed = []; draftNotes = clone(savedNotes); }
 
     // ---------------------------------------------------------------------
     // ทั้งหน้า
@@ -149,7 +156,7 @@
       C.contextStats([
         { label: page.stats.target, value: h('span', null, F.baht(ch.amount) + ' ' + L.baht + ' ', h('span', { class: 'muted sa-target-by' }, page.stats.targetBy)) },
         { label: C.priorLabel(t.priorYear), value: F.baht(ch.prior) + ' ' + L.baht },
-        { label: L.context.growth, value: C.growthText(ch.growth) }
+        { label: L.context.growth, value: C.targetGrowth(ch.growth) }
       ]).forEach(function (el) { toolbar.appendChild(el); });
       root.appendChild(toolbar);
 
@@ -228,6 +235,11 @@
         store.set(phasingKey(id), { monthPct: next, edited: calc.sharesDiffer(next, defaultsOf(id)) });
       });
       removed.forEach(function (id) { if (!inPlan[id]) store.remove(phasingKey(id)); });
+      // CR-27: หมายเหตุ (ข้อความว่าง = ลบ)
+      var notes = {};
+      Object.keys(draftNotes).forEach(function (id) { var v = String(draftNotes[id] || '').trim(); if (v && inPlan[id]) notes[id] = v; });
+      if (JSON.stringify(notes) !== JSON.stringify(savedNotes)) store.set(notesKey, notes);
+      savedNotes = store.get(notesKey) || {};
       savedTD = normalizeTD(store.get(tdKey));
       leaveEdit();
       draw();
@@ -266,6 +278,38 @@
         var vals = calc.salesHistory(data, id, fullYears).concat([calc.l12m(data, id)]);
         return vals.map(function (v, k) { return h('td', { class: 'num sa-hist' + (k === vals.length - 1 ? ' is-latest' : '') }, F.millionPlain(v)); });
       }
+      // CR-27: แผน SKU ของหน่วยขาย (Net Sales ทั้งปี · calc.skuPlanNet) + ลิงก์ไป SKU Planning
+      var skuEntry = SP.core.registry.byId('skuPlanning');
+      function planNet(id) { return calc.skuPlanNet(data, master, id, store.get(store.planKey('sku.' + id)), year); }
+      function goSku(unitId) {
+        return function (e) { e.preventDefault(); e.stopPropagation(); store.set('ui.selection', { channel: ch.id, unit: unitId }); location.href = SP.core.paths.to(skuEntry.path); };
+      }
+      function planLink(v, unitId, name) {
+        return h('a', { href: SP.core.paths.to(skuEntry.path), class: 'sa-plan-link', title: fill(page.planLinkTip, { name: name }), onClick: goSku(unitId) }, F.millionPlain(v));
+      }
+      function gapNode(target, plan) {
+        var rem = calc.remaining(target, plan);
+        return h('span', { class: 'sa-plan-gap text-' + rem.status, title: C.remainingText(rem) }, rem.status === 'ok' ? '✓' : (plan - target >= 0 ? '+' : '−') + F.millionPlain(Math.abs(plan - target)));
+      }
+      // CR-27: หมายเหตุ 💬 (แก้ไข: คลิกเพื่อเขียน · ดู: แสดงเมื่อมีข้อความ)
+      function noteButton(u) {
+        var text = (editing ? draftNotes[u.id] : savedNotes[u.id]) || '';
+        if (!editing && !text) return null;
+        if (!editing) return h('span', { class: 'sa-note has-note', title: text, 'aria-label': fill(page.noteLabel, { name: u.name }) + ': ' + text, role: 'img' }, '💬');
+        return h('button', { type: 'button', class: 'sa-note' + (text ? ' has-note' : ''), title: text || fill(page.noteAdd, { name: u.name }), 'aria-label': fill(page.noteLabel, { name: u.name }),
+          onClick: function (e) {
+            e.stopPropagation();
+            var area = h('textarea', { class: 'pm-input sa-note-input', rows: '4', maxlength: '300', 'aria-label': fill(page.noteLabel, { name: u.name }) });
+            area.value = text;
+            C.dialog({ title: fill(page.noteTitle, { name: u.name }), body: h('div', { class: 'sa-note-form' }, area, h('p', { class: 'muted small' }, page.noteHint)), confirmLabel: page.noteSave }).then(function (r) {
+              if (!r.ok) return;
+              draftNotes[u.id] = area.value.trim();
+              draw();
+            });
+            setTimeout(function () { area.focus(); }, 0);
+          } }, '💬');
+      }
+
       function pick(unitId) {
         if (unitId === null) { if (!sel.aggregate) { select(ch.id, sel.unit ? sel.unit.id : null, true); draw(); } return; }
         if (!sel.aggregate && sel.unit && sel.unit.id === unitId) return;
@@ -275,16 +319,23 @@
 
       // แถวรวมทั้ง Channel = มุมมองรวมของส่วน B (อ่านอย่างเดียว)
       refs.aggCompare = h('td', { class: 'sa-compare' });
+      refs.aggGap = h('td', { class: 'num sa-plan' });
+      var plans = {};
+      ch.children.forEach(function (u) { plans[u.id] = planNet(u.id); });
+      var planSum = calc.sum(ch.children.map(function (u) { return plans[u.id]; }));
       var aggRow = ch.children.length ? h('tr', { class: 'sa-row sa-agg-row' + (sel.aggregate ? ' is-selected' : ''), dataset: { unit: '' } },
         h('th', { scope: 'row', class: 'sa-name' },
           h('button', { type: 'button', class: 'sa-pick', title: page.aggregateRowTip, 'aria-pressed': sel.aggregate ? 'true' : 'false',
-            onClick: function () { pick(null); } }, fill(page.aggregateRow, { channel: ch.name }))),
+            onClick: function () { pick(null); } },
+            h('span', { class: 'sa-agg-icon', 'aria-hidden': 'true' }, '▦'), fill(page.aggregateRow, { channel: ch.name }),
+            h('span', { class: 'sa-agg-tag' }, page.aggregateTag))),
         histCells(ch.id),
         h('td', { class: 'num is-derived' }, F.pct(1, 2)),
         h('td', { class: 'num sa-amount' }, F.baht(ch.amount)),
         h('td', { class: 'num is-derived' }, F.pct(ch.pct, 2)),
-        h('td', { class: 'num' }, C.growthText(ch.growth)),
+        h('td', { class: 'num' }, C.targetGrowth(ch.growth)),
         refs.aggCompare,
+        h('td', { class: 'num sa-plan', title: page.planTotalTip }, F.millionPlain(planSum)), refs.aggGap,
         editing ? h('td', { class: 'sa-manage' }) : null) : null;
       if (aggRow) aggRow.addEventListener('click', function (e) { if (!e.target.closest('input,button,a,select')) pick(null); });
 
@@ -292,6 +343,7 @@
         var ref = {
           tdIn: h('td', { class: 'num sa-pct' }), tdAmt: h('td', { class: 'num sa-amount' }),
           tdTotal: h('td', { class: 'num is-derived' }), growth: h('td', { class: 'num' }), compare: h('td', { class: 'sa-compare' }), pa: null,
+          gap: h('td', { class: 'num sa-plan' }),
           dot: h('span', { class: 'dot sa-dot', role: 'img' })
         };
         if (canEditHere) {
@@ -318,10 +370,11 @@
           h('th', { scope: 'row', class: 'sa-name', title: fill(L.owner.tip, { name: o.name }) + '\n' + o.title },
             h('button', { type: 'button', class: 'sa-pick', title: fill(page.selectTip, { name: u.name }), 'aria-pressed': selected ? 'true' : 'false',
               onClick: function () { pick(u.id); } }, u.name),
-            ref.dot,
+            ref.dot, noteButton(u),
             h('span', { class: 'sa-owner' + (o.vacant ? ' is-vacant' : '') }, o.name)),
           histCells(u.id),
           ref.tdIn, ref.tdAmt, ref.tdTotal, ref.growth, ref.compare,
+          h('td', { class: 'num sa-plan' }, planLink(plans[u.id], u.id, u.name)), ref.gap,
           editing ? h('td', { class: 'sa-manage' }, trash) : null);
         tr.addEventListener('click', function (e) { if (!e.target.closest('input,button,a,select')) pick(u.id); });
         return tr;
@@ -351,6 +404,8 @@
         h('th', { scope: 'col', rowspan: '2', class: 'num', title: cols.pctTotalTip }, h('span', { class: 'has-tip' }, cols.pctTotal)),
         h('th', { scope: 'col', rowspan: '2', class: 'num' }, cols.growth),
         h('th', { scope: 'col', rowspan: '2', class: 'sa-vly-head', title: L.vsLastYear.headerTip }, h('span', { class: 'has-tip' }, L.vsLastYear.header), refs.axis),
+        h('th', { scope: 'col', rowspan: '2', class: 'num', title: cols.planTip }, h('span', { class: 'has-tip' }, cols.plan)),
+        h('th', { scope: 'col', rowspan: '2', class: 'num', title: cols.planGapTip }, h('span', { class: 'has-tip' }, cols.planGap)),
         editing ? h('th', { scope: 'col', rowspan: '2' }, cols.manage) : null);
       var head2 = h('tr', { class: 'sa-head-years' }, fullYears.map(function (y) {
         var tip = y === lastClosed.year - 1 && lastClosed.month < 12
@@ -360,7 +415,7 @@
       var table = h('table', { class: 'sa-table' + (editing ? ' is-editing' : '') },
         h('colgroup', null, h('col', { class: 'col-name' }), fullYears.concat(['l12m']).map(function () { return h('col', { class: 'col-hist' }); }),
           h('col', { class: 'col-pct' }), h('col', { class: 'col-amount' }), h('col', { class: 'col-pct-total' }), h('col', { class: 'col-growth' }),
-          h('col', { class: 'col-compare' }), editing ? h('col', { class: 'col-manage' }) : null),
+          h('col', { class: 'col-compare' }), h('col', { class: 'col-plan' }), h('col', { class: 'col-plan' }), editing ? h('col', { class: 'col-manage' }) : null),
         h('thead', null, head1, head2),
         h('tbody', null, aggRow, unitRows),
         h('tfoot', null, refs.remRow));
@@ -373,6 +428,7 @@
         refs.axis.replaceWith(axis);
         refs.axis = axis;
         if (aggRow) C.clear(refs.aggCompare).appendChild(G.vsLastYearBar(c.amount, c.prior, scaleMax, { colorToken: c.color, year: t.priorYear }));
+        if (aggRow) C.clear(refs.aggGap).appendChild(gapNode(c.amount, planSum));
         c.children.forEach(function (u) {
           var r = refs.rows[u.id];
           if (!r) return;
@@ -383,8 +439,9 @@
           r.tdIn.classList.toggle('is-dirty-cell', changed);
           r.tdAmt.classList.toggle('is-dirty-cell', changed);
           r.tdTotal.textContent = F.pct(u.pctOfTotal, 2);
-          C.clear(r.growth).appendChild(C.growthText(u.growth));
+          C.clear(r.growth).appendChild(C.targetGrowth(u.growth));
           C.clear(r.compare).appendChild(G.vsLastYearBar(u.amount, u.prior, scaleMax, { colorToken: c.color, year: t.priorYear }));
+          C.clear(r.gap).appendChild(gapNode(u.amount, plans[u.id] || 0));
           // จุดสถานะคงเหลือของเป้าหมายรายเดือน (ข้อความใน Tooltip — ไม่สื่อด้วยสีอย่างเดียว)
           var mrem = calc.phasingTotals(u.amount, phasingOf(u.id)).remaining;
           var st = fill(page.monthlyStatus, { status: C.remainingText(mrem) });
@@ -399,12 +456,12 @@
             setShares(ids, calc.normalizeShares(ids.map(function (id) { return draftTD.pct[id] || 0; })));
           } }, page.normalize) : null;
         var menu = canEditHere && ids.length ? C.menuButton([{ label: page.usePriorShares, title: page.usePriorSharesTitle, onClick: function () {
-          setShares(ids, calc.priorShares(c.children.map(function (u) { return u.prior; })));
+          setShares(ids, calc.roundShares(c.children.map(function (u) { return u.prior; })));   // CR-27: สัดส่วน L12M ปัดเป็น % เต็ม
         } }]) : null;
         var cells = fullYears.concat(['l12m']).map(function () { return { text: '' }; }).concat([
           { text: ids.length ? C.remainingPct(rem) : '', className: 'num' },
           { text: C.remainingAmount(rem), className: 'num' },
-          { text: '' }, { text: '' }
+          { text: '' }, { text: '' }, { text: '' }, { text: '' }
         ]);
         if (editing) cells.push({ node: h('span', { class: 'sa-manage-group' }, normalize, menu), colspan: 2, className: 'sa-manage' });
         else cells.push({ text: '' });
@@ -467,6 +524,7 @@
       var owner = C.ownerInfo(data, unit.id, nowKey);
       var showChart = store.get('ui.phasingChart') !== false;
       var canEditHere = editing && !calc.unitAllocationBlock(t, ch.id);
+      var chShares = calc.channelMonthShares(data, ch.id);
       function draftOf() { if (!draftPhasing[unit.id]) draftPhasing[unit.id] = saved.slice(); return draftPhasing[unit.id]; }
 
       var chart = C.barChart({
@@ -515,10 +573,14 @@
       pctRow.push(cells.totalPct);
       amtRow.push(cells.totalAmount);
       pctRow.concat(amtRow).forEach(function (c) { table.appendChild(c); });
-      table.appendChild(cell('ph-label', R.growth));
+      // CR-27: แถวการเติบโต — ทุกเดือนเท่ากัน (ค่าตั้งต้น) = บรรทัดเล็กเต็มแถว · มีเดือนที่ถูกแก้ = แถวเต็ม
+      cells.growthLabel = cell('ph-label', R.growth);
+      table.appendChild(cells.growthLabel);
       F.MONTHS.forEach(function (m, i) { var g = cellAt(i, 'num'); cells.growth.push(g); table.appendChild(g); });
       cells.totalGrowth = cell('num ph-total');
       table.appendChild(cells.totalGrowth);
+      cells.growthLine = cell('ph-growth-line', '');
+      table.appendChild(cells.growthLine);
       cells.remRow = h('div');
       table.appendChild(cells.remRow);
       if (canEditHere) {
@@ -538,7 +600,16 @@
             var d = draftOf();
             defaults.forEach(function (p, i) { d[i] = p; });
             update();
-          } }, page.resetButton) : null));
+          } }, page.resetButton) : null,
+          // CR-27: ใช้รูปแบบรายเดือนของ Channel (สัดส่วนยอดอ้างอิงรวมของทั้ง Channel) — ยืนยันก่อน
+          canEditHere && chShares ? h('button', { type: 'button', class: 'btn btn-sm btn-secondary no-print ph-channel-pattern', title: fill(page.channelPatternTip, { channel: ch.name }), onClick: function () {
+            C.dialog({ title: fill(page.channelPatternConfirm, { channel: ch.name, unit: unit.name }), lines: [page.channelPatternLine], confirmLabel: page.channelPatternButton }).then(function (r) {
+              if (!r.ok) return;
+              var d = draftOf();
+              chShares.forEach(function (p, i) { d[i] = p; });
+              update();
+            });
+          } }, page.channelPatternButton) : null));
       card.appendChild(head);
       card.appendChild(h('div', { class: 'table-scroll ph-scroll' }, h('div', { class: 'ph-grid' }, showChart ? chart : null, ownerRow, table)));
 
@@ -566,6 +637,10 @@
         cells.totalAmount.textContent = F.baht(totals.amountSum);
         cells.totalAmount.title = L.target + ' ' + F.baht(annual);
         C.clear(cells.totalGrowth).appendChild(prior ? C.growthText(calc.growth(totals.amountSum, priorTotal)) : document.createTextNode('–'));
+        var ug = calc.uniformGrowth(totals.amounts, prior);
+        [cells.growthLabel, cells.totalGrowth].concat(cells.growth).forEach(function (c) { c.hidden = ug != null; });
+        cells.growthLine.hidden = ug == null;
+        if (ug != null) { C.clear(cells.growthLine).appendChild(document.createTextNode(fill(page.growthUniform, { label: R.growth, growth: '' }))); cells.growthLine.appendChild(C.growthText(ug)); }
         var rem = totals.remaining;
         var remRow = C.remainingRow({
           tag: 'div', rem: rem,
@@ -672,7 +747,9 @@
       var ch = calc.findById(t.children, channelId);
       var rows1 = calc.topDownRows(t, { channelId: channelId }).map(function (r) {
         if (r.kind === 'remaining') return { r: r, unit: fill(X.remaining, { channel: r.channel, status: L.alert[r.status] }), hist: fullYears.map(function () { return null; }) };
-        return { r: r, unit: r.unit, owner: C.ownerInfo(data, r.unitId, nowKey).name, hist: calc.salesHistory(data, r.unitId, fullYears) };
+        var nt = (useDraft ? draftNotes : savedNotes)[r.unitId] || '';
+        var pl = r.kind === 'unit' ? calc.skuPlanNet(data, master, r.unitId, store.get(store.planKey('sku.' + r.unitId)), year) : null;
+        return { r: r, unit: r.unit, owner: C.ownerInfo(data, r.unitId, nowKey).name, hist: calc.salesHistory(data, r.unitId, fullYears), plan: pl, note: nt };
       });
       var columns1 = [{ key: 'unit', label: Cl.unit, width: 24 }, { key: 'owner', label: Cl.owner, width: 22 }]
         .concat(fullYears.map(function (y, k) { return { key: 'h' + k, label: fill(Cl.history, { year: y }), type: 'money', value: function (x) { return x.hist[k]; } }; }))
@@ -682,7 +759,11 @@
           { key: 'amount', label: fill(Cl.amount, { year: year }), type: 'money', value: function (x) { return x.r.amount; } },
           { key: 'pctOfTotal', label: Cl.pctOfTotal, type: 'pct', value: function (x) { return x.r.pctOfTotal == null ? null : x.r.pctOfTotal; } },
           { key: 'growth', label: Cl.growth, type: 'pct', value: function (x) { var g = x.r.growth; return g == null || isNaN(g) ? null : g; } },
-          { key: 'growthAmount', label: Cl.growthAmount, type: 'money', value: function (x) { return x.r.growthAmount == null ? null : x.r.growthAmount; } }
+          { key: 'growthAmount', label: Cl.growthAmount, type: 'money', value: function (x) { return x.r.growthAmount == null ? null : x.r.growthAmount; } },
+          // CR-27: แผน SKU · ส่วนต่างแผน · หมายเหตุ
+          { key: 'plan', label: Cl.plan, type: 'money', value: function (x) { return x.plan; } },
+          { key: 'planGap', label: Cl.planGap, type: 'money', value: function (x) { return x.plan == null || x.r.amount == null ? null : x.plan - x.r.amount; } },
+          { key: 'note', label: Cl.note, width: 36, value: function (x) { return x.note || ''; } }
         ]);
       var rows2 = (ch ? ch.children : []).map(function (u) {
         var pct = useDraft && draftPhasing[u.id] ? draftPhasing[u.id] : savedPhasing(u.id);

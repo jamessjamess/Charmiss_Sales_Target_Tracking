@@ -5,13 +5,12 @@
  *   core/seed.js แปลงเข้าโครง Product Master ตอนโหลด แล้วเก็บที่ SP.data.products (ไม่มีสินค้าตัวอย่างเดิมแล้ว)
  *
  * โครงของสินค้าหลังนำเข้า (เจ้าของข้อมูล: ทีม Product · clearance → Supply Chain / ค่าที่แก้เก็บที่ store: master.products)
- *   trCode / tempCode   = รหัสหลัก / รหัสชั่วคราว NPD_{ปี}Q{ไตรมาส}_{ลำดับ} (ใช้เมื่อยังไม่มี TR Code)
- *                         productKey = trCode ถ้ามี ไม่มีใช้ tempCode (calc.productKey) — ใช้อ้างสินค้าทุกที่
+ *   trCode              = Product Code (CR-30 ระบบสร้างเสมอ แก้ไม่ได้ · เลขเดียวกับ TRCLOUD) = productKey (calc.productKey) ใช้อ้างสินค้าทุกที่
+ *                         newProducts ด้านล่างใช้รหัสอ้างอิงชั่วคราว (tempCode) เฉพาะในไฟล์นี้ core/seed.js แปลงเป็น Product Code ระบบตอนโหลด
  *   name                = ชื่อเต็ม / shortName = ชื่อย่อ (Product Nickname ใน Excel) ใช้แสดงในหน้าวางแผน SKU (calc.displayName)
- *   internalCode, barcode, nameEn
+ *   barcode, nameEn · inTrcloud (CR-30 true = เปิดใน TRCLOUD แล้ว: สินค้าจาก seed · false = ยังไม่เปิด: newProducts / สร้างใหม่)
  *   categoryId, subCategoryId, typeId = หมวดสินค้า (data/taxonomy.js) / inferred = true → ระบบกำหนดจากคำในชื่อ ควรตรวจสอบ
  *   seriesId, subSeriesId = Series (สร้างจาก Campaign ใน Excel / Existing = ไม่ใช่ Series → ว่าง = ขาดข้อมูลจำเป็น)
- *   itemType            = SALE | TESTER | GIFT | PREMIUM (หน้าวางแผน SKU ใช้เฉพาะ SALE)
  *   packSize, uom       = ขนาดบรรจุ (อ่านจากชื่อ เช่น 5g, 50ml) / image = data URL ของภาพย่อ หรือ null
  *   launchDate          = วันเริ่มขาย 'YYYY-MM-DD' / discontinueMonth = เดือนสุดท้ายที่ขาย 'YYYY-MM' (null = ยังขายอยู่)
  *                         sourceStatus ใน Excel ใช้กำหนดวันที่เท่านั้น Status คำนวณจากวันที่ (calc.productStatus)
@@ -56,16 +55,22 @@
       { word: 'lip', typeId: 'type-lip-care' }
     ],
 
-    // สินค้าใหม่ (NPD) ปี 2027 ที่ยังไม่มี TR Code — ชื่อลงท้าย (ชื่อชั่วคราว) เพื่อไม่ให้สับสนกับสินค้าจริง
-    //   โครงเดียวกับรายการใน data/seed/ + tempCode / Listing ที่ 7-Eleven และ EVEANDBOY (data/listings.js)
+    // สินค้าใหม่ (NPD) ปี 2027 — ชื่อลงท้าย (ชื่อชั่วคราว) เพื่อไม่ให้สับสนกับสินค้าจริง
+    //   โครงเดียวกับรายการใน data/seed/ + tempCode (รหัสอ้างอิงในไฟล์ข้อมูล → Product Code ระบบตาม Type: 32210 · 34150 · 33480)
+    //   Listing ที่ 7-Eleven และ EVEANDBOY (data/listings.js)
     //   แผนการเปิดตัวอยู่ที่ data/npd.js
     newProducts: [
       { tempCode: 'NPD_2027Q2_01', name: 'Charmiss Blooming Heart Gloss 03 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
-        rsp: 199, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-15T14:00:00' },
+        rsp: 199, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-15T14:00:00' },
       { tempCode: 'NPD_2027Q2_02', name: 'Charmiss Blooming Heart Lip Serum 05 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
-        rsp: 239, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-15T14:00:00' },
+        rsp: 239, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-15T14:00:00' },
       { tempCode: 'NPD_2027Q2_03', name: 'Charmiss Juicy Pop Tint 10 (ชื่อชั่วคราว)', series: 'Charming Lips',
-        rsp: 199, dealerPrice: 90, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027 รอรหัสจริง', createdAt: '2026-09-20T10:00:00' }
+        rsp: 199, dealerPrice: 90, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-20T10:00:00' },
+      // CR-30 แผน NPD ต่อเนื่อง: ปี 2028 แบบไตรมาส (ยังไม่ Listing) และเปิดตัว ก.พ. 2028 ที่ Shopee · Lazada (units = หน่วยขายที่ Listing)
+      { tempCode: 'NPD_2028Q2_01', name: 'Charmiss Charming Glow Eyeshadow Palette 02 (ชื่อชั่วคราว)', series: 'Charming Glow',
+        rsp: 459, dealerPrice: 250, launchDate: null, launchQuarter: '2028-Q2', units: [], note: 'สินค้าใหม่ปี 2028', createdAt: '2026-09-22T10:00:00' },
+      { tempCode: 'NPD_2028Q1_01', name: 'Charmiss Perfect Heart Blush Stick 03 (ชื่อชั่วคราว)', series: 'Perfect Heart',
+        rsp: 259, dealerPrice: 140, launchDate: '2028-02-01', units: ['shopee', 'lazada'], note: 'สินค้าใหม่ปี 2028', createdAt: '2026-09-22T10:00:00' }
     ]
   };
 

@@ -8,6 +8,8 @@
  *   actionCount() → จำนวนรายการที่ต้องดำเนินการ (ตัวเลขในเมนูข้างของขั้นที่ 4) = หน่วยขายที่มีประเด็น
  *                   + 1 เมื่อมีร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย (CR-16 ยังไม่ล็อก Baseline)
  *   storeMoves()  → ร้านค้าที่ย้ายเขตหลังอนุมัติจัดสรรเป้าหมายประจำปีของปีที่เลือก (core/stores.js movesAfterApproval)
+ *   pivotPlan(opts, live) → CR-26 ตารางแผนราย SKU × Channel / หน่วยขาย / เดือน / ไตรมาส (calc.pivotPlan บน report.skuItems)
+ *                   opts = { rows, cols, value, show, filters } · ตัวเลขชุดเดียวกับหน้า SKU Planning และ KPI แผน Bottom-up
  *   CR-17 Feature Flags: ปิด approvalWorkflow = รายการที่ต้องดำเนินการนับเฉพาะส่วนต่างและผู้รับผิดชอบ (calc.planActions approval: false)
  *                   ปิด baseline = ไม่ใช้ Snapshot / ไม่ถือว่าล็อก
  *
@@ -15,7 +17,8 @@
  *            channels: [{ id, name, fullName, color, pct, amount, prior }],
  *            units: [{ id, name, channelId, target, prior, pctOfTotal, targetM, priorM, plan, planM, phasing, sku,
  *                      owner: { id, name, vacant, title }, mix: { status, series, category: [{ key, label, value }] } }],
- *            approvals: W.approvalRows (Top-down + Phasing/SKU ทุกหน่วยขาย), assignments, salespeople }
+ *            approvals: W.approvalRows (Top-down + Phasing/SKU ทุกหน่วยขาย), assignments, salespeople,
+ *            skuItems: calc.skuPlanItems ทุกหน่วยขาย [{ key, name, unitId, channelId, seriesId, categoryId, subCategoryId, status, units, sale, net }] (CR-26) }
  * อ่านจาก data/: content (labels) + Master ผ่าน store.data()
  * store อ่าน: app.planYear, plan.<ปี>.topDown, plan.<ปี>.phasing.<unitId>, plan.<ปี>.sku.<unitId>, plan.<ปี>.workflow.*, master.*, ui.currentMonth
  * store เขียน: ไม่มี
@@ -34,7 +37,7 @@
     var states = store.workflowStates();
     var bs = W.stateOf(states, 'baseline');
     // หลังล็อก Baseline แผนครั้งแรกคำนวณด้วยราคา GP และ Promotion ตอนล็อก
-    var snap = locked(states) && bs.snapshot && bs.snapshot.priceList ? bs.snapshot : null;
+    var snap = locked(states) && bs.snapshot && bs.snapshot.basePrices ? bs.snapshot : null;
     var tree = calc.topDown(data, store.get(store.planKey('topDown')), year);
     var nowKey = store.currentKey();
     var tax = master.taxonomy;
@@ -42,10 +45,12 @@
       return list.map(function (x) { return { key: x.key, label: kind === 'status' ? null : calc.taxonomyName(tax, kind, x.key) || null, value: x.value }; });
     }
     var units = [];
+    var skuItems = [];
     var channels = tree.children.map(function (ch) {
       ch.children.forEach(function (u) {
         var grid = calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year, mode: 'initial', snapshot: snap, target: u.amount });
         var owner = C.ownerInfo(data, u.id, nowKey);
+        Array.prototype.push.apply(skuItems, calc.skuPlanItems(grid, u.id, ch.id));
         units.push({
           id: u.id, name: u.name, channelId: ch.id, target: u.amount, prior: u.prior, pctOfTotal: u.pctOfTotal,
           targetM: calc.phasingTotals(u.amount, store.get(store.planKey('phasing.' + u.id)).monthPct).amounts,
@@ -74,7 +79,8 @@
       units: units,
       approvals: W.approvalRows(states, items),
       assignments: data.assignments,
-      salespeople: data.salespeople
+      salespeople: data.salespeople,
+      skuItems: skuItems
     };
   }
 
@@ -109,9 +115,48 @@
     return S.movesAfterApproval(store.data(), store.year(), S.approvedAt(SP.core.workflow.stateOf(store.workflowStates(), 'topDown')));
   }
 
+  // CR-26: Pivot แผนราย SKU — ล็อก Baseline แล้ว (Phase 2) อ่านจาก Snapshot เหมือนส่วนอื่นของรายงาน (Snapshot เก่าไม่มี skuItems = ตารางว่าง)
+  function pivotPlan(opts, live) {
+    var rep = current(live).report;
+    var o = {};
+    Object.keys(opts || {}).forEach(function (k) { o[k] = opts[k]; });
+    o.taxonomy = SP.core.store.master().taxonomy;
+    o.channels = rep.channels.map(function (c) { return c.id; });
+    o.units = rep.units.map(function (u) { return { id: u.id, channelId: u.channelId }; });
+    return SP.core.calc.pivotPlan(rep.skuItems || [], o);
+  }
+
   function actionCount() {
     return actions().length + (!locked(SP.core.store.workflowStates()) && storeMoves().length ? 1 : 0);
   }
 
-  SP.core.report = { build: build, current: current, actions: actions, actionCount: actionCount, storeMoves: storeMoves, locked: locked };
+  // CR-32: ค่ารายเดือนของหน่วยขาย สำหรับมุมมองตามบุคคลของ Sales Person Management (ภาระเป้าหมายต่อคน · calc.personMonthlyLoad)
+  //   ปีไม่เกินปีของเดือนปัจจุบันกลาง = ยอดจริง (history.years[ปี].monthly · เฉพาะเดือนที่ปิดแล้ว ไม่งั้น null)
+  //   ปีหลังจากนั้น = เป้าหมายรายเดือน (Annual Target ของปีนั้น × สัดส่วนรายเดือนของ Sub-channel Allocation · หน่วยที่ไม่อยู่ในแผน = ไม่มีค่า)
+  //   → { kind: 'actual' | 'target', allocated (มีเป้าหมายให้จัดสรรแล้ว), values: { <unitId>: [12 | null] } }
+  function unitMonthlyValues(year) {
+    var calc = SP.core.calc, store = SP.core.store, K = SP.core.clock;
+    var data = store.data();
+    var values = {};
+    if (year <= K.parse(K.currentMonth()).year) {
+      var lc = K.parse(K.lastClosedMonth());
+      var hy = data.history && data.history.years[year];
+      var n = year < lc.year ? 12 : year === lc.year ? lc.month : 0;
+      if (hy && hy.actualMonths != null && year === lc.year) n = Math.min(n, hy.actualMonths);
+      calc.allUnits(data).forEach(function (u) {
+        var mm = hy && hy.monthly && hy.monthly[u.id];
+        values[u.id] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (m) { return mm && m < n ? mm[m] || 0 : null; });
+      });
+      return { kind: 'actual', allocated: true, values: values };
+    }
+    var plan = store.get('plan.' + year + '.topDown');
+    var tree = calc.topDown(data, plan, year);
+    calc.planUnits(tree).forEach(function (u) {
+      if (!(u.amount > 0)) return;
+      values[u.id] = calc.phasingTotals(u.amount, store.get('plan.' + year + '.phasing.' + u.id).monthPct).amounts;
+    });
+    return { kind: 'target', allocated: tree.amount > 0 && Object.keys(values).length > 0, values: values };
+  }
+
+  SP.core.report = { build: build, current: current, actions: actions, actionCount: actionCount, storeMoves: storeMoves, locked: locked, pivotPlan: pivotPlan, unitMonthlyValues: unitMonthlyValues };
 })(window.SP);

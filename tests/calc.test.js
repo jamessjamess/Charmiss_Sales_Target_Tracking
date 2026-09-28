@@ -30,7 +30,7 @@
 
   function round2(n) { return Math.round(n * 100) / 100; }
   function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
-  var MASTER = { products: D.products, listings: D.listings, priceList: D.priceList, npdPlans: D.npdPlans };
+  var MASTER = { products: D.products, listings: D.listings, basePrices: D.basePrices, npdPlans: D.npdPlans };
   function sku(key) { return calc.findProduct(D.products, key); }
   function plan(unitId) { return calc.defaultSkuPlan(MASTER, unitId, YEAR, true); }
   function row(grid, key) { return grid.rows.filter(function (r) { return r.key === key; })[0]; }
@@ -40,7 +40,8 @@
   //   NPD_A, NPD_C = สินค้าใหม่ปี 2027 (เปิดตัว 1 มิ.ย.) แผน NPD อนุมัติแล้ว / NPD_B = รออนุมัติ
   //   CUSHION = 12130 Matte All Day Cushion 5g -01 (7-Eleven + EVEANDBOY) / TINT = 33390 Juicy Pop Tint 01 (Mid-year Sale ที่ Shopee)
   //   TINT02 = 33400 (ราคาเฉพาะ 7-Eleven 149) / OLD = 12040 (เลิกขาย ก.ย. 2026) / BROW = 25011 (Campaign Existing → ไม่มี Series)
-  var NPD_A = 'NPD_2027Q2_01', NPD_B = 'NPD_2027Q2_02', NPD_C = 'NPD_2027Q2_03', CUSHION = '12130', CUSHION2 = '12140', TINT = '33390',
+  // CR-30: รหัสชั่วคราว NPD_2027Q2_01 / 02 / 03 ของข้อมูลตั้งต้นแปลงเป็น Product Code ระบบตอนโหลด (core/catalog.assignSystemCodes)
+  var NPD_A = '32210', NPD_B = '34150', NPD_C = '33480', CUSHION = '12130', CUSHION2 = '12140', TINT = '33390',
     TINT02 = '33400', OLD = '12040', BROW = '25011';
   // สินค้าสมมติที่มีช่วง Clearance (ข้อมูลจริงยังไม่มี) → Master ที่เพิ่มสินค้านี้และ Listing 8 หน่วย
   var CLEAR_UNITS = ['seven', 'watsons', 'eveandboy', 'TT-01', 'TT-02', 'TT-03', 'shopee', 'lazada'];
@@ -52,7 +53,7 @@
   }
   function clearMaster() {
     return { products: D.products.concat([clearProduct()]), listings: D.listings.concat(CLEAR_UNITS.map(function (u) { return { productKey: 'T9', accountId: u }; })),
-      priceList: D.priceList.concat([{ productKey: 'T9', priceType: 'RSP', channelId: null, accountId: null, price: 100, effectiveFrom: '2022-09-01', effectiveTo: null }]), npdPlans: D.npdPlans };
+      basePrices: D.basePrices.concat([{ productKey: 'T9', priceType: 'RSP', channelId: null, accountId: null, price: 100, effectiveFrom: '2022-09-01', effectiveTo: null }]), npdPlans: D.npdPlans };
   }
   // Net Sales ปีก่อนของหน่วยจากยอดขายราย SKU (ราคาปีก่อน × (1 − GP))
   function lyNet(unitId) {
@@ -103,11 +104,6 @@
       name: '3. Clearance 1,000 ชิ้น 3 เดือน → 333 / 333 / 334',
       expected: [333, 333, 334],
       actual: function () { return calc.clearanceSplit(1000, 3); }
-    },
-    {
-      name: '4. Promo 10 จาก 30 วัน ราคาปกติ 100 Promo 70 → 90',
-      expected: 90,
-      actual: function () { return round2(calc.averagePrice(100, [{ days: 10, price: 70 }], 30)); }
     },
     {
       name: '5a. Remaining: เป้า 10,000 แบ่งแล้ว 9,500 → 500 (5%) ยังจัดสรรไม่ครบ',
@@ -259,11 +255,12 @@
       actual: function () { return [calc.remaining(10000, 9999).status, calc.remaining(10000, 10001).status, calc.remaining(10000, 9998.5).status]; }
     },
     {
-      name: 'cr18-5. ราคาต่อ Account: 33400 ที่ 7-Eleven → 149 (ราคาต่อ Account) · ที่ EVEANDBOY (ไม่ได้กรอก) → RSP 199',
-      expected: [149, 'account', 199, 'rsp', 149, null],
+      name: 'cr18-5 (CR-30). 33400 ที่ 7-Eleven → 149 (Promotion Price ระดับหน่วยขายที่ย้ายจากราคาต่อ Account) · ที่ EVEANDBOY (ไม่ได้ตั้ง) → RSP 199',
+      expected: [149, 'promoUnit', 199, 'rsp', 149, null],
       actual: function () {
         var s = calc.pricingDetail(D, TINT02, 'seven', YEAR, 3), e = calc.pricingDetail(D, TINT02, 'eveandboy', YEAR, 3);
-        return [round2(s.price), s.source, round2(e.price), e.source, calc.accountPriceOf(D.accountPrices, TINT02, 'seven'), calc.accountPriceOf(D.accountPrices, TINT02, 'eveandboy')];
+        var ps = calc.promoEntry(D.promoPrices, TINT02, 'mt', 'seven', '2027-04'), pe = calc.promoEntry(D.promoPrices, TINT02, 'mt', 'eveandboy', '2027-04');
+        return [round2(s.price), s.source, round2(e.price), e.source, ps ? ps.price : null, pe ? pe.price : null];
       }
     },
     {
@@ -301,7 +298,7 @@
       name: 'cr20-2. SKU ที่ Discontinued ก่อนปีแผน (12040) → 0 ทุกเดือน (ล็อก) และไม่อยู่ในรายการ + เพิ่ม SKU แม้ Listing แล้ว',
       expected: [true, 0, false, false],
       actual: function () {
-        var m = { products: D.products, listings: D.listings.concat([{ productKey: OLD, accountId: 'seven' }]), priceList: D.priceList, npdPlans: D.npdPlans };
+        var m = { products: D.products, listings: D.listings.concat([{ productKey: OLD, accountId: 'seven' }]), basePrices: D.basePrices, npdPlans: D.npdPlans };
         var pl = plan('seven'); pl.items[OLD] = calc.newPlanItem(sku(OLD), YEAR, 0);
         var cells = row(calc.skuPlanGrid(D, m, 'seven', pl, GRID('seven')), OLD).cells;
         return [cells.every(function (c) { return c.source === 'locked'; }), calc.sum(cells.map(function (c) { return c.units; })),
@@ -317,7 +314,7 @@
         var listedFirst = list.findIndex(function (x) { return !x.listed; }) >= list.filter(function (x) { return x.listed; }).length;
         var ls = calc.addSalesListings(D.listings, [a.key], ['seven'], { at: '2027-03-01T00:00:00Z', by: 'Sales Officer · MT', fromMonth: '2027-03' });
         var added = ls.filter(function (l) { return l.productKey === a.key && l.accountId === 'seven'; })[0];
-        var m = { products: D.products, listings: ls, priceList: D.priceList, npdPlans: D.npdPlans };
+        var m = { products: D.products, listings: ls, basePrices: D.basePrices, npdPlans: D.npdPlans };
         var pl = plan('seven'); pl.items[a.key] = calc.newPlanItem(a.product, YEAR, 0, 2);
         var r = row(calc.skuPlanGrid(D, m, 'seven', pl, GRID('seven')), a.key);
         return [a.listed, listedFirst, added.addedBy, added.fromMonth, !!r && r.listed, r.cells[1].source === 'locked', r.cells[2].state.editable];
@@ -342,20 +339,20 @@
       }
     },
     {
-      name: 'cr20-5. สร้าง NPD จาก Sales: ชื่อ + Series + ราคา 259 + เริ่ม มิ.ย. → รหัสชั่วคราว NPD_2027Q2_04 · source SALES_REQUEST · ม.ค.–พ.ค. ล็อก 0 · มิ.ย.–ธ.ค. กรอกเอง · ราคาต่อ Account + RSP ชั่วคราว · Listing SALES 2 หน่วย',
-      expected: ['NPD_2027Q2_04', 'SALES_REQUEST', [true, true, true, true, true], [true, true, true, true, true, true, true], 259, 259, ['seven', 'watsons'], '2027-06-01', ['name', 'series', 'price', 'month']],
+      name: 'cr20-5. สร้าง NPD จาก Sales: ชื่อ + Series + Type Tint + ราคา 259 + เริ่ม มิ.ย. → CR-30 Product Code ระบบ 33490 · source SALES_REQUEST · ม.ค.–พ.ค. ล็อก 0 · มิ.ย.–ธ.ค. กรอกเอง · ราคาที่ 7-Eleven + RSP ตั้งต้น (ราคาหลัก มิ.ย.) · Listing SALES 2 หน่วย · ไม่เลือก Type = ไม่ยอมรับ',
+      expected: ['33490', 'SALES_REQUEST', [true, true, true, true, true], [true, true, true, true, true, true, true], 259, 259, ['seven', 'watsons'], '2027-06-01', ['name', 'series', 'price', 'type', 'month']],
       actual: function () {
-        var bad = calc.createSalesNpd({ products: D.products, priceList: D.priceList, accountPrices: D.accountPrices, listings: D.listings }, { name: ' ', price: 0, year: YEAR, unitId: 'seven' }, {});
-        var res = calc.createSalesNpd({ products: D.products, priceList: D.priceList, accountPrices: D.accountPrices, listings: D.listings },
-          { name: 'Glow Tint (ชั่วคราว)', seriesId: D.taxonomy.series[0].id, price: 259, startMonth: 5, year: YEAR, unitId: 'seven', unitIds: ['watsons'], note: 'ขายช่วงปิดเทอม' },
+        var bad = calc.createSalesNpd({ products: D.products, basePrices: D.basePrices, listings: D.listings, taxonomy: D.taxonomy, codeCounters: D.codeCounters }, { name: ' ', price: 0, year: YEAR, unitId: 'seven' }, {});
+        var res = calc.createSalesNpd({ products: D.products, basePrices: D.basePrices, listings: D.listings, taxonomy: D.taxonomy, codeCounters: D.codeCounters },
+          { name: 'Glow Tint', seriesId: D.taxonomy.series[0].id, typeId: 'type-tint', price: 259, startMonth: 5, year: YEAR, unitId: 'seven', unitIds: ['watsons'], note: 'ขายช่วงปิดเทอม' },
           { by: 'Sales Manager · MT · อนันต์ ศรีสว่าง', at: '2027-03-10T00:00:00Z' });
-        var m = { products: res.master.products, listings: res.master.listings, priceList: res.master.priceList, npdPlans: D.npdPlans };
-        var d = withData({ priceList: res.master.priceList, accountPrices: res.master.accountPrices, products: res.master.products, listings: res.master.listings });
+        var m = { products: res.master.products, listings: res.master.listings, basePrices: res.master.basePrices, npdPlans: D.npdPlans };
+        var d = withData({ basePrices: res.master.basePrices, products: res.master.products, listings: res.master.listings });
         var pl = plan('seven'); pl.items[res.key] = calc.newPlanItem(res.product, YEAR, 0, 5);
         var cells = row(calc.skuPlanGrid(d, m, 'seven', pl, GRID('seven')), res.key).cells;
         return [res.key, res.product.source, cells.slice(0, 5).map(function (c) { return c.source === 'locked' && c.units === 0; }),
-          cells.slice(5).map(function (c) { return c.source === 'manual' && c.state.editable; }), calc.accountPriceOf(res.master.accountPrices, res.key, 'seven'),
-          calc.priceOn(res.master.priceList, res.key, 'RSP', null, '2027-06-01'),
+          cells.slice(5).map(function (c) { return c.source === 'manual' && c.state.editable; }), calc.resolvePrice(d, res.key, 'seven', '2027-06').price,
+          calc.rspAt(res.master.basePrices, res.key, '2027-06'),
           res.master.listings.filter(function (l) { return l.productKey === res.key && l.addedBy === 'SALES'; }).map(function (l) { return l.accountId; }), res.product.launchDate, bad.errors];
       }
     },
@@ -363,27 +360,26 @@
       name: 'cr20-6. NPD จาก Sales ที่ขาด Category (ข้อมูลจำเป็น) ยังเพิ่มเข้าแผนได้ · สินค้าปกติที่ขาดข้อมูลจำเป็น (25011 ไม่มี Series) ยังเพิ่มไม่ได้ · หน้ารายการสินค้ายังนับว่าไม่ครบ',
       expected: [null, null, false, 'incomplete', 'incomplete'],
       actual: function () {
-        var res = calc.createSalesNpd({ products: D.products, priceList: D.priceList, accountPrices: D.accountPrices, listings: D.listings },
-          { name: 'Brow Pen (ชั่วคราว)', seriesId: null, price: 159, startMonth: 3, year: YEAR, unitId: 'eveandboy' }, {});
-        var m = { products: res.master.products, listings: res.master.listings, priceList: res.master.priceList, npdPlans: D.npdPlans };
+        var res = calc.createSalesNpd({ products: D.products, basePrices: D.basePrices, listings: D.listings, taxonomy: D.taxonomy, codeCounters: D.codeCounters },
+          { name: 'Brow Pen', seriesId: null, typeId: 'type-brow', price: 159, startMonth: 3, year: YEAR, unitId: 'eveandboy' }, {});
+        var m = { products: res.master.products, listings: res.master.listings, basePrices: res.master.basePrices, npdPlans: D.npdPlans };
         var a = calc.addableSkus(m, 'eveandboy', plan('eveandboy'), YEAR).filter(function (x) { return x.key === res.key; })[0];
         var brow = calc.addableSkus(m, 'eveandboy', plan('eveandboy'), YEAR).filter(function (x) { return x.key === BROW; })[0];
         return [calc.planBlockReason(res.product, m.priceList), a.blocked, calc.productCompleteness(res.product, m.priceList).complete,
-          calc.planBlockReason(sku(BROW), D.priceList), brow ? brow.blocked : 'incomplete'];
+          calc.planBlockReason(sku(BROW), D.basePrices), brow ? brow.blocked : 'incomplete'];
       }
     },
     {
-      name: 'cr20-7. ผูกรหัสจริงให้ NPD จาก Sales → แผน SKU ของทุกหน่วยขายที่ใช้สินค้านั้น (7-Eleven, Watsons) อ้างรหัสใหม่ · Listing และราคาต่อ Account ย้ายตาม',
-      expected: [true, [true, true], [false, false], 2, 1],
+      name: 'cr20-7 (CR-30). NPD จาก Sales ได้ Product Code จากระบบทันที · ใน TRCLOUD = ยังไม่เปิด · codeCounters จดเลข 33490 · สร้างอีกครั้งได้ 33500 · Type ที่ยังไม่มีเลขนำหน้า (Highlighter) → prefix',
+      expected: [true, '33490', false, 33490, '33500', ['prefix']],
       actual: function () {
-        var res = calc.createSalesNpd({ products: D.products, priceList: D.priceList, accountPrices: D.accountPrices, listings: D.listings },
-          { name: 'Glow Tint (ชั่วคราว)', seriesId: null, price: 259, startMonth: 5, year: YEAR, unitId: 'seven', unitIds: ['watsons'] }, {});
-        var plans = ['seven', 'watsons'].map(function (u) { var p = plan(u); p.items[res.key] = calc.newPlanItem(res.product, YEAR, 0, 5); return p; });
-        var mst = { products: res.master.products, listings: res.master.listings, priceList: res.master.priceList, accountPrices: res.master.accountPrices, promotions: [], npdPlans: D.npdPlans };
-        var b = calc.bindTrCode(mst, res.key, '99001');
-        var moved = plans.map(function (p) { return calc.renamePlanKey(p, res.key, '99001'); });
-        return [b.ok, moved.map(function (p) { return !!p.items['99001']; }), moved.map(function (p) { return !!p.items[res.key]; }),
-          b.master.listings.filter(function (l) { return l.productKey === '99001'; }).length, b.master.accountPrices.filter(function (x) { return x.productKey === '99001'; }).length];
+        var base = { products: D.products, basePrices: D.basePrices, listings: D.listings, taxonomy: D.taxonomy, codeCounters: D.codeCounters };
+        var input = { name: 'Glow Tint', seriesId: null, typeId: 'type-tint', price: 259, startMonth: 5, year: YEAR, unitId: 'seven', unitIds: ['watsons'] };
+        var res = calc.createSalesNpd(base, input, {});
+        var again = calc.createSalesNpd({ products: res.master.products, basePrices: res.master.basePrices, listings: res.master.listings,
+          taxonomy: D.taxonomy, codeCounters: res.master.codeCounters }, input, {});
+        var hl = calc.createSalesNpd(base, { name: 'Glow', seriesId: null, typeId: 'type-highlighter', price: 259, startMonth: 5, year: YEAR, unitId: 'seven' }, {});
+        return [res.ok, res.key, res.product.inTrcloud, res.master.codeCounters['33'], again.key, hl.errors];
       }
     },
     {
@@ -400,26 +396,22 @@
       name: 'cr20-9. ทีม Product แก้ราคาหรือวันเริ่มขายของ NPD จาก Sales → จุดเตือน (price / launch) · จำนวนชิ้นในแผนไม่เปลี่ยน (แผนใช้วันเริ่มขายที่ Sales กรอก) · Net Sales ตามราคาใหม่',
       expected: [[], ['price', 'launch'], true, true],
       actual: function () {
-        var res = calc.createSalesNpd({ products: D.products, priceList: D.priceList, accountPrices: D.accountPrices, listings: D.listings },
-          { name: 'Glow Tint (ชั่วคราว)', seriesId: null, price: 259, startMonth: 5, year: YEAR, unitId: 'seven' }, {});
-        var base = withData({ priceList: res.master.priceList, accountPrices: res.master.accountPrices });
+        var res = calc.createSalesNpd({ products: D.products, basePrices: D.basePrices, listings: D.listings, taxonomy: D.taxonomy, codeCounters: D.codeCounters },
+          { name: 'Glow Tint', seriesId: null, typeId: 'type-tint', price: 259, startMonth: 5, year: YEAR, unitId: 'seven' }, {});
+        var base = withData({ basePrices: res.master.basePrices });
         var p2 = JSON.parse(JSON.stringify(res.product)); p2.launchDate = '2027-08-01';
         var prods = res.master.products.map(function (p) { return calc.productKey(p) === res.key ? p2 : p; });
-        var ap2 = calc.setAccountPrice(res.master.accountPrices, res.key, 'seven', 229);
-        var changed = withData({ priceList: res.master.priceList, accountPrices: ap2 });
+        var pp2 = calc.setPromoPrice(D.promoPrices, res.key, 'mt', 'seven', '2027-06', 229);
+        pp2 = calc.setPromoPrice(pp2, res.key, 'mt', 'seven', '2027-07', 229);
+        var changed = withData({ basePrices: res.master.basePrices, promoPrices: pp2 });
         var pl = plan('seven'); pl.items[res.key] = calc.newPlanItem(res.product, YEAR, 0, 5);
         pl.items[res.key].qty[6] = 1000;
-        var m1 = { products: res.master.products, listings: res.master.listings, priceList: res.master.priceList, npdPlans: D.npdPlans };
-        var m2 = { products: prods, listings: res.master.listings, priceList: res.master.priceList, npdPlans: D.npdPlans };
+        var m1 = { products: res.master.products, listings: res.master.listings, basePrices: res.master.basePrices, npdPlans: D.npdPlans };
+        var m2 = { products: prods, listings: res.master.listings, basePrices: res.master.basePrices, npdPlans: D.npdPlans };
         var c1 = row(calc.skuPlanGrid(base, m1, 'seven', pl, GRID('seven')), res.key).cells[6];
         var c2 = row(calc.skuPlanGrid(changed, m2, 'seven', pl, GRID('seven')), res.key).cells[6];
         return [calc.salesRequestChanges(res.product, base), calc.salesRequestChanges(p2, changed), c1.units === 1000 && c2.units === 1000, c2.net < c1.net];
       }
-    },
-    {
-      name: 'Promo ตามวันที่: Juicy Pop Tint 01 (33390) ใน Shopee เดือน มิ.ย. (Mid-year Sale 139 บาท 10 วัน จาก RSP 199) ราคาเฉลี่ย 179',
-      expected: 179,
-      actual: function () { return SP.core.features.withFlags({ promotionCalendar: true }, function () { return round2(calc.effectivePrice(D, TINT, 'shopee', YEAR, 5)); }); }
     },
     {
       name: 'Promo คร่อมเดือน 25 พ.ค.–5 มิ.ย. → พ.ค. 7 วัน / มิ.ย. 5 วัน',
@@ -440,7 +432,7 @@
       actual: function () { return Math.abs(calc.sum(calc.seasonalityShares(PRIOR.shopee)) - 1) < 1e-9; }
     },
     {
-      name: 'Status NPD_2027Q2_01 (เริ่มขาย 1 มิ.ย.): พ.ค. Planned / มิ.ย.–ส.ค. New / ก.ย. Active',
+      name: 'Status 32210 (เริ่มขาย 1 มิ.ย.): พ.ค. Planned / มิ.ย.–ส.ค. New / ก.ย. Active',
       expected: ['planned', 'new', 'new', 'new', 'active'],
       actual: function () { return [4, 5, 6, 7, 8].map(function (m) { return calc.statusAt(sku(NPD_A), YEAR, m); }); }
     },
@@ -450,7 +442,7 @@
       actual: function () { return [1, 2, 3, 4, 5].map(function (m) { return calc.statusAt(clearProduct(), YEAR, m); }); }
     },
     {
-      name: 'วิธีเติมยอด NPD_2027Q2_01 (เริ่มขายในหน่วย = มิ.ย.): พ.ค. ล็อก / มิ.ย. กรอกเอง / ธ.ค. กรอกเอง (พ้น New แล้วยังกรอกเอง)',
+      name: 'วิธีเติมยอด 32210 (เริ่มขายในหน่วย = มิ.ย.): พ.ค. ล็อก / มิ.ย. กรอกเอง / ธ.ค. กรอกเอง (พ้น New แล้วยังกรอกเอง)',
       expected: ['locked', 'manual', 'manual'],
       actual: function () {
         var a = sku(NPD_A);
@@ -471,7 +463,7 @@
       actual: function () {
         var k = Object.keys(plan('eveandboy').items);
         return [[CUSHION, TINT, TINT02].every(function (x) { return k.indexOf(x) >= 0; }), [NPD_A, NPD_C].every(function (x) { return k.indexOf(x) >= 0; }),
-          k.indexOf(NPD_B) >= 0, k.indexOf(BROW) >= 0, k.some(function (x) { return sku(x).itemType !== 'SALE'; }), k.indexOf(OLD) >= 0];
+          k.indexOf(NPD_B) >= 0, k.indexOf(BROW) >= 0, k.some(function (x) { return !sku(x); }), k.indexOf(OLD) >= 0];
       }
     },
     {
@@ -541,7 +533,7 @@
       actual: function () { return range(3, 7).map(function (m) { return calc.cellSource(sku(NPD_A), m, YEAR, false, 6); }); }
     },
     {
-      name: 'sku-4. เลือกเดือนเริ่มขายในหน่วยก่อน Launch Date (NPD_2027Q2_01 มิ.ย.) → ไม่ยอมรับ',
+      name: 'sku-4. เลือกเดือนเริ่มขายในหน่วยก่อน Launch Date (32210 มิ.ย.) → ไม่ยอมรับ',
       expected: [false, false, true, true],
       actual: function () { var a = sku(NPD_A); return [0, 4, 5, 11].map(function (m) { return calc.validStartMonth(a, m, YEAR); }); }
     },
@@ -575,10 +567,10 @@
       }
     },
     {
-      name: 'sku: ติ๊ก Listing NPD_2027Q2_02 ใน Watsons → เพิ่มได้ เป็นสินค้าใหม่ของปีแผน และเริ่มขาย มิ.ย.',
+      name: 'sku: ติ๊ก Listing 34150 ใน Watsons → เพิ่มได้ เป็นสินค้าใหม่ของปีแผน และเริ่มขาย มิ.ย.',
       expected: [true, true, null, 5],
       actual: function () {
-        var m = { products: D.products, listings: D.listings.concat([{ productKey: NPD_B, accountId: 'watsons' }]), priceList: D.priceList, npdPlans: D.npdPlans };
+        var m = { products: D.products, listings: D.listings.concat([{ productKey: NPD_B, accountId: 'watsons' }]), basePrices: D.basePrices, npdPlans: D.npdPlans };
         var av = calc.availableSkus(m, 'watsons', plan('watsons'), YEAR).filter(function (x) { return x.key === NPD_B; })[0];
         return [!!av, av.npd, av.blocked, calc.newPlanItem(sku(NPD_B), YEAR, 0).startMonth];
       }
@@ -810,7 +802,7 @@
       }
     },
     {
-      name: 'cx: Tooltip ตรงกับช่องในตาราง (12130 EVEANDBOY เม.ย.) และช่องล็อกบอกเหตุผล (NPD_2027Q2_01 ม.ค.–พ.ค. = Planned)',
+      name: 'cx: Tooltip ตรงกับช่องในตาราง (12130 EVEANDBOY เม.ย.) และช่องล็อกบอกเหตุผล (32210 ม.ค.–พ.ค. = Planned)',
       expected: [true, 'planned'],
       actual: function () {
         var pl = plan('eveandboy');
@@ -944,87 +936,31 @@
         var p = JSON.parse(JSON.stringify(sku(CUSHION)));
         p.barcode = '8859580712130'; p.internalCode = 'CM-12130'; p.subSeriesId = 'S1a';
         p.seriesId = null; p.image = null;
-        var c = calc.productCompleteness(p, D.priceList);
+        var c = calc.productCompleteness(p, D.basePrices);
         var names = D.content.labels.productFields;
         return [c.missingRequired.map(function (f) { return names[f]; }), c.missingRecommended.map(function (f) { return names[f]; }), c.complete];
       }
     },
     {
-      name: 'v6-3. ราคาตามวันที่มีผล: RSP 100 ถึง 31 พ.ค. / 110 ตั้งแต่ 1 มิ.ย. → มิ.ย. = 110, พ.ค. = 100 และราคาใหม่ปิดช่วงของราคาเดิม',
-      expected: [110, 100, '2027-05-31', 'date'],
+      name: 'v6-3 (CR-30). ราคาหลักตามรอบเวลา: RSP 100 มีผล 2027-01 / 110 มีผล 2027-06 → มิ.ย. = 110, พ.ค. = 100 · บันทึกเดือนเดิมซ้ำ = แทนค่า (ไม่เพิ่มรายการ) · ราคา ≤ 0 → price',
+      expected: [110, 100, 2, 115, 'price'],
       actual: function () {
-        var list = [{ productKey: 'T1', priceType: 'RSP', channelId: null, price: 100, effectiveFrom: '2027-01-01', effectiveTo: null }];
-        var res = calc.addPrice(list, { productKey: 'T1', priceType: 'RSP', channelId: null, price: 110, effectiveFrom: '2027-06-01' });
-        var d = withData({ priceList: res.list, promotions: [] });
-        var bad = calc.addPrice(res.list, { productKey: 'T1', priceType: 'RSP', channelId: null, price: 120, effectiveFrom: '2027-03-01' });
-        return [calc.pricingDetail(d, 'T1', 'shopee', YEAR, 5).rsp, calc.pricingDetail(d, 'T1', 'shopee', YEAR, 4).rsp, res.list[0].effectiveTo, bad.error];
+        var list = calc.setBasePrice([], { productKey: 'T1', priceType: 'RSP', effectiveMonth: '2027-01', price: 100 }).list;
+        list = calc.setBasePrice(list, { productKey: 'T1', priceType: 'RSP', effectiveMonth: '2027-06', price: 110 }).list;
+        var d = withData({ basePrices: list, promoPrices: [] });
+        var again = calc.setBasePrice(list, { productKey: 'T1', priceType: 'RSP', effectiveMonth: '2027-06', price: 115 }).list;
+        return [calc.pricingDetail(d, 'T1', 'shopee', YEAR, 5).rsp, calc.pricingDetail(d, 'T1', 'shopee', YEAR, 4).rsp, again.length, calc.basePriceAt(again, 'T1', 'RSP', '2027-06'),
+          calc.setBasePrice(list, { productKey: 'T1', priceType: 'RSP', effectiveMonth: '2027-08', price: 0 }).error];
       }
     },
     {
-      name: 'v6-4. effectivePrice: RSP 100 · Promotion 70 วันที่ 1–10 มิ.ย. (10 จาก 30 วัน) → 90',
-      expected: 90,
+      name: 'v6-8 (CR-30). รหัสชั่วคราวของข้อมูลตั้งต้นแปลงเป็น Product Code ระบบตอนโหลด (NPD_2027Q2_01 / 02 / 03 → 32210 / 34150 / 33480 · ปี 2028 → 22110 / 16490) · Listing ราคา แผน NPD ยอดจริงอ้างรหัสใหม่ · ไม่เหลือรหัสชั่วคราว',
+      expected: ['{"NPD_2027Q2_01":"32210","NPD_2027Q2_02":"34150","NPD_2027Q2_03":"33480","NPD_2028Q2_01":"22110","NPD_2028Q1_01":"16490"}', true, true, true, true, 0],
       actual: function () {
-        var d = withData({
-          priceList: [{ productKey: 'T1', priceType: 'RSP', channelId: null, price: 100, effectiveFrom: '2027-01-01', effectiveTo: null }],
-          promotions: [{ id: 'x1', name: 'P', productKey: 'T1', accountIds: ['shopee'], startDate: '2027-06-01', endDate: '2027-06-10', mode: 'PRICE', value: 70, promoGpPct: null, status: 'CONFIRMED' }]
-        });
-        return SP.core.features.withFlags({ promotionCalendar: true }, function () { return round2(calc.effectivePrice(d, 'T1', 'shopee', YEAR, 5)); });
-      }
-    },
-    {
-      name: 'v6-5. Promotion ส่วนลด 20% บน RSP 100 → 80',
-      expected: [80, 80],
-      actual: function () {
-        var promo = { id: 'x2', name: 'D', productKey: 'T1', accountIds: ['shopee'], startDate: '2027-06-01', endDate: '2027-06-30', mode: 'DISCOUNT_PCT', value: 0.2, promoGpPct: null, status: 'CONFIRMED' };
-        var d = withData({ priceList: [{ productKey: 'T1', priceType: 'RSP', channelId: null, price: 100, effectiveFrom: '2027-01-01', effectiveTo: null }], promotions: [promo] });
-        return SP.core.features.withFlags({ promotionCalendar: true }, function () { return [calc.promoPrice(promo, 100), round2(calc.effectivePrice(d, 'T1', 'shopee', YEAR, 5))]; });
-      }
-    },
-    {
-      name: 'v6-6b. คัดลอก Promotion ไปเดือนถัดไป: ทั้งเดือน → ทั้งเดือนถัดไป / 15–31 ม.ค. → 15–28 ก.พ.',
-      expected: [['2027-07-01', '2027-07-31'], ['2027-02-15', '2027-02-28'], ['2028-01-01', '2028-01-31']],
-      actual: function () {
-        var a = calc.shiftPromotion({ startDate: '2027-06-01', endDate: '2027-06-30' }, 1);
-        var b = calc.shiftPromotion({ startDate: '2027-01-15', endDate: '2027-01-31' }, 1);
-        var c = calc.shiftPromotion({ startDate: '2027-12-01', endDate: '2027-12-31' }, 1);
-        return [[a.startDate, a.endDate], [b.startDate, b.endDate], [c.startDate, c.endDate]];
-      }
-    },
-    {
-      name: 'v6-6. Promotion ซ้อนกันใน SKU × Account เดียวกัน → ไม่ยอมรับ (บอกชื่อ Promotion ที่ชน) / คนละ Account → ยอมรับ',
-      expected: [false, 'overlap', ['Mid-year Sale'], true],
-      actual: function () {
-        var p = { id: 'new', name: 'ใหม่', productKey: TINT, accountIds: ['shopee'], startDate: '2027-06-05', endDate: '2027-06-20', mode: 'PRICE', value: 149, status: 'DRAFT' };
-        var v = calc.validatePromotion(D.promotions, p, 199);
-        var ok = calc.validatePromotion(D.promotions, { id: 'new2', name: 'ใหม่', productKey: TINT, accountIds: ['tiktok'], startDate: '2027-06-05', endDate: '2027-06-20', mode: 'PRICE', value: 149, status: 'DRAFT' }, 199);
-        return [v.ok, v.errors[0].code, v.errors[0].names, ok.ok];
-      }
-    },
-    {
-      name: 'v6-7. Promotion ฉบับร่างไม่มีผลต่อ effectivePrice',
-      expected: [100, 1],
-      actual: function () {
-        var d = withData({
-          priceList: [{ productKey: 'T1', priceType: 'RSP', channelId: null, price: 100, effectiveFrom: '2027-01-01', effectiveTo: null }],
-          promotions: [{ id: 'x3', name: 'Draft', productKey: 'T1', accountIds: ['shopee'], startDate: '2027-06-01', endDate: '2027-06-10', mode: 'PRICE', value: 70, promoGpPct: null, status: 'DRAFT' }]
-        });
-        var det = SP.core.features.withFlags({ promotionCalendar: true }, function () { return calc.pricingDetail(d, 'T1', 'shopee', YEAR, 5); });
-        return [round2(det.price), det.drafts.length];
-      }
-    },
-    {
-      name: 'v6-8. ผูกรหัสจริง NPD_2027Q2_01 → 11050: Listing, ราคา, Promotion, แผน NPD และแผน SKU อ้าง 11050 / TR Code ซ้ำ → ไม่ยอมรับ',
-      expected: [true, true, true, true, true, true, 'NPD_2027Q2_01', 'duplicate'],
-      actual: function () {
-        var m = { products: D.products, listings: D.listings, priceList: D.priceList, promotions: D.promotions, npdPlans: D.npdPlans };
-        var res = calc.bindTrCode(m, NPD_A, '11050');
-        var o = res.master;
-        function none(list) { return list.every(function (r) { return r.productKey !== NPD_A; }) && list.some(function (r) { return r.productKey === '11050'; }); }
-        var pl = plan('watsons'); pl.items[NPD_A] = calc.newPlanItem(sku(NPD_A), YEAR, 100);
-        var moved = calc.renamePlanKey(pl, NPD_A, '11050');
-        var p = calc.findProduct(o.products, '11050');
-        return [res.ok, none(o.listings), none(o.priceList), none(o.promotions), none(o.npdPlans), !!moved.items['11050'] && !moved.items[NPD_A],
-          p.tempCode, calc.bindTrCode(m, NPD_B, CUSHION).error];
+        var old = /^NPD_/;
+        function moved(list) { return list.every(function (r) { return !old.test(r.productKey); }) && list.some(function (r) { return r.productKey === NPD_A; }); }
+        return [JSON.stringify(SP.data.codeMigration), moved(D.listings), moved(D.basePrices), moved(D.npdPlans), !!D.actuals.years[YEAR].seven[NPD_A],
+          D.products.filter(function (p) { return p.tempCode || old.test(calc.productKey(p)); }).length];
       }
     },
     {
@@ -1038,33 +974,31 @@
       }
     },
     {
-      name: 'v6-10. แผน NPD อนุมัติแล้ว → Listing ของหน่วยที่วางแผนถูกตั้งค่า และเดือนเริ่มขายเป็นค่าเริ่มต้นในแผน SKU (NPD_2027Q2_02 EVEANDBOY ก.ค.)',
+      name: 'v6-10. แผน NPD อนุมัติแล้ว → Listing ของหน่วยที่วางแผนถูกตั้งค่า และเดือนเริ่มขายเป็นค่าเริ่มต้นในแผน SKU (34150 EVEANDBOY ก.ค.)',
       expected: [true, true, 6, '2027-06-01'],
       actual: function () {
         var np = JSON.parse(JSON.stringify(D.npdPlans));
         var h = np.filter(function (n) { return n.productKey === NPD_B; })[0];
         h.workflow = { status: 'approved', history: [] };
         var applied = calc.applyNpdApproval({ products: D.products, listings: D.listings.filter(function (l) { return l.productKey !== NPD_B; }) }, h);
-        var m = { products: applied.products, listings: applied.listings, priceList: D.priceList, npdPlans: np };
+        var m = { products: applied.products, listings: applied.listings, basePrices: D.basePrices, npdPlans: np };
         var pl = calc.defaultSkuPlan(m, 'eveandboy', YEAR, true);
         return [calc.isListed(applied.listings, NPD_B, 'eveandboy'), !!pl.items[NPD_B], pl.items[NPD_B].startMonth, calc.findProduct(applied.products, NPD_B).launchDate];
       }
     },
     {
-      name: 'v6-11. แก้ Promotion หลังล็อก Baseline → Net Sales ของ Baseline (Snapshot) ไม่เปลี่ยน / Forecast เปลี่ยน',
+      name: 'v6-11 (CR-30). ตั้ง Promotion Price หลังล็อก Baseline → Net Sales ของ Baseline (Snapshot) ไม่เปลี่ยน / Forecast เปลี่ยน',
       expected: [true, true],
       actual: function () {
-        return SP.core.features.withFlags({ promotionCalendar: true }, function () { 
-        var snapshot = { priceList: D.priceList, promotions: D.promotions.filter(function (p) { return p.status === 'CONFIRMED'; }), gp: { shopee: calc.gpOf(D, 'shopee') } };
+        var snapshot = { basePrices: D.basePrices, promoPrices: D.promoPrices, gp: { shopee: calc.gpOf(D, 'shopee') } };
         var pl = plan('shopee');
         var before = calc.skuPlanGrid(D, MASTER, 'shopee', pl, GRID('shopee', { snapshot: snapshot })).yearTotal.net;
-        var promo = { id: 'late', name: 'หลังล็อก', productKey: CUSHION, accountIds: ['shopee'], startDate: '2027-08-01', endDate: '2027-08-31', mode: 'DISCOUNT_PCT', value: 0.3, promoGpPct: null, status: 'CONFIRMED' };
-        var d2 = withData({ promotions: D.promotions.concat([promo]) });
+        var base = calc.rspAt(D.basePrices, CUSHION, '2027-08');
+        var d2 = withData({ promoPrices: calc.setPromoPrice(D.promoPrices, CUSHION, 'ecom', 'shopee', '2027-08', base * 0.7) });
         var baseline = calc.skuPlanGrid(d2, MASTER, 'shopee', pl, GRID('shopee', { snapshot: snapshot })).yearTotal.net;
         var live = calc.skuPlanGrid(d2, MASTER, 'shopee', pl, GRID('shopee', { mode: 'reforecast', currentMonth: 2 })).yearTotal.net;
         var liveBefore = calc.skuPlanGrid(D, MASTER, 'shopee', pl, GRID('shopee', { mode: 'reforecast', currentMonth: 2 })).yearTotal.net;
         return [Math.abs(before - baseline) < 1e-6, live < liveBefore - 1];
-        });
       }
     },
     {
@@ -1117,7 +1051,7 @@
     },
     {
       name: 'v7-6. ส่งออก CSV หน้า Top-down: มี BOM / จำนวนแถว = Channel + หน่วยขาย + Total + คงเหลือ / % เป็นทศนิยม',
-      expected: [true, 3 + 10 + 1 + 4, 3 + 10 + 1 + 4 + 1, '0.45'],
+      expected: [true, 3 + 10 + 1 + 4, 3 + 10 + 1 + 4 + 1, '0.48'],   // CR-27 MT 48%
       actual: function () {
         var t = calc.topDown(D, D.targets.years[YEAR], YEAR);
         var rows = calc.topDownRows(t);
@@ -1191,7 +1125,7 @@
         var ly = calc.skuHistory(D.history, YEAR - 1, 'seven', CUSHION);
         var pl = plan('seven'); pl.method = 'lastYear';
         var c = row(calc.skuPlanGrid(D, MASTER, 'seven', pl, GRID('seven')), CUSHION).cells[0];
-        var gL12 = calc.growthFactor(22140000, calc.l12m(D, 'seven'));
+        var gL12 = calc.growthFactor(target('seven'), calc.l12m(D, 'seven'));   // CR-27: เป้าหมาย 7-Eleven จากข้อมูลตั้งต้น
         return [F.number(calc.growthFactor(22140000, 19800000), 4), ly[0], calc.defaultPlanQty('lastYear', { monthly: ly }, 22140000, 19800000)[0], c.units === Math.round(15970 * gL12), c.source];
       }
     },
@@ -1199,7 +1133,7 @@
       name: 'cr11-2. SKU ที่ Discontinued ก่อนปีแผน (12040 เลิกขาย ก.ย. 2026) → ค่าตั้งต้น 0 ทุกเดือน (ล็อก) และไม่อยู่ในรายการเพิ่ม SKU แม้ติ๊ก Listing',
       expected: [true, true, false, false],
       actual: function () {
-        var m = { products: D.products, listings: D.listings.concat([{ productKey: OLD, accountId: 'eveandboy' }]), priceList: D.priceList, npdPlans: D.npdPlans };
+        var m = { products: D.products, listings: D.listings.concat([{ productKey: OLD, accountId: 'eveandboy' }]), basePrices: D.basePrices, npdPlans: D.npdPlans };
         var pl = plan('eveandboy'); pl.items[OLD] = calc.newPlanItem(sku(OLD), YEAR, 0);
         var cells = row(calc.skuPlanGrid(D, m, 'eveandboy', pl, GRID('eveandboy')), OLD).cells;
         return [cells.every(function (c) { return c.units === 0; }), cells.every(function (c) { return c.source === 'locked'; }),
@@ -1221,14 +1155,13 @@
       }
     },
     {
-      name: 'cr11-5. ลำดับราคา: ราคาต่อ Account → ราคาทั่วไป / เปิดปฏิทิน Promotion (Phase 2) → Promotion ที่ยืนยันแล้วมาก่อนราคาต่อ Account (129) · ปิด → 149',
-      expected: [149, 199, 149, 199, 129, 149],
+      name: 'cr11-5 (CR-30). ลำดับราคา resolvePrice: Promotion ของหน่วยขาย (7-Eleven 149) → Promotion ของ Channel (ทั้ง MT ม.ค. 129) → ราคาหลัก (EVEANDBOY ก.พ. RSP 199) · TT ใช้ TT Dealer (12160 ก.ค. 240)',
+      expected: [149, 129, 199, 240, 'promoUnit', 'promoChannel', 'base', 'TT_DEALER'],
       actual: function () {
-        var promo = { id: 'x', name: 'P', productKey: TINT02, accountIds: ['seven'], startDate: '2027-01-01', endDate: '2027-01-31', mode: 'PRICE', value: 129, promoGpPct: null, status: 'CONFIRMED' };
-        return [round2(calc.effectivePrice(D, TINT02, 'seven', YEAR, 1)), round2(calc.effectivePrice(D, TINT02, 'eveandboy', YEAR, 1)),
-          calc.accountPriceOf(D.accountPrices, TINT02, 'seven'), calc.rspOn(D.priceList, TINT02, '2027-02-01', 'mt'),
-          SP.core.features.withFlags({ promotionCalendar: true }, function () { return round2(calc.effectivePrice(withData({ promotions: [promo] }), TINT02, 'seven', YEAR, 0)); }),
-          round2(calc.effectivePrice(withData({ promotions: [promo] }), TINT02, 'seven', YEAR, 0))];
+        var d = withData({ promoPrices: calc.setPromoPrice(D.promoPrices, TINT02, 'mt', null, '2027-01', 129) });
+        var a = calc.resolvePrice(d, TINT02, 'seven', '2027-01'), b = calc.resolvePrice(d, TINT02, 'eveandboy', '2027-01'), c = calc.resolvePrice(d, TINT02, 'eveandboy', '2027-02');
+        var t = calc.resolvePrice(D, '12160', 'TT-01', '2027-07');
+        return [a.price, b.price, c.price, t.price, a.source, b.source, c.source, t.priceType];
       }
     },
     {
@@ -1243,17 +1176,17 @@
       name: 'cr11-7. SKU Series Existing → series ว่าง และ productCompleteness คืน missingRequired มี Series (5 SKU ที่ขาด Series / ไม่มี Series ชื่อ Existing)',
       expected: [null, true, 5, false],
       actual: function () {
-        return [sku(BROW).seriesId, calc.productCompleteness(sku(BROW), D.priceList).missingRequired.indexOf('seriesId') >= 0,
+        return [sku(BROW).seriesId, calc.productCompleteness(sku(BROW), D.basePrices).missingRequired.indexOf('seriesId') >= 0,
           D.products.filter(function (p) { return !p.seriesId; }).length, D.taxonomy.series.some(function (s) { return s.name === 'Existing'; })];
       }
     },
     {
-      name: 'cr11-8. นำเข้า seed แล้ว ยอดขายปีก่อนของหน่วยขาย 7-Eleven = 19,800,000 และ EVEANDBOY = 9,900,000 (±100) / Net Sales จากจำนวนชิ้นราย SKU ต่างไม่เกิน 0.2% (CR-18 seed ฉบับที่ 2 รวม VAT) / สินค้าจริง 117 + ชั่วคราว 3',
-      expected: [true, true, true, true, 117, 3],
+      name: 'cr11-8. นำเข้า seed แล้ว ยอดขายปีก่อนของหน่วยขาย 7-Eleven = 19,800,000 และ EVEANDBOY = 9,900,000 (±100) / Net Sales จากจำนวนชิ้นราย SKU ต่างไม่เกิน 0.2% (CR-18 seed ฉบับที่ 2 รวม VAT) / สินค้าจริง 117 (ใน TRCLOUD เปิดแล้ว) + สินค้าใหม่ 5 (ปี 2027 · 2028 ยังไม่เปิด · CR-30)',
+      expected: [true, true, true, true, 117, 5],
       actual: function () {
         return [Math.abs(lyNet('seven') / 19800000 - 1) <= 0.002, Math.abs(calc.unitHistory(D.history, YEAR - 1, 'seven') - 19800000) <= 100,
           Math.abs(calc.unitHistory(D.history, YEAR - 1, 'eveandboy') - 9900000) <= 100, Math.abs(lyNet('eveandboy') / 9900000 - 1) <= 0.002,
-          D.products.filter(function (p) { return p.trCode; }).length, D.products.filter(function (p) { return !p.trCode && p.tempCode; }).length];
+          D.products.filter(function (p) { return p.inTrcloud !== false; }).length, D.products.filter(function (p) { return p.inTrcloud === false; }).length];
       }
     },
     {
@@ -1385,8 +1318,8 @@
       }
     },
     {
-      name: 'cr12-9. % ของ Total ของ 7-Eleven: 22,140,000 ÷ 120,000,000 → 18.45% (เท่ากับ % ใน Channel × % ของ Total ของ Channel)',
-      expected: ['18.45%', true],
+      name: 'cr12-9. % ของ Total ของ 7-Eleven: 26,496,000 ÷ 120,000,000 → 22.08% (CR-27: MT 48% × 7-Eleven 46% · เท่ากับ % ใน Channel × % ของ Total ของ Channel)',
+      expected: ['22.08%', true],
       actual: function () {
         var seven = calc.planUnits(TREE).filter(function (u) { return u.id === 'seven'; })[0];
         var pct = calc.pctFromAmount(TREE.amount, seven.amount);
@@ -1396,8 +1329,8 @@
     },
     // ---------------- CR-13: การอนุมัติในแท็บติดตามสถานะ + มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน (CR-13 ข้อ 4 · สรุปใน docs/CHANGELOG.md) ----------------
     {
-      name: 'cr13-4. aggregatePhasing([7-Eleven, Watsons, EVEANDBOY]): ม.ค. = ผลรวมเป้าหมาย ม.ค. ของ 3 หน่วย · ทั้งปี = 54,000,000 · สัดส่วนรายเดือนรวม 100%',
-      expected: [true, 54000000, 54000000, 1, 3, []],
+      name: 'cr13-4. aggregatePhasing([7-Eleven, Watsons, EVEANDBOY]): ม.ค. = ผลรวมเป้าหมาย ม.ค. ของ 3 หน่วย · ทั้งปี = 57,600,000 (CR-27) · สัดส่วนรายเดือนรวม 100%',
+      expected: [true, 57600000, 57600000, 1, 3, []],
       actual: function () {
         var ids = ['seven', 'watsons', 'eveandboy'];
         var a = calc.aggregatePhasing(D, TREE, {}, ids, YEAR);
@@ -1435,11 +1368,11 @@
     }
   ];
 
-  // Test ชุดอื่น (tests/taxonomy.test.js, tests/stores.test.js, tests/features.test.js, tests/permissions.test.js, tests/targets.test.js, tests/l12m.test.js โหลดก่อน loader ใน calc.test.html) รวมแสดงในหน้านี้ด้วย / Node: node tests/run.js
+  // Test ชุดอื่น (tests/taxonomy.test.js, tests/stores.test.js, tests/features.test.js, tests/permissions.test.js, tests/targets.test.js, tests/l12m.test.js, tests/aging.test.js, tests/cr27.test.js, tests/cr28.test.js, tests/cr29.test.js, tests/cr30.test.js, tests/cr31.test.js, tests/cr32.test.js, tests/cr33.test.js โหลดก่อน loader ใน calc.test.html) รวมแสดงในหน้านี้ด้วย / Node: node tests/run.js
   SP.tests = SP.tests || {};
   SP.tests.calc = CASES;
   function run() {
-    var all = CASES.concat((SP.tests && SP.tests.taxonomy) || [], (SP.tests && SP.tests.stores) || [], (SP.tests && SP.tests.features) || [], (SP.tests && SP.tests.permissions) || [], (SP.tests && SP.tests.targets) || [], (SP.tests && SP.tests.l12m) || []);
+    var all = CASES.concat((SP.tests && SP.tests.taxonomy) || [], (SP.tests && SP.tests.stores) || [], (SP.tests && SP.tests.features) || [], (SP.tests && SP.tests.permissions) || [], (SP.tests && SP.tests.targets) || [], (SP.tests && SP.tests.l12m) || [], (SP.tests && SP.tests.aging) || [], (SP.tests && SP.tests.cr27) || [], (SP.tests && SP.tests.cr28) || [], (SP.tests && SP.tests.cr29) || [], (SP.tests && SP.tests.cr30) || [], (SP.tests && SP.tests.cr31) || [], (SP.tests && SP.tests.cr32) || [], (SP.tests && SP.tests.cr33) || []);
     return all.map(function (c) {
       var actual, error = null;
       try { actual = c.actual(); } catch (e) { error = e; }

@@ -31,19 +31,27 @@
     { id: 'skuPlanning',   title: 'SKU Planning',                short: 'SKU Planning',           path: 'modules/sku-planning/index.html',     group: 'sales-planning', tour: 3,    visible: true, fit: true, year: true },
     { id: 'summary',       title: 'Plan Summary',                short: 'Plan Summary',           path: 'modules/summary/index.html',          group: 'sales-planning', tour: 4,    visible: true, year: true },
     { id: 'productList',   title: 'รายการสินค้า',                short: 'รายการสินค้า',           icon: 'P', path: 'modules/products/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
-    { id: 'npdPlan',       title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)', short: 'แผน NPD',             icon: 'N', path: 'modules/npd-plan/index.html',       group: 'product-master', tour: null, visible: true, fit: true, year: true },
-    { id: 'promotionPrice', title: 'ราคาขายต่อ Account',         short: 'ราคาขายต่อ Account',        icon: '%', path: 'modules/promotions/index.html',     group: 'product-master', tour: null, visible: true, fit: true, year: true },
-    { id: 'productMaster', title: 'Listing และวันเริ่มขาย',      short: 'Listing และวันเริ่มขาย', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'npdPlan',       title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)', short: 'แผน NPD',             icon: 'N', path: 'modules/npd-plan/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
+    { id: 'promotionPrice', title: 'ราคาและ Promotion',          short: 'ราคาและ Promotion',         icon: '%', path: 'modules/promotions/index.html',     group: 'product-master', tour: null, visible: true, fit: true, year: true },
+    { id: 'productMaster', title: 'Listing',      short: 'Listing', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: true, fit: true },
     { id: 'taxonomy',      title: 'หมวดสินค้าและ Series',        short: 'หมวดสินค้าและ Series',   icon: 'C', path: 'modules/taxonomy/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
-    { id: 'accounts',      title: 'Account',                     short: 'Account',               icon: 'A', path: 'modules/accounts/index.html',       group: 'account-master', tour: null, visible: true, fit: true },
-    { id: 'territories',   title: 'เขตการขายและร้านค้า',          short: 'เขตการขายและร้านค้า ({territoryChannels})', icon: 'T', path: 'modules/territories/index.html', group: 'account-master', tour: null, visible: true, fit: true },
-    { id: 'salespeople',   title: 'ผู้รับผิดชอบ',                short: 'ผู้รับผิดชอบ',           icon: 'S', path: 'modules/salespeople/index.html', group: 'account-master', tour: null, visible: true, fit: true, year: true },
-    { id: 'salesTeam',     title: 'ทีมขาย',                      short: 'ทีมขาย',                icon: 'G', path: 'modules/sales-team/index.html',  group: 'account-master', tour: null, visible: true },
-    // CR-25: Role Management 3 หน้าใช้สิทธิ์เดียวกัน (roleManagement) · ไอคอน K / R / U ไม่ซ้ำกับหน้าอื่น
+    // CR-29: Account Master 3 หน้าตามสิ่งที่จัดการ — Account & Platform · เขตและร้านค้า (TT) · บุคลากรและทีม (ใหม่)
+    //   หน้าผู้รับผิดชอบ / ทีมขายเดิม ซ่อน (visible: false · ใช้สิทธิ์ของ people) ลิงก์เดิมพาไปแท็บที่ตรงกันของหน้าบุคลากรและทีม
+    // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น Sales Unit & Customer (salesUnits) · หน้าเดิมซ่อน (ใช้สิทธิ์ของ salesUnits)
+    //   ลิงก์เดิมพาไปหน้าใหม่ (หน้าเขตเดิม → แท็บ Channel ที่แบ่งเป้าตามเขต)
+    { id: 'salesUnits',    title: 'Sales Unit & Customer',       short: 'Sales Unit & Customer', icon: 'A', path: 'modules/sales-units/index.html',    group: 'account-master', tour: null, visible: true, fit: true },
+    { id: 'accounts',      title: 'Account & Platform',          short: 'Account & Platform',    icon: 'A', path: 'modules/accounts/index.html',       group: 'account-master', tour: null, visible: false, perm: 'salesUnits' },
+    { id: 'territories',   title: 'เขตและร้านค้า (TT)',           short: 'เขตและร้านค้า ({territoryChannels})', icon: 'T', path: 'modules/territories/index.html', group: 'account-master', tour: null, visible: false, perm: 'salesUnits' },
+    // CR-32: บุคลากรและทีม → Sales Person Management (id / Path / สิทธิ์ people เดิม)
+    { id: 'people',        title: 'Sales Person Management',     short: 'Sales Person Management', icon: 'S', path: 'modules/people/index.html',         group: 'account-master', tour: null, visible: true, fit: true },
+    { id: 'salespeople',   title: 'ผู้รับผิดชอบ',                short: 'ผู้รับผิดชอบ',           icon: 'S', path: 'modules/salespeople/index.html', group: 'account-master', tour: null, visible: false, perm: 'people' },
+    { id: 'salesTeam',     title: 'ทีมขาย',                      short: 'ทีมขาย',                icon: 'G', path: 'modules/sales-team/index.html',  group: 'account-master', tour: null, visible: false, perm: 'people' },
+    // CR-25: Role Management ใช้สิทธิ์เดียวกัน (roleManagement) · ไอคอน K / R / U · CR-31 หน้า Roles ซ่อน (ลิงก์เดิมพาไปหน้า Permissions)
     { id: 'roleManagement', title: 'Permissions',                short: 'Permissions',            icon: 'K', path: 'modules/role-management/index.html', group: 'role-management', tour: null, visible: true, fit: true },
-    { id: 'roleRoles',     title: 'Roles',                       short: 'Roles',                  icon: 'R', path: 'modules/role-management/roles/index.html', group: 'role-management', tour: null, visible: true, fit: true, perm: 'roleManagement' },
+    { id: 'roleRoles',     title: 'Roles',                       short: 'Roles',                  icon: 'R', path: 'modules/role-management/roles/index.html', group: 'role-management', tour: null, visible: false, fit: true, perm: 'roleManagement' },
     { id: 'roleUsers',     title: 'Users',                       short: 'Users',                  icon: 'U', path: 'modules/role-management/users/index.html', group: 'role-management', tour: null, visible: true, fit: true, perm: 'roleManagement' },
-    { id: 'aboutPrototype', title: 'เกี่ยวกับ Prototype',        short: 'เกี่ยวกับ Prototype',     icon: 'i', path: 'modules/about-prototype/index.html', group: 'project-info', tour: null, visible: true, fit: true, open: true }
+    // CR-28: คู่มือการใช้งาน (แทนเกี่ยวกับ Prototype · คง id และ Path เดิม ลิงก์เดิมยังใช้ได้) · กลุ่ม project-info แสดงชื่อ ช่วยเหลือ
+    { id: 'aboutPrototype', title: 'คู่มือการใช้งาน',            short: 'คู่มือการใช้งาน',         icon: '?', path: 'modules/about-prototype/index.html', group: 'project-info', tour: null, visible: true, fit: true, open: true }
   ];
 
   function byTour(a, b) { return (a.tour == null ? 999 : a.tour) - (b.tour == null ? 999 : b.tour); }

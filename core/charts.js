@@ -54,14 +54,15 @@
     var L = SP.data.content.labels;
     var V = L.vsLastYear;
     var r = SP.core.calc.vsLastYear(target, lastYear, scaleMax);
-    var title = r.isNew
+    var title = opts.title ? opts.title : r.isNew   // CR-27: opts.title = ข้อความ Tooltip อื่น (เช่น เป้าหมายเทียบแผน)
       ? C.fill(V.newTip, { year: opts.year || '', target: F.baht(target) })
       : C.fill(V.tip, { target: F.baht(target), year: opts.year || '', prior: F.baht(lastYear), pct: r.growth == null || isNaN(r.growth) ? '–' : F.signedPct(r.growth, 1) });
-    var el = h('span', { class: 'vly' + (r.isNew ? ' is-new' : ''), title: title, style: opts.colorToken ? { '--c': C.tokenVar(opts.colorToken) } : null },
+    var isNew = r.isNew && opts.newTag !== false;   // CR-27: opts.newTag false = ไม่แสดงป้าย "ใหม่" (เช่น เป้าหมายเทียบแผน ที่แผนยังเป็น 0)
+    var el = h('span', { class: 'vly' + (isNew ? ' is-new' : ''), title: title, style: opts.colorToken ? { '--c': C.tokenVar(opts.colorToken) } : null },
       h('span', { class: 'vly-track' },
         r.bar > 0 ? h('span', { class: 'vly-bar', style: { width: pctStyle(r.bar) } }) : null,
         r.tick != null ? h('span', { class: 'vly-tick', style: { left: pctStyle(r.tick) } }) : null,
-        r.isNew ? h('span', { class: 'vly-new', style: { left: 'min(calc(' + pctStyle(r.bar) + ' + 4px), calc(100% - 3.2em))' } }, V.newTag) : null));
+        isNew ? h('span', { class: 'vly-new', style: { left: 'min(calc(' + pctStyle(r.bar) + ' + 4px), calc(100% - 3.2em))' } }, V.newTag) : null));
     el.info = r;
     return el;
   }
@@ -363,7 +364,7 @@
         r.parts.forEach(function (p) {
           if (!(p.value > 0)) return;
           var seg = h('span', { class: 'ssc-seg', dataset: { id: p.id }, title: p.title || null, style: { width: p.value * 100 + '%', '--c': C.tokenVar(p.colorToken) } },
-            p.value >= (o.minLabel == null ? 0.06 : o.minLabel) ? h('span', { class: 'ssc-text' }, F.pct(p.value, 0)) : null);
+            p.value >= (o.minLabel == null ? 0.06 : o.minLabel) ? h('span', { class: 'ssc-text' }, p.text != null ? p.text : F.pct(p.value, 0)) : null);   // CR-27 p.text = ป้ายอื่น
           seg.addEventListener('mouseenter', function () { if (o.onHover) o.onHover(p.id); });
           seg.addEventListener('mouseleave', function () { if (o.onHover) o.onHover(null); });
           (nodes[p.id] = nodes[p.id] || []).push(seg);
@@ -394,7 +395,7 @@
   // CR-24: แท่งแนวตั้งซ้อน (Stacked columns) — ยอดขายและเป้าหมายราย Channel (หน้า Annual Target) · HTML + CSS
   //   (สไตล์ .scol-* อยู่ที่ modules/top-down/top-down.css เพราะใช้หน้าเดียว)
   //   o = { columns: [{ id, label, sub, emphasize (แท่งเป้าหมาย = ขอบเน้น), parts: [{ id, value, colorToken, title }] }],
-  //         legend: [{ id, label, colorToken }], tick(v, step) (ป้ายแกน), total(v) (ป้ายรวมเหนือแท่ง), growth(prev, cur) → ข้อความ | null
+  //         legend: [{ id, label, colorToken }], tick(v, step) (ป้ายแกน), total(v) (ป้ายรวมเหนือแท่ง), growth(prev, cur, i) → ข้อความ | { text, muted } | null
   //         (ป้ายระหว่างแท่ง), share(v, total) → ข้อความ (ป้ายในช่วงเมื่อสูงพอ), minLabel (px ค่าตั้งต้น 14), headroom, onHover(partId | null) }
   //   แกน Y เริ่มที่ 0 · ค่าสูงสุด = niceScaleMax(ยอดรวมทุกแท่ง, { headroom }) เส้นแบ่งจาก calc.niceAxis
   //   → element + .info = { top, step, ticks, totals } · .update(o) · .highlight(partId | null)
@@ -438,8 +439,10 @@
       var xlabels = h('div', { class: 'scol-xlabels', 'aria-hidden': 'true' });
       current.columns.forEach(function (c, i) {
         if (i > 0) {
-          var g = current.growth ? current.growth(totals[i - 1], totals[i]) : null;
-          cols.appendChild(h('div', { class: 'scol-gap' }, g ? h('span', { class: 'scol-growth', style: { bottom: pctStyle((pos(totals[i - 1]) + pos(totals[i])) / 2) } }, g) : null));
+          // CR-27: ป้ายระหว่างแท่ง i-1 → i · { text, muted } = ข้อความจาง (เช่น ช่วงเวลาทับซ้อน)
+          var g = current.growth ? current.growth(totals[i - 1], totals[i], i) : null;
+          var gm = g && typeof g === 'object';
+          cols.appendChild(h('div', { class: 'scol-gap' }, g ? h('span', { class: 'scol-growth' + (gm && g.muted ? ' is-muted' : ''), style: { bottom: pctStyle((pos(totals[i - 1]) + pos(totals[i])) / 2) } }, gm ? g.text : g) : null));
           xlabels.appendChild(h('span', { class: 'scol-gap' }));
         }
         var stack = h('div', { class: 'scol-stack' + (c.emphasize ? ' is-target' : ''), style: { height: pctStyle(pos(totals[i])) } });

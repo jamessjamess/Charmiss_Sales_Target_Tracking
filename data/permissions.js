@@ -42,13 +42,26 @@
         { id: 'skuPlan', label: 'แผนยอดขายราย SKU', main: true, scopable: true },
         { id: 'skuPlan.createNpd', label: 'สร้าง NPD', scopable: true, action: true }
       ],
+      // CR-30: หน้าราคาและ Promotion = หน้าหลัก + ส่วนของหน้า ราคาหลัก (ทีม Product) · Promotion Price (Sales ตาม Channel ในทีม)
+      promotionPrice: [
+        { id: 'prices', label: 'ราคาและ Promotion', main: true },
+        { id: 'prices.base', label: 'ราคาหลัก' },
+        { id: 'prices.promo', label: 'Promotion Price', scopable: true }
+      ],
       productMaster: [
-        { id: 'listing', label: 'Listing และวันเริ่มขาย', main: true },
+        { id: 'listing', label: 'Listing', main: true },
         { id: 'listing.clearance', label: 'Clearance' }
       ],
-      // CR-25: Permissions · Roles · Users ใช้สิทธิ์เดียวกัน (registry perm: 'roleManagement')
+      // CR-29: หน้า Account & Platform = หน้าหลัก + ส่วนของหน้า GP / Platform Fee และตั้งค่า Channel (สิทธิ์ย่อยสูงกว่าหน้าหลักได้)
+      // CR-32: ย้ายมาอยู่ใต้หน้า Sales Unit & Customer (ค่าเดิมของ accounts / territories แปลงให้เอง · core/permissions.js LEGACY)
+      salesUnits: [
+        { id: 'salesUnits', label: 'Sales Unit & Customer', main: true },
+        { id: 'salesUnits.gp', label: 'GP / Platform Fee' },
+        { id: 'salesUnits.channelSettings', label: 'ตั้งค่า Channel' }
+      ],
+      // CR-25: Permissions · Roles · Users ใช้สิทธิ์เดียวกัน (registry perm: 'roleManagement') · CR-31 หน้า Roles ซ่อน
       roleManagement: [
-        { id: 'roleManagement', label: 'Permissions / Roles / Users', main: true }
+        { id: 'roleManagement', label: 'Permissions / Users', main: true }
       ]
     },
     global: [
@@ -67,14 +80,17 @@
     summary:             'V V V V V V V V',
     productList:         'N V V V E V N E',
     npdPlan:             'N V V V E V N E',
-    promotionPrice:      'N V V V E N N E',
+    prices:              'N V V V V N N E',
+    'prices.base':       'N V V V E N N E',
+    'prices.promo':      'N E T T V N N E',
     listing:             'N V V V E V N E',
     'listing.clearance': 'N V V V V E N E',
     taxonomy:            'N N N N E N N E',
-    accounts:            'N E V N N N N E',
-    territories:         'N E V V N N N E',
-    salespeople:         'N E V N N N N E',
-    salesTeam:           'N E V N N N N E',
+    // CR-32: salesUnits = สิทธิ์สูงสุดของ accounts (N E V N N N N E) และ territories (N E V V N N N E) เดิม · สิทธิ์ย่อยคงค่าเดิม
+    salesUnits:          'N E V V N N N E',
+    'salesUnits.gp':     'N E V N N N N E',
+    'salesUnits.channelSettings': 'N E N N N N N E',
+    people:              'N E V N N N N E',
     roleManagement:      'N N N N N N N E',
     'export':            'E E E E E E E E'
   };

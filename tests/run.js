@@ -2,7 +2,7 @@
  * tests/run.js — รัน Test ด้วย Node โดยไม่ต้องเปิดเบราว์เซอร์ (CR-15 · ไม่ต้องติดตั้ง package)
  *
  *   node tests/run.js              รันทุกชุด
- *   node tests/run.js taxonomy     รันเฉพาะชุดที่ระบุ (taxonomy · calc · stores · features · permissions · targets · l12m)
+ *   node tests/run.js taxonomy     รันเฉพาะชุดที่ระบุ (taxonomy · calc · stores · features · permissions · targets · l12m · aging · cr27 · cr28 · cr29 · cr30 · cr31 · cr32 · cr33)
  * โหลดไฟล์ Test ทุกชุดเสมอ (features ft-4 รัน Test เดิมของชุด calc) แต่รายงานเฉพาะชุดที่ระบุ
  *
  * โหลดไฟล์ core/ และ data/ ตามลำดับใน core/loader.js (FILES) ลง vm ที่มี window จำลอง (ไม่มี DOM)
@@ -16,7 +16,7 @@ var path = require('path');
 var vm = require('vm');
 
 var ROOT = path.join(__dirname, '..');
-var SUITES = { taxonomy: 'tests/taxonomy.test.js', calc: 'tests/calc.test.js', stores: 'tests/stores.test.js', features: 'tests/features.test.js', permissions: 'tests/permissions.test.js', targets: 'tests/targets.test.js', l12m: 'tests/l12m.test.js' };
+var SUITES = { taxonomy: 'tests/taxonomy.test.js', calc: 'tests/calc.test.js', stores: 'tests/stores.test.js', features: 'tests/features.test.js', permissions: 'tests/permissions.test.js', targets: 'tests/targets.test.js', l12m: 'tests/l12m.test.js', aging: 'tests/aging.test.js', cr27: 'tests/cr27.test.js', cr28: 'tests/cr28.test.js', cr29: 'tests/cr29.test.js', cr30: 'tests/cr30.test.js', cr31: 'tests/cr31.test.js', cr32: 'tests/cr32.test.js', cr33: 'tests/cr33.test.js' };
 var SKIP_FILES = ['core/paths.js', 'core/store.js', 'core/components.js', 'core/charts.js', 'core/report.js', 'core/layout.js'];
 
 function loaderFiles() {

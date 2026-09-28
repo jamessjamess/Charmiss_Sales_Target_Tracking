@@ -5,6 +5,7 @@
  *   downloadCsv(filename, rows, columns)
  *   toXlsx(sheets, meta)            → Promise ดาวน์โหลดไฟล์ .xlsx (โหลด SheetJS จาก cdnjs เมื่อเรียกครั้งแรกเท่านั้น)
  *   loadXlsx()                      → Promise<XLSX> / XLSX_URL
+ *   readTable(file)                 → Promise<[[ค่า]]> แถวของชีตแรก (CR-29 นำเข้าร้านค้า · .xlsx / .xls / .csv ผ่าน SheetJS ที่โหลดเมื่อกด)
  *   columns = [{ key, label, value(row) → ค่า, type: 'text' | 'money' | 'pct' | 'number' | 'price', width }]
  *             ตัวเลขส่งออกเป็นชนิดตัวเลขจริง: pct เก็บเป็นทศนิยม (0.25) จัดรูปแบบ 0.00% / money และ number จัดรูปแบบ #,##0 /
  *             price (ราคาต่อชิ้น CR-18) จัดรูปแบบ #,##0.00
@@ -140,7 +141,26 @@
     });
   }
 
+  // CR-29: อ่านไฟล์ที่ผู้ใช้เลือก → แถวของชีตแรก (ค่าเป็นข้อความตามที่แสดงใน Excel) · อ่านไม่ได้ = Promise reject
+  function readTable(file) {
+    return loadXlsx().then(function (X) {
+      return new Promise(function (resolve, reject) {
+        var r = new FileReader();
+        r.onerror = function () { reject(new Error('read')); };
+        r.onload = function () {
+          try {
+            var wb = X.read(new Uint8Array(r.result), { type: 'array' });
+            var ws = wb.Sheets[wb.SheetNames[0]];
+            resolve(X.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' }));
+          } catch (e) { reject(e); }
+        };
+        r.readAsArrayBuffer(file);
+      });
+    });
+  }
+
   SP.core['export'] = {
+    readTable: readTable,
     BOM: BOM,
     XLSX_URL: XLSX_URL,
     toCsv: toCsv,

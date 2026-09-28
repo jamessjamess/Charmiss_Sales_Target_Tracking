@@ -72,7 +72,14 @@
 .tx-sku-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tx-sku-code { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .tx-open-products { font-size: var(--fs-sm); margin-top: var(--sp-1); }
-.tx-detail-warn ul { margin: var(--sp-1) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--c-warn-fg); }
+/* CR-30: คำเตือนใต้ชื่อ · เลขนำหน้า Product Code ของ Type */
+.tx-detail-warn { margin: var(--sp-1) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--c-warn-fg); }
+.tx-prefix-input { font: inherit; font-size: var(--fs-sm); width: 4em; padding: 2px var(--sp-1); text-align: center; font-variant-numeric: tabular-nums; border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); }
+.tx-prefix-input.is-invalid { border-color: var(--c-danger-bd); }
+.tx-prefix-edit { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.tx-prefix-error { font-size: var(--fs-xs); color: var(--c-danger-fg); }
+.tx-prefix-value { font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.tx-next-code { flex-basis: 100%; }
 .tx-detail-period { display: grid; gap: var(--sp-1); }
 .tx-date-row { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
 .tx-date { display: inline-flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }

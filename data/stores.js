@@ -28,6 +28,24 @@
       'อยุธยา': 'พระนครศรีอยุธยา'
     },
     salesRefTotal: 22900000,
+    // CR-29: นำเข้าร้านค้าจาก Excel (หน้าเขตและร้านค้า) — รูปแบบเดียวกับไฟล์ส่งออกร้านค้า · หัวคอลัมน์ที่รับได้ต่อ field (ไม่สนช่องว่าง/ตัวพิมพ์)
+    importColumns: {
+      systemId: ['System ID', 'SystemID', 'รหัสร้าน', 'รหัสร้านค้า', 'Store ID'],
+      name: ['ชื่อร้าน', 'ชื่อร้านค้า', 'Store Name'],
+      storeType: ['ประเภทร้าน', 'ประเภทร้านค้า', 'Store Type'],
+      priceType: ['ประเภทราคา', 'Price Type'],
+      province: ['จังหวัด', 'Province'],
+      hasExport: ['Export'],
+      hasOnline: ['Online'],
+      active: ['สถานะ', 'Status'],
+      territory: ['เขตการขาย', 'เขต', 'Territory']
+    },
+    importRules: {
+      no: ['ไม่', 'ไม่มี', 'no', 'false', '0', '-', 'n'],
+      inactive: ['ยกเลิกการขาย', 'ยกเลิก', 'ปิดใช้งาน', 'inactive', 'cancelled', 'cancel'],
+      personalPrefixes: ['คุณ', 'นาย', 'นาง', 'นางสาว', 'น.ส.', 'ด.ช.', 'ด.ญ.'],
+      maskedName: 'ร้านค้า {id} (บุคคลธรรมดา)'
+    },
     seasonality: [2017, 1914, 2027, 2054, 1901, 1806, 1697, 1652, 1786, 1901, 1998, 2147]
   };
 

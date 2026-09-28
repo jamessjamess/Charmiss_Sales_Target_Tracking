@@ -2,17 +2,20 @@
  * modules/taxonomy/taxonomy.js — หมวดสินค้าและ Series (Product Master) — CR-15 มุมมองแบบคอลัมน์
  *
  * หน้าที่:        แท็บ หมวดสินค้า | Series | ตารางไขว้ (จำแท็บและรายการที่เลือกที่ ui.taxonomySelection)
- *                 แถบตัวกรอง (ใช้ร่วมกันทั้ง 3 แท็บ จำที่ ui.taxonomyFilters): ค้นหาชื่อ (ผลลัพธ์พร้อมเส้นทาง) · Category → Sub Category ·
- *                 Series → Sub Series (components.categoryFilter) · สถานะ · ข้อมูล + Chip ตัวกรองที่ใช้อยู่ (components.filterChips)
+ *                 แถบตัวกรองแถวเดียว (จำที่ ui.taxonomyFilters · CR-30): ค้นหาชื่อ (ผลลัพธ์พร้อมเส้นทาง) · Series (เฉพาะแท็บหมวดสินค้า) ·
+ *                 หมวดสินค้า (เฉพาะแท็บ Series · ตารางไขว้ใช้ทั้งสอง) · สถานะ · ข้อมูลที่ต้องตรวจ + Chip ตัวกรองที่ใช้อยู่ (components.filterChips)
+ *                 (ตัดตัวกรอง Category / Sub Category / Sub Series ที่ซ้ำกับคอลัมน์)
  *                 หมวดสินค้า / Series: คอลัมน์ต่อระดับ (Category · Sub Category · Type | Series · Sub Series) เลื่อนภายในคอลัมน์ +
  *                 แผงรายละเอียด (จอแคบกว่า 1280px = Drawer ด้านขวา) / คีย์บอร์ด ↑↓ ← → F2
  *                 ตัวกรองข้ามมิติ = นับเฉพาะ SKU ที่ตรง (x / y) ซ่อนรายการที่ได้ 0 / ตารางไขว้ Series × หมวดสินค้า (อ่านอย่างเดียว กดช่อง = รายการสินค้า)
  *                 เปิดมาเป็นโหมดดู / แก้ไข (ทีม Product, workflowBar แบบง่าย): เพิ่ม (แถวใหม่ช่องว่าง) · เปลี่ยนชื่อในแถว · ลากจัดลำดับ
  *                 ภายในรายการแม่เดียวกัน · แผงรายละเอียด: ย้ายไปอยู่ใต้… · ย้าย SKU ไป… · รวมกับ… · เปิด/ปิดใช้งาน · ลบ (เฉพาะไม่มี SKU
- *                 และไม่มีรายการย่อย) · วันเริ่ม / วันสิ้นสุดของ Series → บันทึก / ยกเลิก (แก้สำเนา ไม่เขียน store จนกดบันทึก)
+ *                 และไม่มีรายการย่อย) · วันเริ่ม / วันสิ้นสุดของ Series · เลขนำหน้า Product Code ของ Type (2 หลัก ห้ามซ้ำ + รหัสถัดไป · core/catalog.js)
+ *                 → บันทึก / ยกเลิก (แก้สำเนา ไม่เขียน store จนกดบันทึก) · แผงรายละเอียด: ชื่อ + {ระดับ} · อยู่ใน {เส้นทางแม่} + คำเตือนใต้ชื่อ
+ *                 ⚠ แสดงเฉพาะรายการที่มีปัญหา (ไม่แสดงซ้ำที่รายการแม่) · Type ที่ยังไม่มีเลขนำหน้าอยู่ใน ข้อมูลที่ต้องตรวจ
  *                 กฎทั้งหมดจาก core/taxonomy.js (Pure functions)
  * อ่านจาก data/:  settings (TAXONOMY_SKU_LIST_MAX), content (pages.taxonomy, labels) + Master ผ่าน store (taxonomy, products)
- * store อ่าน:     master.taxonomy, master.products, ui.taxonomySelection, ui.taxonomyFilters, ui.role, ui.currentMonth
+ * store อ่าน:     master.taxonomy, master.products, master.codeCounters, ui.taxonomySelection, ui.taxonomyFilters, ui.role, ui.currentMonth
  * store เขียน:    master.taxonomy, master.products และ master.audit (ตอนกด บันทึก) / ui.taxonomySelection, ui.taxonomyFilters /
  *                 ui.productFilterHandoff (ก่อนเปิดหน้ารายการสินค้าที่กรองตามรายการนั้น — หน้ารายการสินค้าอ่านแล้วลบ)
  */
@@ -21,6 +24,7 @@
 
   var C = SP.core.components;
   var calc = SP.core.calc;
+  var CAT = SP.core.catalog;
   var store = SP.core.store;
   var h = C.h;
   var fill = C.fill;
@@ -53,6 +57,8 @@
     function normalizeFilters(f) {
       var out = clone(DEFAULT_FILTERS);
       Object.keys(out).forEach(function (k) { if (f && f[k] != null) out[k] = clone(f[k]); });
+      out.subCategory = []; out.subSeries = [];   // CR-30: ตัดตัวกรอง Sub Category / Sub Series (ซ้ำกับคอลัมน์)
+      if (['all', 'noSku', 'dupParent', 'expired', 'noPrefix'].indexOf(out.data) < 0) out.data = 'all';
       return out;
     }
     function persistSel() { store.set('ui.taxonomySelection', sel); }
@@ -60,9 +66,12 @@
     function cur() { return editing ? draft : saved; }
     function tabKind() { return sel.tab === 'series' ? 'series' : 'category'; }
     function levelName(level) { return X.levels[level]; }
-    function filterArgs() { return { category: filters.category, subCategory: filters.subCategory, series: filters.series, subSeries: filters.subSeries, status: filters.status, data: filters.data, showZero: filters.showZero }; }
+    // CR-30: แท็บหมวดสินค้าใช้ตัวกรอง Series · แท็บ Series ใช้ตัวกรองหมวดสินค้า · ตารางไขว้ใช้ทั้งสอง
+    function useCat() { return sel.tab !== 'category'; }
+    function useSer() { return sel.tab !== 'series'; }
+    function filterArgs() { return { category: useCat() ? filters.category : [], subCategory: [], series: useSer() ? filters.series : [], subSeries: [], status: filters.status, data: filters.data, showZero: filters.showZero }; }
     function anyFilter() {
-      return filters.category.length || filters.subCategory.length || filters.series.length || filters.subSeries.length || filters.status !== 'active' || filters.data !== 'all';
+      return (useCat() && filters.category.length) || (useSer() && filters.series.length) || filters.status !== 'active' || filters.data !== 'all';
     }
 
     // ---------- สิ่งที่ยังไม่บันทึก ----------
@@ -154,14 +163,14 @@
 
     // ---------- แถบตัวกรอง ----------
     function filterBar(tax, products) {
-      var catF = C.categoryFilter({
-        tax: tax, kind: 'category', levels: ['CATEGORY', 'SUB_CATEGORY'], value: { CATEGORY: filters.category, SUB_CATEGORY: filters.subCategory },
-        onChange: function (v) { filters.category = v.CATEGORY || []; filters.subCategory = v.SUB_CATEGORY || []; persistFilters(); draw(); }
-      });
-      var serF = C.categoryFilter({
-        tax: tax, kind: 'series', levels: ['SERIES', 'SUB_SERIES'], value: { SERIES: filters.series, SUB_SERIES: filters.subSeries },
-        onChange: function (v) { filters.series = v.SERIES || []; filters.subSeries = v.SUB_SERIES || []; persistFilters(); draw(); }
-      });
+      var catF = useCat() ? C.categoryFilter({
+        tax: tax, kind: 'category', levels: ['CATEGORY'], labels: { CATEGORY: page.dims.category }, value: { CATEGORY: filters.category },
+        onChange: function (v) { filters.category = v.CATEGORY || []; persistFilters(); draw(); }
+      }) : null;
+      var serF = useSer() ? C.categoryFilter({
+        tax: tax, kind: 'series', levels: ['SERIES'], value: { SERIES: filters.series },
+        onChange: function (v) { filters.series = v.SERIES || []; persistFilters(); draw(); }
+      }) : null;
       function sel2(label, key, keys, texts) {
         return h('label', { class: 'tx-sel' }, h('span', { class: 'field-label' }, label), C.select({
           label: label, value: filters[key], className: 'tx-select',
@@ -170,12 +179,12 @@
         }));
       }
       var kind = tabKind();
-      var crossActive = sel.tab !== 'cross' && (kind === 'category' ? filters.series.length || filters.subSeries.length : filters.category.length || filters.subCategory.length);
+      var crossActive = sel.tab !== 'cross' && (kind === 'category' ? filters.series.length : filters.category.length);
       return h('div', { class: 'tool-row tx-filters' },
         searchBox(tax),
         catF, serF,
         sel2(page.status.label, 'status', ['active', 'inactive', 'all'], page.status),
-        sel2(page.data.label, 'data', ['all', 'noSku', 'dupParent', 'expired'], page.data),
+        sel2(page.data.label, 'data', ['all', 'noSku', 'dupParent', 'expired', 'noPrefix'], page.data),
         crossActive ? h('label', { class: 'tx-check' }, h('input', { type: 'checkbox', checked: filters.showZero, onChange: function (e) { filters.showZero = e.target.checked; persistFilters(); draw(); } }), page.showZero) : null,
         anyFilter() ? h('button', { type: 'button', class: 'link-btn tx-clear', onClick: clearFilters }, X.filter.clearAll) : null);
     }
@@ -233,10 +242,8 @@
           items.push({ label: levelName(level) + ': ' + (n ? n.name : id), onRemove: function () { filters[key] = filters[key].filter(function (x) { return x !== id; }); persistFilters(); draw(); } });
         });
       }
-      add('category', 'category', 'CATEGORY');
-      add('subCategory', 'category', 'SUB_CATEGORY');
-      add('series', 'series', 'SERIES');
-      add('subSeries', 'series', 'SUB_SERIES');
+      if (useCat()) add('category', 'category', 'CATEGORY');
+      if (useSer()) add('series', 'series', 'SERIES');
       if (filters.status !== 'active') items.push({ label: fill(page.chipStatus, { v: page.status[filters.status] }), onRemove: function () { filters.status = 'active'; persistFilters(); draw(); } });
       if (filters.data !== 'all') items.push({ label: fill(page.chipData, { v: page.data[filters.data] }), onRemove: function () { filters.data = 'all'; persistFilters(); draw(); } });
       return C.filterChips(items, clearFilters);
@@ -315,8 +322,7 @@
       if (parent && T.norm(parent.name) === T.norm(n.name)) out.push(fill(page.warn.dupParent, { parent: parent.name }));
       if (!count.total) out.push(page.warn.noSku);
       if (kind === 'series' && T.seriesEnded(n, today)) out.push(fill(page.warn.expired, { date: SP.core.format.date(n.endDate) }));
-      var twin = T.children(tax, kind, n.id).filter(function (k) { return T.norm(k.name) === T.norm(n.name); })[0];
-      if (twin) out.push(fill(page.warn.childDup, { name: twin.name }));
+      if (n.level === 'TYPE' && !CAT.typePrefix(tax, n.id)) out.push(page.warn.noPrefix);
       return out;
     }
 
@@ -456,7 +462,9 @@
       panel.appendChild(h('button', { type: 'button', class: 'icon-btn tx-detail-close', title: D2.close, 'aria-label': D2.close, onClick: function () { ui.detailOpen = false; draw(); } }, '×'));
       panel.appendChild(h('div', { class: 'tx-detail-head' },
         h('h2', { class: 'tx-detail-name' }, n.name, nodeDirty(kind, id) ? h('span', { class: 'tx-dirty', title: page.dirtyTip }) : null),
-        h('p', { class: 'tx-detail-path' }, path.map(function (a) { return a.name; }).join(' › ') + ' · ' + levelName(n.level))));
+        h('p', { class: 'tx-detail-path' }, path.length > 1 ? fill(D2.pathIn, { level: levelName(n.level), path: path.slice(0, -1).map(function (a) { return a.name; }).join(' › ') }) : levelName(n.level)),
+        warns.length ? h('ul', { class: 'tx-detail-warn' }, warns.map(function (w) { return h('li', null, '⚠ ', w); })) : null));
+      if (n.level === 'TYPE') panel.appendChild(prefixBlock(n, tax, products));
 
       // สถานะใช้งาน (โหมดแก้ไข = สวิตช์)
       var statusText = n.active === false ? D2.inactive : D2.active;
@@ -492,10 +500,6 @@
       }
       panel.appendChild(skuBox);
 
-      if (warns.length) {
-        panel.appendChild(h('div', { class: 'tx-detail-warn' }, h('span', { class: 'field-label' }, D2.warnings),
-          h('ul', null, warns.map(function (w) { return h('li', null, '⚠ ', w); }))));
-      }
       if (editing) panel.appendChild(actionsBlock(kind, n, tax, products, own, kids));
       return panel;
     }
@@ -508,6 +512,31 @@
       var id = crossNodeOf(tax);
       var n = id ? T.find(tax, 'category', id) : null;
       return n ? n.level : null;
+    }
+
+    function prefixBlock(n, tax, products) {
+      var D2 = page.detail;
+      var pre = CAT.typePrefix(tax, n.id);
+      var next = CAT.nextCode(products, tax, n.id, store.get('master.codeCounters'));
+      var nextText = next.ok ? fill(D2.nextCode, { code: next.code }) : D2.nextCodeErrors[next.error] || '';
+      var body;
+      if (editing) {
+        var err = h('span', { class: 'tx-prefix-error', role: 'alert' });
+        var input = h('input', { type: 'text', class: 'tx-prefix-input', inputmode: 'numeric', maxlength: '2', value: pre || '', 'aria-label': D2.prefix, placeholder: D2.prefixPlaceholder });
+        input.addEventListener('change', function () {
+          var v = input.value.trim();
+          var e = CAT.prefixError(draft.tax, n.id, v);
+          if (e) { err.textContent = D2.prefixErrors[e]; input.classList.add('is-invalid'); return; }
+          var node = T.find(draft.tax, 'category', n.id);
+          if (v) node.codePrefix = v; else delete node.codePrefix;
+          draw();
+        });
+        body = h('span', { class: 'tx-prefix-edit' }, input, err);
+      } else {
+        body = h('span', { class: 'tx-prefix-value' + (pre ? '' : ' muted') }, pre || D2.noPrefix);
+      }
+      return h('div', { class: 'tx-detail-row tx-detail-prefix' }, h('span', { class: 'field-label', title: D2.prefixTip }, D2.prefix), body,
+        h('span', { class: 'tx-detail-sub tx-next-code' }, nextText));
     }
 
     function periodBlock(n) {

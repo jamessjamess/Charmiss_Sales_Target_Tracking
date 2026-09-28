@@ -9,6 +9,8 @@
  *               null / ไม่มี = ยังไม่ได้กำหนด → calc.netSales คืน null (Net Sales แสดง –) / Channel ที่ hasGP = false ไม่ใช้ค่านี้
  *               gpFrom = วันที่ค่านี้มีผล 'YYYY-MM-DD' (โครงเดิม คงไว้ในข้อมูล CR-18 ตัดออกจาก UI) / เจ้าของข้อมูล: Sales/KAM + Finance
  *   note      = หมายเหตุที่แสดงในหน้า Account (ไม่บังคับ)
+ *   suggest   = CR-32 คำนำหน้าชื่อคู่ค้า (ข้อความก่อน _ ตัวแรก) ที่แนะนำหน่วยขายนี้ (หลายค่าได้ · ไม่สนตัวพิมพ์) · ค่าตั้งต้น = ชื่อ Account ตัวพิมพ์ใหญ่
+ *               ไม่มีช่องว่างและเครื่องหมาย · ECOM ไม่มี (1 Platform = 1 รหัสคู่ค้า ไม่ต้องแนะนำ)
  * CR-11: GP ของ 7-Eleven (40%) และ EVEANDBOY (45%) ตรงกับที่ใช้ปรับยอดขายราย SKU ปี 2026 ใน data/seed/
  * Platform ใหม่ของ ECOM (Website (Own), LINE Shop) ตั้ง active: false ไว้เดโมการเปิดใช้งานและเพิ่มในหน้า Top-down
  * ค่าที่แก้ในหน้า Account Master เก็บที่ store: master.accounts
@@ -18,15 +20,15 @@
   'use strict';
 
   SP.data.accounts = [
-    { id: 'seven',     name: '7-Eleven',           channelId: 'mt',     active: true, gp: 0.40, gpFrom: '2026-01-01' },
-    { id: 'watsons',   name: 'Watsons',            channelId: 'mt',     active: true, gp: 0.45, gpFrom: '2026-04-01' },
-    { id: 'eveandboy', name: 'EVEANDBOY',          channelId: 'mt',     active: true, gp: 0.45, gpFrom: '2026-01-01' },
-    { id: 'beautrium', name: 'Beautrium',          channelId: 'mt',     active: true, gp: 0.40, gpFrom: '2025-07-01' },
-    { id: 'cjexpress', name: 'CJexpress',          channelId: 'mt',     active: true, gp: 0.35, gpFrom: '2026-01-01' },
-    { id: 'konvy',     name: 'Konvy',              channelId: 'mt',     active: true, gp: 0.25, gpFrom: '2026-01-01' },
-    { id: 'lotuss',    name: "Lotus's",            channelId: 'mt',     active: true, gp: 0.38, gpFrom: '2026-01-01' },
-    { id: 'tsuruha',   name: 'Tsuruha',            channelId: 'mt',     active: true, gp: 0.42, gpFrom: '2026-01-01' },
-    { id: 'mrdiy',     name: 'MR.DIY',             channelId: 'mt',     active: true, gp: 0.35, gpFrom: '2027-01-01' },
+    { id: 'seven',     name: '7-Eleven',           channelId: 'mt',     active: true, gp: 0.40, gpFrom: '2026-01-01', suggest: ['7ELEVEN'] },
+    { id: 'watsons',   name: 'Watsons',            channelId: 'mt',     active: true, gp: 0.45, gpFrom: '2026-04-01', suggest: ['WATSONS'] },
+    { id: 'eveandboy', name: 'EVEANDBOY',          channelId: 'mt',     active: true, gp: 0.45, gpFrom: '2026-01-01', suggest: ['EVEANDBOY'] },
+    { id: 'beautrium', name: 'Beautrium',          channelId: 'mt',     active: true, gp: 0.40, gpFrom: '2025-07-01', suggest: ['BEAUTRIUM'] },
+    { id: 'cjexpress', name: 'CJexpress',          channelId: 'mt',     active: true, gp: 0.35, gpFrom: '2026-01-01', suggest: ['CJEXPRESS'] },
+    { id: 'konvy',     name: 'Konvy',              channelId: 'mt',     active: true, gp: 0.25, gpFrom: '2026-01-01', suggest: ['KONVY'] },
+    { id: 'lotuss',    name: "Lotus's",            channelId: 'mt',     active: true, gp: 0.38, gpFrom: '2026-01-01', suggest: ['LOTUSS'] },
+    { id: 'tsuruha',   name: 'Tsuruha',            channelId: 'mt',     active: true, gp: 0.42, gpFrom: '2026-01-01', suggest: ['TSURUHA'] },
+    { id: 'mrdiy',     name: 'MR.DIY',             channelId: 'mt',     active: true, gp: 0.35, gpFrom: '2027-01-01', suggest: ['MRDIY'] },
     { id: 'shopee',    name: 'Shopee',             channelId: 'ecom',   active: true, gp: 0.20, gpFrom: '2026-07-01' },
     { id: 'lazada',    name: 'Lazada',             channelId: 'ecom',   active: true, gp: 0.20, gpFrom: '2026-07-01' },
     { id: 'tiktok',    name: 'Tiktok',             channelId: 'ecom',   active: true, gp: 0.15, gpFrom: '2026-01-01' },

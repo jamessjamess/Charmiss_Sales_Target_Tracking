@@ -118,7 +118,8 @@
       update();
     }
     function channelIds() { return tree().children.map(function (c) { return c.id; }); }
-    function priorSharesAll() { return calc.priorShares(tree().children.map(function (c) { return c.prior; })); }
+    // CR-27: สัดส่วน L12M ปัดเป็น % เต็ม รวม 100% (ตรงกับค่าตั้งต้นใน data/targets.js)
+    function priorSharesAll() { return calc.roundShares(tree().children.map(function (c) { return c.prior; })); }
 
     function removeChannel(ch) {
       (draft.units[ch.id] || []).forEach(function (id) { delete draft.pct[id]; });
@@ -282,7 +283,8 @@
         legend: t.children.map(function (c) { return { id: c.id, label: c.name, colorToken: c.color }; }),
         tick: G.millionTick,
         total: mb,
-        growth: function (prev, cur) { return prev > 0 ? F.growth(calc.growth(cur, prev)) : null; },
+        // CR-27: 2025 → L12M ช่วงเวลาทับซ้อน (ก.ย.–ธ.ค. 2025 อยู่ในทั้งสองแท่ง) → ข้อความจางแทนการเติบโต
+        growth: function (prev, cur, i) { if (columns[i] && columns[i].id === 'l12m') return { text: X.overlap, muted: true }; return prev > 0 ? F.growth(calc.growth(cur, prev)) : null; },
         share: function (v, total) { return total > 0 ? F.pct(v / total, 0) : ''; },
         onHover: function (id) { highlightChannel(id, 'columns'); }
       };
@@ -308,7 +310,7 @@
       if (refs.totalValue.setValue) refs.totalValue.setValue(t.amount);
       else refs.totalValue.textContent = F.baht(t.amount);
       refs.totalValue.classList.toggle('is-dirty-cell', editing && (draft.total || 0) !== (saved.total || 0));
-      var g = C.growthText(t.growth);
+      var g = C.targetGrowth(t.growth);
       C.clear(refs.totalGrowth).appendChild(g);
       if (t.growthAmount != null) refs.totalGrowth.appendChild(h('span', { class: g.className + ' td-growth-amount' }, '(' + F.signedBaht(t.growthAmount) + ' ' + L.baht + ')'));
 
@@ -327,7 +329,7 @@
         var changed = editing && Math.abs((draft.pct[ch.id] || 0) - (saved.pct[ch.id] || 0)) > 1e-12;
         r.tdPct.classList.toggle('is-dirty-cell', changed);
         r.tdAmt.classList.toggle('is-dirty-cell', changed);
-        C.clear(r.growth).appendChild(C.growthText(ch.growth));
+        C.clear(r.growth).appendChild(C.targetGrowth(ch.growth));
         C.clear(r.compare).appendChild(G.vsLastYearBar(ch.amount, ch.prior, scaleMax, { colorToken: ch.color, year: t.priorYear }));
       });
 

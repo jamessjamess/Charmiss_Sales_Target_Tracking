@@ -1,0 +1,103 @@
+/* modules/people/people.css — บุคลากรและทีม (CR-29): รายชื่อและทีม (จัดกลุ่มตาม Channel) · ผู้รับผิดชอบรายเดือน · Drawer ของคน */
+
+.page-people .module-body > * + * { margin-top: var(--sp-2); }
+.pp-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }
+.pp-search { width: 12em; }
+.pp-tools-end { display: inline-flex; gap: var(--sp-2); margin-left: auto; }
+.pp-group-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap; }
+
+/* รายชื่อและทีม · CR-32: เส้นแบ่งแถวต่อเนื่อง (border-collapse · border-bottom ที่ช่องค่าเดียวทั้งแถว · Chip ไม่มี margin · ความสูงแถวคงที่) */
+.pp-toolbar-2 { font-size: var(--fs-sm); }
+.pp-table { border-collapse: collapse; }
+.pp-table td, .pp-table th { padding: 0 var(--sp-2); height: 40px; vertical-align: middle; border: 0; border-bottom: 1px solid var(--c-border); white-space: nowrap; }
+.pp-table thead th { height: 34px; }
+.pp-table tbody tr > * { border-top: 0 !important; }
+.pp-table tr.is-selected > * { background: var(--c-primary-soft); }
+.pp-table tr.is-dirty-row > *:first-child { box-shadow: inset 3px 0 0 var(--c-dirty); }
+.pp-table tbody th[scope="row"] { background: transparent; font-weight: var(--fw-medium); }
+.pp-name { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.pp-team-icon { display: inline-block; padding: 0 6px; border-radius: 999px; border: 1px solid var(--c-border-strong); font-size: 11px; line-height: 1.5; color: var(--c-text-muted); cursor: help; }
+.sp-person-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--seg); border: 1px solid var(--c-border-strong); flex: 0 0 auto; }
+.pp-teams { display: inline-flex; flex-wrap: nowrap; gap: 4px; max-width: 100%; overflow: hidden; vertical-align: middle; }
+.pp-team-chip { display: inline-flex; align-items: center; padding: 0 8px; margin: 0; border-radius: 999px; font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 1.6;
+  color: var(--c-text); white-space: nowrap; background: color-mix(in srgb, var(--c, var(--c-border-strong)) 12%, var(--c-surface)); box-shadow: inset 3px 0 0 var(--c, var(--c-border-strong)); }
+.pp-unit-chips { display: inline-flex; flex-wrap: nowrap; gap: 4px; align-items: center; max-width: 100%; overflow: hidden; vertical-align: middle; }
+.pp-unit-chip { display: inline-block; padding: 0 8px; margin: 0; border-radius: 999px; background: var(--c-surface-2); font-size: var(--fs-xs); line-height: 1.6; white-space: nowrap; }
+.pp-unit-more { font-size: var(--fs-xs); color: var(--c-text-muted); white-space: nowrap; }
+.pp-account { font-size: var(--fs-sm); }
+.pp-d-account .pp-account-line { margin: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; font-size: var(--fs-sm); }
+.pp-account-link { font-size: var(--fs-xs); }
+.pp-account-edit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin-top: var(--sp-2); }
+.pp-role-boxes { display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); }
+.pp-add-account { display: grid; gap: var(--sp-2); padding-top: var(--sp-2); border-top: 1px solid var(--c-border); }
+.pp-team-chip.is-ended { opacity: 0.55; text-decoration: line-through; }
+.pp-units { font-size: var(--fs-sm); }
+.pp-status .badge + .badge { margin-left: 4px; }
+.pp-group > th { padding: 0 !important; height: 34px !important; background: var(--c-surface-2); box-shadow: inset 4px 0 0 var(--c, var(--c-border-strong)); }
+.pp-group-btn { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); width: 100%; padding: 6px var(--sp-3); border: 0; background: transparent; font: inherit; font-size: var(--fs-sm); text-align: left; cursor: pointer; color: var(--c-text); }
+.pp-caret { width: 1em; color: var(--c-text-muted); }
+.pp-group-stat { color: var(--c-text-muted); white-space: nowrap; }
+.pp-group-warn { font-weight: var(--fw-bold); }
+
+/* ผู้รับผิดชอบรายเดือน (Timeline เดิมของหน้าผู้รับผิดชอบ) */
+.card.pp-monthly { padding: var(--sp-2) var(--sp-4); display: flex; flex-direction: column; }
+.pp-monthly > * + * { margin-top: var(--sp-2); }
+.sp-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-1) var(--sp-3); }
+.sp-card-head h2 { font-size: var(--fs-base); margin: 0; }
+/* CR-32: เส้นตารางต่อเนื่อง · ช่องเดือนเว้นช่องไฟเท่ากันทุกช่อง (ขอบขาวเท่ากันทุกช่อง) */
+.tl-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+.tl-table th, .tl-table td { padding: 2px 4px; height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0; border-bottom: 1px solid var(--c-border); }
+.tl-table td.tl-cell { border-left: 2px solid var(--c-surface); border-bottom: 3px solid var(--c-surface); }
+.tl-table.has-focus td.tl-cell.is-dim { opacity: 0.35; }
+.tl-table.has-focus td.tl-cell.is-focus { box-shadow: inset 0 0 0 2px var(--c-primary); }
+.tl-table.has-focus td.tl-cell.is-focus .owner-name { display: inline; }
+/* มุมมองตามบุคคล */
+.pp-load-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: var(--fs-xs); }
+.pp-load-table th, .pp-load-table td { padding: 0 6px; height: 28px; border: 0; border-bottom: 1px solid var(--c-border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.pp-load-table thead th { position: sticky; top: 0; z-index: 1; background: var(--c-surface-2); }
+.pp-load-table .pp-l-name { width: 22%; text-align: left; }
+.pp-load-table .pp-l-name.is-sub { padding-left: 1.8em; font-weight: normal; color: var(--c-text-muted); }
+.pp-load-table .pp-l-total { font-weight: var(--fw-bold); }
+.pp-load-table tr.pp-l-group > * { background: var(--c-surface-2); font-weight: var(--fw-bold); box-shadow: inset 0 -1px 0 var(--c-border); }
+.pp-load-table tr.pp-l-group > th { box-shadow: inset 4px 0 0 var(--c, var(--c-border-strong)); }
+.pp-load-table tr.pp-l-person > th { font-weight: var(--fw-medium); }
+.pp-load-table td.is-sub { color: var(--c-text-muted); }
+.pp-load-table tr.pp-l-vacant > * { color: var(--status-short-fg); }
+.pp-replace-check { display: flex; gap: var(--sp-2); align-items: flex-start; margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
+.tl-table .tl-unit { width: 22%; text-align: left; font-size: var(--fs-xs); font-weight: var(--fw-medium); box-shadow: inset 4px 0 0 var(--c, var(--c-border-strong)); padding-left: var(--sp-2); cursor: help; }
+.tl-table thead .tl-unit { box-shadow: none; cursor: default; }
+.tl-table thead th { position: sticky; top: 0; z-index: 1; background: var(--c-surface); }
+.tl-month { text-align: center; font-weight: var(--fw-bold); color: var(--c-text-muted); }
+.tl-month.is-past { opacity: 0.55; }
+.tl-month.is-current { color: var(--c-primary-strong); box-shadow: inset 0 -2px 0 var(--c-primary); }
+.tl-group th { text-align: left; font-size: 11px; font-weight: var(--fw-bold); color: var(--c); text-transform: uppercase; padding-top: var(--sp-2); }
+.tl-table td.owner-seg { border-radius: 0; }
+.tl-table td.tl-cell:not(.is-start) .owner-name { display: none; }
+.tl-table.is-editing td.tl-cell { cursor: pointer; }
+.tl-table.is-editing td.tl-cell.is-past { cursor: not-allowed; opacity: 0.55; }
+.tl-table td.tl-cell.is-picked { box-shadow: inset 0 0 0 2px var(--c-primary); }
+.tl-table td.tl-cell:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.sp-assign { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-3); background: var(--c-primary-soft); border: 1px solid var(--c-primary); border-radius: var(--radius-sm); font-size: var(--fs-sm); }
+.sp-assign .select { font-size: var(--fs-sm); padding-top: 2px; padding-bottom: 2px; min-width: 12em; }
+
+/* Drawer ของคน */
+.pp-drawer { width: min(640px, 100vw); }
+.pp-d-sec { margin-top: var(--sp-4); }
+.pp-d-sec h3 { margin-bottom: var(--sp-2) !important; }
+.pp-d-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: var(--fs-sm); }
+.pp-d-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-2); }
+.pp-d-list li.is-ended { color: var(--c-text-muted); }
+.pp-d-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4); }
+.pp-perf { margin: 0; font-size: var(--fs-sm); }
+.pp-end-flow { display: grid; gap: var(--sp-2); }
+.pp-end-flow h3 { margin: 0; font-size: var(--fs-base); }
+.pp-step { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); color: var(--c-text-muted); }
+.pp-end-units { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pp-end-units li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12em, auto); align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.pp-end-all-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); }
+.pp-end-summary { font-size: var(--fs-sm); }
+
+@media (min-width: 1024px) {
+  .page-people .module-body > .pp-monthly, .page-people .module-body > .pp-card { flex: 1 1 auto; min-height: 0; }
+}
+@media (max-width: 720px) { .tl-table { min-width: 640px; } .pp-search { width: 100%; } }

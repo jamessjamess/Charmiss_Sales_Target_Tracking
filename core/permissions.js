@@ -35,11 +35,16 @@
   // CR-19 → CR-21: ชื่อ Module เดิมที่ Module ต่างๆ ยังเรียก
   var ALIASES = {
     topDownTotal: 'annualTarget', topDownUnits: 'unitTargets', 'topdown.channel': 'annualTarget', 'topdown.unit': 'unitTargets', phasing: 'unitTargets',
-    npdFromSku: 'skuPlan.createNpd', clearance: 'listing.clearance'
+    npdFromSku: 'skuPlan.createNpd', clearance: 'listing.clearance',
+    // CR-32: หน้า Account & Platform / เขตและร้านค้า (TT) เดิม → Sales Unit & Customer
+    accounts: 'salesUnits', territories: 'salesUnits', 'accounts.gp': 'salesUnits.gp', 'accounts.channelSettings': 'salesUnits.channelSettings'
   };
   var STEPS = { topDown: ['annualTarget'], phasing: ['unitTargets'], sku: ['skuPlan'], forecast: ['skuPlan'] };
   // CR-23: Key เดิมของสิทธิ์ที่รวมเป็น resource ใหม่
-  var LEGACY = { annualTarget: ['topdown.channel'], unitTargets: ['topdown.unit', 'phasing'] };
+  // CR-29: people (หน้าบุคลากรและทีม) รวมหน้าผู้รับผิดชอบ + ทีมขายเดิม (ระดับสูงสุดของสองค่า)
+  // CR-32: salesUnits = ระดับสูงสุดของ accounts + territories · สิทธิ์ย่อย GP / ตั้งค่า Channel ย้ายค่าเดิม
+  var LEGACY = { annualTarget: ['topdown.channel'], unitTargets: ['topdown.unit', 'phasing'], people: ['salespeople', 'salesTeam'], prices: ['promotionPrice', 'accountPrices'],
+    salesUnits: ['accounts', 'territories'], 'salesUnits.gp': ['accounts.gp'], 'salesUnits.channelSettings': ['accounts.channelSettings'] };
 
   function copy(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
   function store() { return SP.core.store; }
@@ -93,6 +98,8 @@
     return { perms: out, changed: changed };
   }
   function usersNow() { return fromStore('master.users', SP.data.users || []); }
+  // CR-32: บุคลากร (ผูกผู้ใช้ด้วย person.userId)
+  function peopleNow() { return fromStore('master.salespeople', SP.data.salespeople || []); }
   function teamsNow() { return fromStore('master.teams', SP.data.teams || []); }
   function monthNow() { var s = store(); return s ? s.currentKey() : null; }
   function listNow() { return SP.core.registry ? SP.core.registry.list : []; }
@@ -100,7 +107,8 @@
     context = context || {};
     return {
       roles: sortRoles(context.roles || rolesNow()), perms: context.perms || permsNow(), users: context.users || usersNow(),
-      teams: context.teams || teamsNow(), month: context.month || monthNow(), list: context.list || listNow(), channelId: context.channelId || null
+      teams: context.teams || teamsNow(), month: context.month || monthNow(), list: context.list || listNow(), channelId: context.channelId || null,
+      people: context.people || peopleNow()
     };
   }
   function sortRoles(roles) { return (roles || []).slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); }); }
@@ -172,11 +180,13 @@
       var type = raw && raw.type ? (raw.type === 'trade' ? 'product' : raw.type) : def;
       if (type !== 'sales' && !roleById(S.roles, type)) type = def;   // บทบาทที่ไม่รู้จัก = บทบาทตั้งต้น
       var pid = raw && raw.personId ? raw.personId : null;
-      if (pid) u = users.filter(function (x) { return x.salesPersonId === pid; })[0] || null;
+      var puid = pid ? userOfPerson(S.people, pid) : null;
+      if (puid) u = users.filter(function (x) { return x.id === puid; })[0] || null;
       if (!u && type !== 'sales') u = users.filter(function (x) { return x.active !== false && (x.roleIds || []).indexOf(type) >= 0; })[0] || null;
       if (!u) u = { id: null, name: '', salesPersonId: pid, roleIds: type === 'sales' ? ['officer'] : [type], active: true };
     }
-    var personId = u.salesPersonId !== undefined ? u.salesPersonId : (u.personId || null);
+    // CR-32: บุคลากรของผู้ใช้ = person.userId (ผู้ใช้สมมติที่ส่ง salesPersonId / personId มาเอง เช่น Test ใช้ค่านั้น)
+    var personId = u.salesPersonId !== undefined ? u.salesPersonId : u.personId !== undefined ? u.personId || null : (u.id ? personOfUser(S.people, u.id) : null);
     var chs = personId ? teamChannels(S.teams, personId, S.month) : [];
     var anyCh = personId && !chs.length ? (S.teams || []).filter(function (t) { return t.members.some(function (m) { return m.salesPersonId === personId; }); }).map(function (t) { return t.channelId; }) : chs;
     var wantCh = raw && raw.channelId && anyCh.indexOf(raw.channelId) >= 0 ? raw.channelId : (anyCh[0] || null);
@@ -615,6 +625,40 @@
     return { ok: true, error: null, teams: out };
   }
 
+  // ---------------------------------------------------------------------
+  // CR-32: ผูกผู้ใช้กับบุคลากร (person.userId · 1:1 · เฉพาะบุคลากรประเภทบุคคล) — Pure
+  // ---------------------------------------------------------------------
+  function isTeamPerson(p) { return !!p && p.type === 'team'; }
+  function personOfUser(people, userId) {
+    var p = (people || []).filter(function (x) { return userId && x.userId === userId && !isTeamPerson(x); })[0];
+    return p ? p.id : null;
+  }
+  function userOfPerson(people, personId) {
+    var p = (people || []).filter(function (x) { return x.id === personId; })[0];
+    return p && !isTeamPerson(p) && p.userId ? p.userId : null;
+  }
+  // ผูก personId กับ userId (null = ยกเลิกการผูก) → { ok, people } | { ok: false, error: 'missing' | 'team' | 'taken' }
+  //   taken = ผู้ใช้นี้ผูกกับบุคลากรคนอื่นอยู่แล้ว (1:1)
+  function linkUser(people, personId, userId) {
+    var out = copy(people || []);
+    var p = out.filter(function (x) { return x.id === personId; })[0];
+    if (!p) return { ok: false, error: 'missing' };
+    if (userId && isTeamPerson(p)) return { ok: false, error: 'team' };
+    if (userId && out.some(function (x) { return x.id !== personId && x.userId === userId; })) return { ok: false, error: 'taken' };
+    if (userId) p.userId = userId; else p.userId = null;
+    return { ok: true, people: out };
+  }
+  // บทบาทตั้งต้นของบัญชีผู้ใช้ใหม่ตามบทบาทในทีม (Sales Manager → manager · Sales Officer → officer) ณ เดือน month
+  function defaultRolesFor(teams, personId, month) {
+    var r = salesRole(teams, personId, month, null) || salesRole(teams, personId, null, null);
+    return r ? [r] : [];
+  }
+
+  // ค่าตั้งต้นของ person.userId (data/users.js personUsers) — บุคลากร TT มาจาก seed (core/stores.js) จึงผูกตอนโหลด
+  (SP.data.salespeople || []).forEach(function (p) {
+    if (p.userId === undefined) p.userId = (SP.data.personUsers || {})[p.id] || null;
+  });
+
   SP.core.permissions = {
     LEVELS: LEVELS,
     ALIASES: ALIASES,
@@ -677,6 +721,11 @@
     addMonths: addMonths,
     addMember: addMember,
     endMember: endMember,
-    removeMember: removeMember
+    removeMember: removeMember,
+    peopleNow: peopleNow,
+    personOfUser: personOfUser,
+    userOfPerson: userOfPerson,
+    linkUser: linkUser,
+    defaultRolesFor: defaultRolesFor
   };
 })(window.SP);

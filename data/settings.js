@@ -16,27 +16,38 @@
       baseline: false,           // ล็อก Baseline, Snapshot, เลขฉบับ, ช่องลงนาม
       reforecast: false,         // โหมดปรับแผน, ล็อก M+1–M+3, Actual ในตาราง
       sellIn: false,             // ข้อความและมุมมอง Sell-in (TT ยังคำนวณด้วยราคา Dealer)
-      npdApproval: false,        // การอนุมัติแผน NPD โดย Sales Director (ปิด = บันทึกแล้วมีผลทันที)
-      promotionCalendar: false   // CR-18 ปฏิทิน Promotion รายเดือน (ปิด = ไม่นับ Promotion ในราคา ใช้ราคาต่อ Account แทน)
+      npdApproval: false         // การอนุมัติแผน NPD โดย Sales Director (ปิด = บันทึกแล้วมีผลทันที)
+      // CR-30: ตัด promotionCalendar (ปฏิทิน Promotion รายวัน) — ใช้ Promotion Price รายเดือนแทน
     },
 
     VAT: 0.07,
-    // ราคาใน Product Master และราคาต่อ Account รวม VAT (CR-18 ได้คำตอบแล้ว): Net Sales = Sale Amount ÷ (1 + VAT) × (1 − GP)
+    // ราคาหลักและ Promotion Price รวม VAT (CR-18 ได้คำตอบแล้ว): Net Sales = Sale Amount ÷ (1 + VAT) × (1 − GP)
     PRICE_INCLUDES_VAT: true,
-    // ราคาต่อ Account: เตือน (ไม่บล็อก) เมื่อสูงกว่า RSP หรือต่ำกว่า RSP เกินสัดส่วนนี้
-    ACCOUNT_PRICE_WARN_BELOW: 0.5,
+    // CR-30 ประเภทราคาหลัก (ชื่อใน content.js labels.priceTypes · เพิ่มได้ภายหลัง เช่น TT Clearance, Export) · ราคาหลักของ Channel = channels.priceBasis
+    PRICE_TYPES: ['RSP', 'TT_DEALER', 'TT_WHOLESALE'],
+    // CR-30 Promotion Price: เตือน (ไม่บล็อก) เมื่อสูงกว่าราคาหลัก หรือต่ำกว่าราคาหลักเกินสัดส่วนนี้
+    PROMO_PRICE_WARN_BELOW: 0.5,
 
-    // Status "New" = จำนวนเดือนแรกนับจากวันเริ่มขาย (นับเดือนที่เริ่มขายเป็นเดือนที่ 1)
+    // Status "NPD" (ค่าภายใน 'new') = จำนวนเดือนแรกนับจากเดือนเปิดตัว (นับเดือนเปิดตัวเป็นเดือนที่ 1)
     NPD_MONTHS: 3,
 
     // ความครบถ้วนของข้อมูลสินค้า (calc.productCompleteness)
     //   จำเป็น: ขาดแล้วใช้ในหน้าวางแผน SKU ไม่ได้ / ควรมี: แสดงเป็นข้อมูลที่ควรเติม
-    //   code = TR Code หรือรหัสชั่วคราว / rsp = มี RSP ใน Price List
-    PRODUCT_REQUIRED: ['code', 'name', 'categoryId', 'subCategoryId', 'typeId', 'seriesId', 'itemType', 'rsp', 'launchDate'],
-    PRODUCT_RECOMMENDED: ['barcode', 'image', 'subSeriesId', 'internalCode', 'packSize'],
+    //   code = Product Code / rsp = มี RSP ในราคาหลัก / CR-30 ตัด Item Type · Internal Code · Sub Series · ขนาดบรรจุ ออกจากกฎ
+    PRODUCT_REQUIRED: ['code', 'name', 'categoryId', 'subCategoryId', 'typeId', 'seriesId', 'rsp', 'launchDate'],
+    PRODUCT_RECOMMENDED: ['barcode', 'image'],
 
-    // ประเภทสินค้า (หน้าวางแผน SKU ใช้เฉพาะ SALE) / หน่วยของขนาดบรรจุ
-    ITEM_TYPES: ['SALE', 'TESTER', 'GIFT', 'PREMIUM'],
+    // CR-30 Product Code ระบบสร้าง: {เลขนำหน้าของ Type 2 หลัก}{ลำดับ} รวม CODE_DIGITS หลัก ขั้นละ CODE_STEP (core/catalog.js)
+    CODE_DIGITS: 5,
+    CODE_STEP: 10,
+    // CR-30 Preset คอลัมน์ของระบบในหน้ารายการสินค้า (ชื่อใน content.js pages.productList.presets) · Product Code และชื่อสินค้าแสดงเสมอ
+    PRODUCT_COLUMN_PRESETS: [
+      { id: 'standard', columns: ['image', 'status', 'category', 'subCategory', 'type', 'series', 'rsp', 'completeness'] },
+      { id: 'price', columns: ['image', 'status', 'series', 'rsp', 'sellIn', 'listedCount'] },
+      { id: 'completeness', columns: ['completeness', 'category', 'subCategory', 'type', 'series', 'rsp', 'launchDate', 'barcode', 'image', 'inTrcloud'] }
+    ],
+
+    // หน่วยของขนาดบรรจุ
     UOMS: ['g', 'ml', 'ชิ้น'],
 
     // รูปสินค้า: ย่อด้วย Canvas ให้ด้านยาวไม่เกินค่านี้ (px) แล้วเก็บเป็น data URL
@@ -60,6 +71,18 @@
     GROUP_BY_SERIES_ABOVE: 20,
     // ตรวจความผิดปกติ: ช่องที่ต่างจากเดือนเดียวกันปีก่อนเกิน ± ค่านี้ (สัดส่วน 0.5 = 50%) แสดง ▲/▼ (ไม่บล็อกการบันทึก)
     ANOMALY_PCT: 0.5,
+    // CR-26: อายุการขายของ SKU × หน่วยขาย (calc.salesAge) — CR-27 / CR-33 กลุ่มอายุ > 2 ปี เมื่อขายมาแล้วมากกว่า AGING_LONG_MONTHS เดือน ·
+    //   ตัวกรองอายุ: ไม่เกิน AGING_YEAR_MONTHS (1 ปี) · มากกว่า 1 ปีถึง AGING_LONG_MONTHS · มากกว่า AGING_LONG_MONTHS ·
+    //   ป้าย ไม่มียอด เมื่อไม่มียอดจริง ≥ NO_SALE_WARN_MONTHS เดือนจนถึงเดือนปิดล่าสุด · ตัวกรองเริ่มขายภายใน AGING_RECENT_MONTHS เดือน
+    AGING_LONG_MONTHS: 24,
+    AGING_YEAR_MONTHS: 12,
+    NO_SALE_WARN_MONTHS: 3,
+    AGING_RECENT_MONTHS: 12,
+    // CR-26: ประวัติย้อนหลังที่ core/seed.js สร้าง (seed มียอดราย SKU แค่ปี 2026): NPD-2025 เริ่มขาย AGING_NPD_START ·
+    //   Active / Discontinued เริ่มขายเดือนที่ (TR Code mod จำนวนเดือน) นับจาก AGING_START_FROM ถึง AGING_START_TO (กำหนดตายตัว ไม่สุ่ม)
+    AGING_NPD_START: '2025-10',
+    AGING_START_FROM: '2022-01',
+    AGING_START_TO: '2024-12',
     // ย้อนกลับ (Ctrl+Z) ได้สูงสุดกี่ครั้งต่อรอบแก้ไข
     UNDO_LIMIT: 50,
 
@@ -103,6 +126,23 @@
 
     // CR-24: เดือนปัจจุบันกลาง (core/clock.js) — ยอดขาย L12M = 12 เดือนที่ปิดแล้วก่อนเดือนนี้ (ก.ย. 2025 – ส.ค. 2026) ·
     //   ยอดอ้างอิงรายเดือน (ม.ค.–ส.ค. ปี 2026 · ก.ย.–ธ.ค. ปี 2025) · หน้าร้านค้า TT "ข้อมูล ณ เดือน" / ลบค่า = ใช้เดือนจริงของเครื่อง
-    DEMO_CURRENT_MONTH: '2026-09'
+    DEMO_CURRENT_MONTH: '2026-09',
+
+    // CR-32: คอลัมน์ของตารางคู่ค้า (หน้า Sales Unit & Customer · components.columnPicker) รหัสคู่ค้าและชื่อแสดงเสมอ
+    //   standard = ค่าตั้งต้นของแท็บทั้งหมด / Channel ที่แบ่งเป้าตาม Account · territory = ค่าตั้งต้นของ Channel ที่แบ่งเป้าตามเขต (+ คอลัมน์ของหน้าเขตเดิม)
+    // CR-33: ค่าเริ่มต้นตามแท็บ (core/units.js columnPresetFor): standard = แท็บทั้งหมด / Channel ที่คู่ค้ามีหลายประเภท · single = คู่ค้าประเภทเดียว ·
+    //   territory = ร้านค้าของเขต · full = ทุกคอลัมน์ · ตัดยอดอ้างอิงและหน่วยขายแนะนำออกจากค่าเริ่มต้น (หน่วยขายแนะนำแสดงในช่องหน่วยขาย)
+    //   SALES_UNIT_COLUMN_VERSION เปลี่ยน = ล้าง Preset / คอลัมน์ที่ผู้ใช้เลือกไว้ของตารางนี้ 1 ครั้ง (catalog.ensureVersion)
+    SALES_UNIT_COLUMN_PRESETS: [
+      { id: 'standard', columns: ['kind', 'status', 'unit'] },
+      { id: 'single', columns: ['status', 'unit'] },
+      { id: 'territory', columns: ['storeType', 'priceType', 'province', 'export', 'online', 'status', 'unit'] },
+      { id: 'full', columns: ['kind', 'trcloudType', 'storeType', 'priceType', 'province', 'export', 'online', 'status', 'unit', 'refL12M', 'taxId', 'legalName', 'period'] }
+    ],
+    SALES_UNIT_COLUMN_VERSION: 2,
+
+    // CR-32: เดือนสุดท้ายของแผน (core/clock.js horizonEnd) ที่เดียวทั้งเว็บ · ปกติไม่ตั้งแผนยาว 2 ปีพร้อมกัน ห้าม Hardcode ปี / เดือนสุดแผนที่อื่น
+    //   ใช้กับ: ปุ่มปีของผู้รับผิดชอบรายเดือน (ปีของเดือนปัจจุบัน ถึงปีของค่านี้) · กล่องแทนที่ผู้รับผิดชอบ (แทนที่ถึงสุดแผน) · เกณฑ์ข้อมูลที่ต้องตรวจของบุคลากร
+    PLAN_HORIZON_END: '2027-12'
   };
 })(window.SP);

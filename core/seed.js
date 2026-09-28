@@ -3,22 +3,31 @@
  *
  * อ่าน data/:  productImport (data/products.js), seed ตามชื่อใน productImport.seed (data/seed/seed-charmiss.js),
  *              taxonomy, listingRules (data/listings.js), priceImport (data/pricing.js), erpImport (data/erp-snapshot.js),
- *              accounts, territories, channels, history, settings, promotions
- * เขียน:       SP.data.products, taxonomy.series, listings, priceList, accountPrices (CR-18), erpSnapshot,
+ *              accounts, territories, channels, history, settings
+ * เขียน:       SP.data.products, taxonomy.series, listings, basePrices · promoPrices (CR-30), erpSnapshot,
+ *              CR-30: taxonomy.category[TYPE].codePrefix (ค่าตั้งต้น) · codeCounters · codeMigration และรหัสใหม่ใน npdPlans / actuals / planSeeds,
  *              history.years.<ปีของ seed>.skuQty (ยอดขายราย SKU), history.years.<ปี>.monthly ของหน่วยที่มียอดราย SKU จริง
- *              (รูปแบบรายเดือนจาก SKU ยอดทั้งปีเท่าเดิม), history.runRate
+ *              (รูปแบบรายเดือนจาก SKU ยอดทั้งปีเท่าเดิม), history.runRate,
+ *              history.skuStart (CR-26 เดือนเริ่มขายราย SKU สำหรับอายุการขาย),
+ *              history.years.<ปีก่อนหน้า>.skuQty (CR-27 ยอดราย SKU ปี 2025 จากยอดหน่วยขาย — ยอดอ้างอิงของ CR-24 ใช้ค่านี้แทนค่าประมาณการ)
  * store:       ไม่อ่าน ไม่เขียน (store โหลดหลังไฟล์นี้ ค่าตั้งต้นของ master.* จึงเป็นข้อมูลที่นำเข้าแล้ว)
  *
  * ขั้นตอน (ไม่มีการสุ่ม ผลลัพธ์เหมือนเดิมทุกครั้ง / สูตรเรียก SP.core.calc):
  *   1. สินค้า: seed.products + productImport.newProducts → โครง Product Master
  *      Series จาก Campaign (ยกเว้น notSeries เช่น Existing) · หมวดสินค้าจากคำในชื่อ (calc.inferCategory, inferred: true)
  *      ขนาดบรรจุจากชื่อ (5g, 50ml) · Status ไม่เก็บ (คำนวณจากวันที่)
- *   2. ราคา: RSP ทั่วไป · SELL_IN (dealerPrice) ของ Channel ใน priceImport.dealerChannels · priceImport.changes
- *      ราคาต่อ Account (CR-18) = SP.data.accountPrices [{ productKey, accountId, price }] ราคาเดียวทั้งปี (รวม VAT) ไม่อยู่ใน Price List
+ *   2. ราคา (CR-30): ราคาหลัก RSP (rsp) · TT_DEALER (dealerPrice) มีผล priceImport.baseFrom + priceImport.changes
+ *      ราคาต่อ Account เดิม (CR-18) → Promotion Price ระดับหน่วยขาย ทุกเดือน priceImport.promoFrom – ธ.ค. ปีแผนสุดท้าย
  *   3. Listing: seed.listings (ชื่อ Account → id) · สินค้าใหม่ → newProductUnits · หน่วยอื่นตาม listingRules.units
  *   4. ยอดขายปีก่อนราย SKU: หน่วยใน seed = history ของ seed / หน่วยอื่น = รูปแบบของหน่วยต้นแบบ (from) เฉพาะ SKU ที่ Listing
  *      ปรับให้ Net Sales แต่ละเดือนเท่ากับ history.years.<ปี>.monthly ของหน่วยนั้น · Run-rate = เฉลี่ย RUN_RATE_MONTHS เดือนจริงล่าสุด
  *   5. ERP ตัวอย่าง: สินค้าที่มี TR Code + ความต่างใน erpImport
+ *   6. CR-26 ประวัติย้อนหลัง (seed มียอดราย SKU แค่ปี 2026): เดือนเริ่มขายราย SKU (startMonths)
+ *      sourceStatus NPD-2025 → settings.AGING_NPD_START (ต.ค. 2025) · Active / Discontinued → AGING_START_FROM + (เลข TR Code mod จำนวนเดือนในช่วง)
+ *      ยอดรายเดือนปี 2022–2024 = รูปแบบปี 2026 ของ SKU ตั้งแต่เดือนเริ่มขาย (calc.skuBackfill คำนวณจากค่านี้ ไม่เก็บซ้ำ)
+ *   7. CR-27 ยอดราย SKU ปี 2025 (priorSkuQty): ยอดหน่วยขายเดือน M ปี 2025 (history monthly · Net Sales) × สัดส่วน Net Sales ของ SKU
+ *      เดือน M ปี 2026 (เดือนนั้นหน่วยขายเป็น 0 = สัดส่วนทั้งปี 2026) เฉพาะ SKU ที่เริ่มขายแล้ว (skuStart ≤ เดือนนั้น) ÷ Net Sales ต่อชิ้น
+ *      ของเดือนนั้น (ไม่มีราคาปี 2025 = ราคาปี 2026) ปัดเป็นชิ้น → ผลรวม SKU ≈ ยอดหน่วยขาย (±1 ชิ้นต่อ SKU)
  */
 (function (SP) {
   'use strict';
@@ -60,37 +69,53 @@
       var sid = seriesId(src.series);
       var skipped = !sid && (cfg.notSeries || []).indexOf(src.series) >= 0;
       return {
-        trCode: src.trCode || '', tempCode: src.tempCode || '', tempCodeHistory: [], internalCode: '', barcode: '',
+        trCode: src.trCode || '', tempCode: src.tempCode || '', barcode: '',
         name: src.name, nameEn: '', shortName: src.shortName || '',
         categoryId: cat ? cat.categoryId : null, subCategoryId: cat ? cat.subCategoryId : null, typeId: cat ? cat.typeId : null,
         inferred: !!cat,
-        seriesId: sid, subSeriesId: null, itemType: 'SALE', packSize: pack.packSize, uom: pack.uom, image: null,
+        seriesId: sid, subSeriesId: null, packSize: pack.packSize, uom: pack.uom, image: null, inTrcloud: !!src.trCode,
         launchDate: src.launchDate || null, discontinueMonth: src.discontinueMonth || null, clearance: null,
         note: src.note || (skipped ? cfg.notSeriesNote : ''), createdAt: src.createdAt || stamp, updatedAt: src.createdAt || stamp
       };
     }
-    return { products: (seed.products || []).map(make).concat((cfg.newProducts || []).map(make)), series: series };
+    function withQuarter(p, src) { if (src.launchQuarter) p.launchQuarter = src.launchQuarter; return p; }   // CR-30 แผน NPD แบบไตรมาส
+    return { products: (seed.products || []).map(make).concat((cfg.newProducts || []).map(function (src) { return withQuarter(make(src), src); })), series: series };
   }
 
-  // 2) Price List
+  // 2) ราคาหลักรายเดือน (CR-30): RSP · TT_DEALER มีผลตั้งแต่ baseFrom + ราคาที่เปลี่ยนตามรอบเวลา (changes)
   function buildPrices(data, seed, cfg, pcfg) {
     var list = [];
     var by = cfg.importedBy || '';
-    function from(src) { return src.launchDate && src.launchDate > cfg.priceFrom ? src.launchDate : cfg.priceFrom; }
+    var from = pcfg.baseFrom || String(cfg.priceFrom || '').slice(0, 7);
+    var at = from + '-01T09:00:00';
     (seed.products || []).concat(cfg.newProducts || []).forEach(function (src) {
       var key = src.trCode || src.tempCode;
-      var f = from(src);
-      if (src.rsp > 0) list.push({ productKey: key, priceType: 'RSP', channelId: null, accountId: null, price: src.rsp, effectiveFrom: f, effectiveTo: null, by: by, at: f + 'T09:00:00' });
-      (pcfg.dealerChannels || []).forEach(function (ch) {
-        if (src.dealerPrice > 0) list.push({ productKey: key, priceType: 'SELL_IN', channelId: ch, accountId: null, price: src.dealerPrice, effectiveFrom: f, effectiveTo: null, by: by, at: f + 'T09:00:00' });
-      });
+      if (src.rsp > 0) list = calc.setBasePrice(list, { productKey: key, priceType: 'RSP', effectiveMonth: from, price: src.rsp, by: by, at: at }).list;
+      if (src.dealerPrice > 0) list = calc.setBasePrice(list, { productKey: key, priceType: 'TT_DEALER', effectiveMonth: from, price: src.dealerPrice, by: by, at: at }).list;
     });
-
-    (pcfg.changes || []).forEach(function (c) {
-      var res = calc.addPrice(list, c);
-      if (res.ok) list = res.list;
-    });
+    (pcfg.changes || []).forEach(function (c) { var res = calc.setBasePrice(list, c); if (res.ok) list = res.list; });
     return list;
+  }
+
+  // ราคาต่อ Account เดิม (CR-18 ราคาเดียวทั้งปี) → Promotion Price ระดับหน่วยขาย ทุกเดือน promoFrom – ธ.ค. ปีแผนสุดท้าย
+  function buildPromoPrices(data, seed, cfg, pcfg) {
+    var out = [];
+    var years = (data.settings.PLAN_YEARS || [data.settings.DEFAULT_PLAN_YEAR]);
+    var from = pcfg.promoFrom || pcfg.baseFrom || '2024-01';
+    var last = Math.max.apply(null, years);
+    (seed.accountPrices || []).forEach(function (a) {
+      var unit = unitIdOf(data, a.account);
+      var info = unit ? calc.unitInfo(data, unit) : null;
+      if (!info || !(a.rsp > 0)) return;
+      for (var y = Number(from.slice(0, 4)); y <= last; y++) {
+        for (var m = 0; m < 12; m++) {
+          var key = calc.monthKey(y, m);
+          if (key < from) continue;
+          out = calc.setPromoPrice(out, a.trCode, info.channel.id, unit, key, a.rsp, { by: cfg.importedBy || '', at: from + '-01T09:00:00' });
+        }
+      }
+    });
+    return out;
   }
 
   // 3) Listing
@@ -103,7 +128,8 @@
       add(l.trCode, unit);
       if (unit) (base[unit] = base[unit] || []).push(l.trCode);
     });
-    (cfg.newProducts || []).forEach(function (p) { (rules.newProductUnits || []).forEach(function (u) { add(p.tempCode, u); }); });
+    // CR-30: สินค้าใหม่ที่ระบุ units ใช้หน่วยขายของรายการนั้น (ว่าง = ยังไม่ Listing) · ไม่ระบุ = newProductUnits
+    (cfg.newProducts || []).forEach(function (p) { (p.units || rules.newProductUnits || []).forEach(function (u) { add(p.tempCode, u); }); });
     var byKey = {};
     products.forEach(function (p) { byKey[calc.productKey(p)] = p; });
     var seriesName = {};
@@ -179,12 +205,69 @@
     return history;
   }
 
+  // 6) CR-26: เดือนเริ่มขายราย SKU (กำหนดตายตัว ไม่สุ่ม) → { <productKey>: 'YYYY-MM' } เฉพาะสินค้าใน seed (สินค้าใหม่ปี 2027 ไม่มีประวัติ)
+  function startMonths(products, S) {
+    var K = SP.core.clock;
+    var from = K.parse(S.AGING_START_FROM), to = K.parse(S.AGING_START_TO);
+    var span = (to.year - from.year) * 12 + (to.month - from.month) + 1;
+    var out = {};
+    (products || []).forEach(function (src) {
+      var key = src.trCode || src.tempCode;
+      if (!key) return;
+      if (src.sourceStatus === 'NPD-2025') { out[key] = S.AGING_NPD_START; return; }
+      var digits = String(key).replace(/\D/g, '');
+      var n = digits ? Number(digits) : String(key).split('').reduce(function (s, ch) { return s + ch.charCodeAt(0); }, 0);
+      out[key] = K.addMonths(S.AGING_START_FROM, n % span);
+    });
+    return out;
+  }
+
+  // 7) CR-27: ยอดราย SKU ปีก่อนหน้าปีที่มียอดราย SKU (2025) — กำหนดตายตัว ไม่สุ่ม · แก้ history ที่ส่งเข้ามา
+  function priorSkuQty(d, history, start) {
+    var ys = Object.keys(history.years).filter(function (y) { return history.years[y].skuQty; }).map(Number);
+    if (!ys.length) return history;
+    var py = Math.max.apply(null, ys), y0 = py - 1;
+    var prev = history.years[y0];
+    if (!prev || !prev.monthly) return history;
+    var src = history.years[py].skuQty;
+    var K = SP.core.clock;
+    var qty = prev.skuQty = prev.skuQty || {};
+    Object.keys(src).forEach(function (unit) {
+      var target = prev.monthly[unit];
+      if (!target || qty[unit]) return;
+      var keys = Object.keys(src[unit]);
+      var annual = {};
+      keys.forEach(function (k) {
+        var t = 0;
+        for (var mm = 0; mm < 12; mm++) t += (src[unit][k][mm] || 0) * unitNet(d, k, unit, py, mm);
+        annual[k] = t;
+      });
+      var out = {};
+      keys.forEach(function (k) { out[k] = []; });
+      for (var m = 0; m < 12; m++) {
+        var ym = K.key(y0, m + 1);
+        var elig = keys.filter(function (k) { return !start[k] || start[k] <= ym; });
+        var w = elig.map(function (k) { return (src[unit][k][m] || 0) * unitNet(d, k, unit, py, m); });
+        if (!(calc.sum(w) > 0)) w = elig.map(function (k) { return annual[k]; });
+        var W = calc.sum(w);
+        keys.forEach(function (k) { out[k].push(0); });
+        if (!(W > 0) || !(target[m] > 0)) continue;
+        elig.forEach(function (k, i) {
+          var per = unitNet(d, k, unit, y0, m) || unitNet(d, k, unit, py, m);
+          out[k][m] = per > 0 ? Math.round(target[m] * w[i] / W / per) : 0;
+        });
+      }
+      qty[unit] = out;
+    });
+    return history;
+  }
+
   // 5) ERP ตัวอย่าง
-  function buildErp(products, priceList, cfg, erp) {
+  function buildErp(products, basePrices, cfg, erp) {
     var out = [];
     products.forEach(function (p) {
       if (!p.trCode || (erp.notInErp || []).indexOf(p.trCode) >= 0) return;
-      var rsp = calc.rspOn(priceList, p.trCode, cfg.priceFrom);
+      var rsp = calc.rspAt(basePrices, p.trCode, String(cfg.priceFrom).slice(0, 7));
       out.push({
         trCode: p.trCode,
         name: (erp.rename && erp.rename[p.trCode]) || p.name,
@@ -195,31 +278,28 @@
     return out.concat(copy(erp.onlyErp || []));
   }
 
-  // นำเข้าทั้งหมด: data = SP.data → { products, series, priceList, listings, history, erpSnapshot } (แก้ history ของ data โดยตรง)
+  // นำเข้าทั้งหมด: data = SP.data → { products, series, basePrices, promoPrices, listings, history, erpSnapshot } (แก้ history ของ data โดยตรง)
   function build(data) {
     var cfg = data.productImport;
     var seed = cfg && data[cfg.seed];
     if (!seed) return null;
     var built = buildProducts(seed, cfg, data.taxonomy);
-    var priceList = buildPrices(data, seed, cfg, data.priceImport || {});
-    // CR-18: ราคาต่อ Account จาก seed (ชื่อ Account → id) ราคาเดียวทั้งปี
-    var accountPrices = [];
-    (seed.accountPrices || []).forEach(function (a) {
-      var unit = unitIdOf(data, a.account);
-      if (unit && a.rsp > 0) accountPrices = calc.setAccountPrice(accountPrices, a.trCode, unit, a.rsp);
-    });
+    var basePrices = buildPrices(data, seed, cfg, data.priceImport || {});
+    var promoPrices = buildPromoPrices(data, seed, cfg, data.priceImport || {});
     var listCfg = { newProducts: cfg.newProducts, seriesList: built.series };
     var listings = buildListings(data, seed, listCfg, data.listingRules || {}, built.products);
     var d = {};
     Object.keys(data).forEach(function (k) { d[k] = data[k]; });
     d.products = built.products;
-    d.priceList = priceList;
-    d.accountPrices = accountPrices;
+    d.basePrices = basePrices;
+    d.promoPrices = promoPrices;
     d.listings = listings;
     var history = buildHistory(d, seed, data.listingRules || {}, listings);
+    history.skuStart = startMonths(seed.products, data.settings);
+    priorSkuQty(d, history, history.skuStart);   // CR-27
     return {
-      products: built.products, series: built.series, priceList: priceList, accountPrices: accountPrices, listings: listings, history: history,
-      erpSnapshot: buildErp(built.products, priceList, cfg, data.erpImport || {})
+      products: built.products, series: built.series, basePrices: basePrices, promoPrices: promoPrices, listings: listings, history: history,
+      erpSnapshot: buildErp(built.products, basePrices, cfg, data.erpImport || {})
     };
   }
 
@@ -229,12 +309,24 @@
     SP.data.taxonomy.series = result.series.concat((SP.data.taxonomy.series || []).filter(function (s) {
       return !result.series.some(function (x) { return x.id === s.id; });
     }));
-    SP.data.priceList = result.priceList;
-    SP.data.accountPrices = result.accountPrices;
+    SP.data.basePrices = result.basePrices;
+    SP.data.promoPrices = result.promoPrices;
     SP.data.listings = result.listings;
     SP.data.history = result.history;
     SP.data.erpSnapshot = result.erpSnapshot;
+    // CR-30: เลขนำหน้า Product Code ตั้งต้นของทุก Type + แปลงรหัสชั่วคราวของสินค้าใหม่เป็นรหัสระบบ (ย้ายการอ้างอิงทั้งหมด)
+    var cat = SP.core.catalog;
+    SP.data.taxonomy = cat.applyPrefixDefaults(SP.data.taxonomy, SP.data.products);
+    var coded = cat.assignSystemCodes({
+      products: SP.data.products, listings: SP.data.listings, basePrices: SP.data.basePrices, promoPrices: SP.data.promoPrices,
+      npdPlans: SP.data.npdPlans, taxonomy: SP.data.taxonomy, actuals: SP.data.actuals, planSeeds: SP.data.planSeeds
+    });
+    ['products', 'listings', 'basePrices', 'promoPrices', 'npdPlans', 'actuals', 'planSeeds'].forEach(function (k) { SP.data[k] = coded.data[k]; });
+    SP.data.codeCounters = coded.counters;
+    SP.data.codeMigration = coded.map;
+    // CR-30 รอบ 3: Listing เดิม → สถานะ วางขาย + เดือนเริ่มวางขาย (แผน NPD ต่อหน่วย หรือเดือนเปิดตัว)
+    SP.data.listings = SP.core.calc.normalizeListings(SP.data.listings, SP.data.products, SP.data.npdPlans);
   }
 
-  SP.core.seed = { build: build, imported: !!result, packOf: packOf, seriesIdOf: seriesIdOf };
+  SP.core.seed = { build: build, imported: !!result, packOf: packOf, seriesIdOf: seriesIdOf, startMonths: startMonths, priorSkuQty: priorSkuQty };
 })(window.SP);
