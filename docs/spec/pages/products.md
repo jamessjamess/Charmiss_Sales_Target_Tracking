@@ -1,6 +1,34 @@
-# รายการสินค้า (`modules/products`, id `productList`)
+# Product List (`modules/products`, id `productList`)
+
+CR-35 ชื่อหน้าภาษาอังกฤษ (ทุกหน้าใน Product Master) · ไม่มีคำอธิบายใต้หัวข้อ · ข้อความเดิมเป็นบรรทัดแรกของปุ่ม `?` (`page.helpLead` → `components.pageHelp`)
 
 Product Master · fit · ผู้แก้ไขตั้งต้น: ทีม Product · Status ณ เดือนปัจจุบันกลาง (`core/clock.js`) · Product Code และ Preset คอลัมน์จาก `core/catalog.js`
+
+## CR-36 แท็บ · หมวดแบบลำดับชั้น · จัดกลุ่ม · Product Year · Drawer
+
+- แท็บ `สินค้า | Product Level` ต่อจากหัวข้อ เหนือการ์ดสรุป (`ui.productListTab` · `#items` / `#level`) · แท็บ Product Level = หน้า Category & Series เดิมทั้งหมด (ดู [taxonomy.md](taxonomy.md)) ·
+  เห็นเมื่อสิทธิ์ `taxonomy` ไม่ใช่ ไม่เห็น (ส่วนของหน้า Product List · ค่าเดิม ทีม Product / ผู้ดูแลระบบ แก้ไข) · โค้ดของ 2 แท็บอยู่ใน `modules/products/products.js` (`renderItems` · `renderLevel`)
+- ตัวกรองหมวดสินค้า `components.treeSelect` (`calc.categoryOptions`): Category ตัวหนา · `- ` Sub Category · `-- ` Type · เยื้องตามระดับ · ช่องที่เลือกแสดงชื่อไม่มีเครื่องหมาย
+- `จัดกลุ่ม: <เกณฑ์> ▾` (`components.groupPicker` · `calc.productGroupLevels` + `groupItems`): ไม่จัดกลุ่ม · Category · Sub Category · Type · Series (ค่าเริ่มต้น) ·
+  Product Level (3 ชั้น) · Status · Product Year · หัวกลุ่ม `<ชื่อ> · N SKU` พับได้ทุกชั้น · จำต่อผู้ใช้ที่ `ui.groupBy.<ผู้ใช้>.productList`
+- Product Year (`calc.productYear`): ตัวกรองเพิ่มเติม (หลายปี + `ยังไม่มี Listing`) · คอลัมน์เลือกได้ (ไม่อยู่ในค่าเริ่มต้น) · เกณฑ์จัดกลุ่ม
+- คอลัมน์ค่าเริ่มต้นเพิ่ม `Sub Series` ต่อจาก Series (`PRODUCT_COLUMN_PRESETS.standard`) · ไม่มีแถบเลื่อนแนวนอนที่ 1920 · ตัวเลือก Status ค่าเริ่มต้น `ไม่รวม Delete`
+- Drawer สินค้ากว้าง 50% ของจอ (ขั้นต่ำ 720px) · ช่องข้อมูล 2 คู่ต่อแถว · รูปอยู่ขวาของส่วนรหัสและชื่อ · ป้าย `ระบบกำหนด` = ลิงก์ไปแท็บ Product Level ที่เลือก Type นั้น (`ui.taxonomySelection`)
+
+## CR-35 วงจรสถานะ · รหัสชั่วคราว · การ์ด
+
+- Status 7 แบบตามลำดับ `Request` · `Planned` · `NPD` · `Active` · `Discontinued` · `Clearance` · `Delete` (ลำดับของตัวกรองทุกหน้า · กฎที่ [product-rules.md](../product-rules.md))
+- KPI:
+  - `ทั้งหมด` ไม่นับ Delete
+  - `Active` + บรรทัดย่อย `Discontinued {n}`
+  - `NPD` + บรรทัดย่อยกดได้ `ขอ NPD {n} · ยืนยันแล้ว {n} · เปิดขายแล้ว {n}` (Request · Planned · NPD)
+  - `ยังไม่เปิดใน TRCLOUD` = จำนวน Request (ไม่มีรหัส 5 หลัก) + บรรทัดย่อย `รหัสชั่วคราว`
+- ตัวกรอง Status ค่าเริ่มต้น `ทุก Status ยกเว้น Delete` (+ `ทั้งหมด`) · `ตัวกรองเพิ่มเติม` เพิ่ม `ประเภทรายได้` (NPD / Existing / Clearance · `calc.revenueTypeOf`) · ค้นหาด้วย Product Code รหัสชั่วคราว หรือชื่อ
+- คอลัมน์รหัส = `calc.productCode` (คำขอ = `NPD-YYMM-NNN`) · ป้าย `ชื่อชั่วคราว` เฉพาะ Request (`components.tempNameTag` · ไม่ใช่ส่วนของชื่อ) · ป้าย `จาก Sales` ต่อท้ายชื่อ (ไม่ถูกตัด)
+- Drawer ของคำขอ: รหัสชั่วคราว + ปุ่ม `ยืนยันเป็น NPD` (ทีม Product) → กล่องยืนยัน (`components.confirmRequestDialog`: ชื่อสินค้าจริง · Type · รหัส 5 หลักที่จะได้) → `catalog.confirmRequest` บันทึกทันที + Audit + Toast
+  - ได้ Product Code จากตัวสร้างเดิม (`catalog.nextCode`) · `tempCode` เก็บไว้ (ช่อง `รหัสชั่วคราวเดิม` · ค้นหาได้) · Key เดิม (`REQ-nnn`) แผน SKU / Listing / ราคาอยู่ครบ · Status Request → Planned
+- Drawer แท็บ Listing และวงจรสินค้า: `Delete ตั้งแต่เดือน` (โหมดแก้ไข) · บันทึกแล้วสินค้ายังมีในแผน = ถาม `สินค้านี้มีในแผน {n} หน่วยขาย` ก่อน (แถวในแผนอ่านอย่างเดียว ไม่ล้างค่าให้อัตโนมัติ)
+- ลิงก์ Listing ใน Drawer → [Launch & Listing](launch-listing.md) แท็บ Listing ของสินค้านั้น
 
 ## โครงหน้า (CR-30)
 

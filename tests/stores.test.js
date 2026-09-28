@@ -30,8 +30,8 @@
 
   SP.tests.stores = [
     {
-      name: 'st-1. นำเข้า seed → ร้าน 220 · ยังไม่จัดสรร ณ ก.ย. 2026 = 9 · เขต 4 มี 99 ร้าน · ชื่อบุคคลธรรมดาถูกซ่อน 29 ร้าน · ใช้งาน 185 · ไม่ระบุจังหวัด 30',
-      expected: [220, 9, 99, 29, true, 185, 30],
+      name: 'st-1. นำเข้า seed → ร้าน 211 (CR-35 รวมรหัสซ้ำ 9 แถว) · ยังไม่จัดสรร ณ ก.ย. 2026 = 9 · เขต 4 มี 93 ร้าน · ชื่อบุคคลธรรมดาถูกซ่อน 26 ร้าน · ใช้งาน 177 · ไม่ระบุจังหวัด 27',
+      expected: [211, 9, 93, 26, true, 177, 27],
       actual: function () {
         var masked = D().stores.filter(function (s) { return s.masked; });
         var sum = S().summary(D(), '2026-09');
@@ -130,20 +130,19 @@
       }
     },
     {
-      name: 'st-10. System ID ซ้ำในไฟล์ต้นทาง (8 ID · 9 แถวเพิ่ม) แยก id ภายใน ใช้ช่วงเขตชุดเดียวกัน · ย้อนการย้ายหลายครั้งหลังอนุมัติได้ครบ',
-      expected: [8, 9, ['6352', '6352-2', '6352-3'], true, true],
+      name: 'st-10. CR-35 รหัสซ้ำในไฟล์ต้นทาง (8 รหัส · 9 แถวเพิ่ม · ชื่อเหมือนกันทุกรหัส) รวมเป็นรายการเดียว: ไม่มีรหัสซ้ำ · ไม่มี id -2 · 6352 เหลือช่วงเขตชุดเดียว · ย้อนการย้ายหลายครั้งหลังอนุมัติได้ครบ',
+      expected: [8, 9, ['6352'], true, true],
       actual: function () {
-        var dup = {};
-        D().stores.forEach(function (s) { if (s.duplicates > 1) dup[s.systemId] = (dup[s.systemId] || 0) + 1; });
-        var extra = calc().sum(Object.keys(dup).map(function (k) { return dup[k] - 1; }));
+        var merges = D().storeCodeMerges || [];
+        var extra = calc().sum(merges.map(function (m) { return m.rows.length - 1; }));
         var ids = D().stores.filter(function (s) { return s.systemId === '6352'; }).map(function (s) { return s.id; });
-        var sameRanges = ids.every(function (id) { return JSON.stringify(ranges(D().storeAssignments, id).map(function (r) { return r.slice(0); })) === JSON.stringify(ranges(D().storeAssignments, '6352')); });
+        var sameRanges = merges.every(function (m) { return m.action === 'merged'; }) && ranges(D().storeAssignments, '6352').length === 1;
         var a = S().moveStores(D(), ['711', '781'], 'TT-02', '2026-10', { current: '2026-09', at: '2026-09-20T10:00:00.000Z' });
         var d1 = withData({ storeAssignments: a.storeAssignments, storeMoves: [a.move] });
         var b = S().unassignStores(d1, ['711'], '2026-11', { current: '2026-09', at: '2026-09-21T10:00:00.000Z' });
         var d2 = withData({ storeAssignments: b.storeAssignments, storeMoves: [a.move, b.move] });
         var asOf = S().assignmentsAsOf(d2, '2026-09-15T00:00:00.000Z');
-        return [Object.keys(dup).length, extra, ids, sameRanges,
+        return [merges.length, extra, ids, sameRanges,
           JSON.stringify(['711', '781'].map(function (id) { return ranges(asOf, id); })) === JSON.stringify(['711', '781'].map(function (id) { return ranges(D().storeAssignments, id); }))];
       }
     }

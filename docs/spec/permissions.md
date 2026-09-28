@@ -12,7 +12,7 @@
 - **ขอบเขต** ทุก Channel / เฉพาะทีม: เฉพาะทีม = แก้ได้เฉพาะ Channel ที่เป็นสมาชิกทีม ณ เดือนปัจจุบันจำลอง นอกทีมเป็นดู
 - **ปุ่มเฉพาะ** (เช่น สร้าง NPD · ส่งออก) มีแค่ อนุญาต / ไม่อนุญาต
 - รายการสิทธิ์ = 1 รายการต่อหน้าใน registry (หน้าใหม่ได้ค่าตั้งต้นของบทบาท = ดู · ผู้ดูแลระบบแก้ไข) + สิทธิ์ย่อย:
-  - CR-32 `salesUnits` (Sales Unit & Customer) + ส่วนของหน้า `salesUnits.gp` · `salesUnits.channelSettings` แทน `accounts` · `accounts.gp` · `accounts.channelSettings` · `territories`
+  - CR-32 `salesUnits` (Account Master) + ส่วนของหน้า `salesUnits.gp` · `salesUnits.channelSettings` แทน `accounts` · `accounts.gp` · `accounts.channelSettings` · `territories`
     (ค่าที่บันทึกไว้เดิม = ระดับสูงสุดของ accounts / territories · สิทธิ์ย่อยย้ายค่าเดิม · `LEGACY` + `ALIASES` ใน `core/permissions.js` · หน้าเดิม `perm: 'salesUnits'`) ·
     ค่าตั้งต้น salesUnits: Director แก้ไข · Manager ดู · Officer ดู · ผู้ดูแลระบบแก้ไข · `people` คง key เดิม (ชื่อแสดง Sales Person Management)
   - CR-29 Account Master: `accounts` (Account & Platform) + ส่วนของหน้า `accounts.gp` · `accounts.channelSettings` · `territories` · `people` (บุคลากรและทีม ·
@@ -22,7 +22,13 @@
   - CR-25: Permissions · Users (CR-31 · หน้า Roles ซ่อน) ใช้สิทธิ์เดียว `roleManagement` (แถว `Permissions / Users`) · คู่มือการใช้งาน (CR-28 เดิมเกี่ยวกับ Prototype · id `aboutPrototype`) เห็นทุกบทบาทเสมอ ไม่อยู่ในเมทริกซ์
   - Annual Target = `annualTarget` · Sub-channel Allocation = `unitTargets` (CR-23 แทน topdown.channel / topdown.unit / phasing — ค่าที่บันทึกไว้เดิมแปลงให้เอง ค่าที่สูงกว่า)
   - แผน SKU: สร้าง NPD
-  - Listing: Clearance
+  - CR-35 Launch & Listing: `launchListing` (หน้า · แทน `npdPlan` + `listing` · ค่าที่บันทึกไว้เดิม = ระดับสูงสุดของสองค่า แล้วลบ Key เดิม · `LEGACY` + `ALIASES` ·
+    ถามสิทธิ์ด้วยชื่อเดิมได้ผลของ `launchListing` · ค่าตั้งต้นของ 2 Key เดิมเท่ากันทุกบทบาท `N V V V E V N E` จึงไม่มีบทบาทใดได้สิทธิ์เปลี่ยน) + ส่วนของหน้า Clearance (`listing.clearance` คง id เดิม)
+    - หน้าแผน NPD / Listing เดิม `visible: false` · `perm: 'launchListing'`
+  - CR-36 Product List = `productList` (หน้า) + ส่วนของหน้า `taxonomy` (แท็บ Product Level · ค่าเดิม ทีม Product / ผู้ดูแลระบบ แก้ไข) · หน้า Category & Series เดิม `perm: 'productList'` ·
+    เมนู Product Master 3 หน้า · Partner List = ชื่อใหม่ของ `salesUnits` (key คงเดิม)
+    - Clearance ใช้กับแท็บ Clearance ของ Price & Promotion ด้วย: registry `alsoPerms: ['listing.clearance']` ทำให้หน้า Price & Promotion มองเห็นสำหรับผู้มีสิทธิ์ย่อยนี้ (`pageLevel`) ·
+      workflowBar ของหน้าใช้ `pageModules + listing.clearance` · ผู้ไม่มีสิทธิ์ราคาเห็นเฉพาะแท็บ Clearance (Supply Chain · Test cr25-9 = เห็น 4 · แก้ไข 2)
   - CR-30 ราคาและ Promotion: `prices` (หน้า · แทน `promotionPrice` / `accountPrices` · ค่าที่บันทึกไว้เดิมย้ายให้ผ่าน `LEGACY`) + ส่วนของหน้า `prices.base` (ราคาหลัก) · `prices.promo` (Promotion Price · กำหนดขอบเขตเฉพาะทีมได้)
   - ทุกหน้า: ส่งออก (Excel / CSV / พิมพ์)
 - ผู้ใช้หลายบทบาทใช้สิทธิ์สูงสุด (แก้ไข > ดู > ไม่เห็น · ทุก Channel > เฉพาะทีม) · ผู้ใช้ที่ปิดใช้งาน = ไม่เห็นทุกหน้า
@@ -42,11 +48,11 @@
   | 2 Sub-channel Allocation | ดู | แก้ไข ★ | ดู | ดู | — | — | — | แก้ไข |
   | 3 SKU Planning · สร้าง NPD | ดู · – | ดู · – | แก้ไข·ทีม ★ · ✓·ทีม | แก้ไข·ทีม ★ · ✓·ทีม | — | — | — | แก้ไข · ✓ |
   | 4 Plan Summary | ดู | ดู | ดู | ดู | ดู | ดู | ดู ★ | ดู |
-  | รายการสินค้า · แผน NPD | — | ดู | ดู | ดู | แก้ไข (★ รายการสินค้า) | ดู (★ รายการสินค้า) | — | แก้ไข |
+  | Product List · Launch & Listing (CR-35 แทนแผน NPD) | — | ดู | ดู | ดู | แก้ไข (★ Product List) | ดู (★ Product List) | — | แก้ไข |
   | ราคาและ Promotion · ราคาหลัก · Promotion Price (CR-30) | — | ดู · ดู · **แก้ไข** | ดู · ดู · **แก้ไข·ทีม** | ดู · ดู · **แก้ไข·ทีม** | ดู · **แก้ไข** · ดู | — | — | แก้ไข |
-  | Listing · Clearance | — | ดู · ดู | ดู · ดู | ดู · ดู | แก้ไข · ดู | ดู · **แก้ไข** | — | แก้ไข |
-  | หมวดสินค้าและ Series | — | — | — | — | แก้ไข | — | — | แก้ไข |
-  | Sales Unit & Customer (CR-32 · GP = Director · Manager ดู · ตั้งค่า Channel = Director) | — | แก้ไข | ดู | ดู | — | — | — | แก้ไข |
+  | Clearance (CR-35 ส่วนของ Launch & Listing + แท็บ Clearance ของ Price & Promotion) | — | ดู | ดู | ดู | ดู | **แก้ไข** | — | แก้ไข |
+  | Product Level (CR-36 ส่วนของหน้า Product List · key เดิม `taxonomy`) | — | — | — | — | แก้ไข | — | — | แก้ไข |
+  | Account Master (CR-32 · GP = Director · Manager ดู · ตั้งค่า Channel = Director) | — | แก้ไข | ดู | ดู | — | — | — | แก้ไข |
   | Sales Person Management (people) | — | แก้ไข | ดู | — | — | — | — | แก้ไข |
   | Permissions / Users | — | — | — | — | — | — | — | แก้ไข ★ (Permissions) |
 

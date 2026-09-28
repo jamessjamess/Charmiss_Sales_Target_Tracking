@@ -8,8 +8,9 @@
  *   เป้าหมายผูกกับเขต (% ใน Channel) การย้ายร้านจึงไม่เปลี่ยนเป้าหมาย เปลี่ยนเฉพาะยอดขายปีก่อนของเขต (ก่อนอนุมัติเป้าหมายประจำปี)
  *
  * นำเข้าตอนโหลด (หลัง core/calc.js ก่อน core/seed.js): data.storeImport (data/stores.js) + seed (data/seed/seed-tt-stores.js)
- *   → SP.data.stores [{ id, systemId, name, masked, storeType, tags, priceType, active, province, hasExport, hasOnline, salesRef, duplicates }]
- *       id = System ID / แถวที่ System ID ซ้ำในไฟล์ต้นทาง: แถวถัดไปเป็น {System ID}-2, -3 (duplicates = จำนวนแถวที่ใช้ ID เดียวกัน)
+ *   → SP.data.stores [{ id, systemId, name, masked, storeType, tags, priceType, active, province, hasExport, hasOnline, salesRef }]
+ *       id = System ID (= รหัสคู่ค้า · CR-35 ห้ามซ้ำ) · แถวที่รหัสซ้ำในไฟล์ต้นทาง: ชื่อเหมือนกัน = รวมเป็นรายการเดียว (ยอดอ้างอิงรวม · ข้อมูลและเขตของแถวแรก) ·
+ *       ชื่อต่างกัน = เก็บแถวที่ยอดอ้างอิงสูงกว่า → SP.data.storeCodeMerges = [{ code, name, action: 'merged' | 'kept', rows: [{ name, salesRef }], salesRef }]
  *     SP.data.storeAssignments · provinceSuggestions · storeMoves ([]) · storeChannels (Channel ที่มีข้อมูลร้านค้า)
  *   → แทนที่เขตการขาย Sales Person และช่วงผู้รับผิดชอบของ Channel ที่นำเข้าด้วยข้อมูลใน seed
  *   → history.years.<ปีก่อนปีแผนตั้งต้น>.monthly.<เขต> = Σ ยอดอ้างอิงรายเดือนของร้านที่อยู่ในเขต ณ เดือนแรกของปีแผน
@@ -420,10 +421,9 @@
       return {
         id: n === 1 ? String(s.storeId) : s.storeId + '-' + n, systemId: String(s.storeId), name: s.name, masked: !!s.masked,
         storeType: s.storeType || null, tags: copy(s.tags || []), priceType: s.priceType || null, active: s.active !== false,
-        province: normProvince(s.province, aliases), hasExport: !!s.hasExport, hasOnline: !!s.hasOnline, salesRef: s.salesRef || 0, duplicates: 1
+        province: normProvince(s.province, aliases), hasExport: !!s.hasExport, hasOnline: !!s.hasOnline, salesRef: s.salesRef || 0
       };
     });
-    stores.forEach(function (s) { s.duplicates = seen[s.systemId]; });
     // ยอดรวมตามที่ seed ตั้งใจ: ส่วนต่างจากการปัดเศษ (บาท) ใส่ให้ร้านที่ยอดอ้างอิงสูงสุดร้านละ 1 บาท (เท่ากัน = ลำดับในไฟล์)
     if (cfg.salesRefTotal) {
       var diff = Math.round(cfg.salesRefTotal - calc.sum(stores.map(function (s) { return s.salesRef; })));
@@ -431,7 +431,10 @@
         .sort(function (a, b) { return b.s.salesRef - a.s.salesRef || a.i - b.i; })
         .slice(0, Math.abs(diff)).forEach(function (x) { x.s.salesRef += diff > 0 ? 1 : -1; });
     }
-    // ช่วงของร้าน: แถวที่ System ID ซ้ำใช้ช่วงชุดเดียวกัน (ตัดช่วงที่ซ้ำกันในไฟล์ต้นทาง)
+    // CR-35: รหัสคู่ค้าห้ามซ้ำ — รวม / ตัดแถวที่รหัสซ้ำ (หลังปัดยอดรวม ยอดอ้างอิงรวมของเขตจึงเท่าเดิม)
+    var merged = mergeDuplicates(stores);
+    stores = merged.stores;
+    // ช่วงของร้าน: ตัดช่วงที่ซ้ำกันในไฟล์ต้นทาง (แถวรหัสเดียวกันใช้ช่วงชุดเดียวกัน)
     var ranges = {};
     (seed.storeAssignments || []).forEach(function (a) {
       var k = [a.territoryId, a.fromMonth, a.toMonth || ''].join('|');
@@ -457,8 +460,30 @@
       assignments: (seed.territoryAssignments || []).map(function (a) {
         return { unitId: a.unitId, salesPersonId: a.salesPersonId || null, fromMonth: a.fromMonth, toMonth: a.toMonth || null };
       }),
-      channels: unique(territories.map(function (t) { return t.channelId; }))
+      channels: unique(territories.map(function (t) { return t.channelId; })),
+      codeMerges: merged.merges
     };
+  }
+  // แถวที่รหัสซ้ำ → { stores (รหัสไม่ซ้ำ · id = รหัส), merges } · ชื่อเหมือนกัน (ไม่สนช่องว่าง) = รวม · ต่างกัน = เก็บยอดอ้างอิงสูงสุด (เท่ากัน = แถวแรก)
+  function mergeDuplicates(list) {
+    var byCode = {}, order = [];
+    list.forEach(function (s) { if (!byCode[s.systemId]) { byCode[s.systemId] = []; order.push(s.systemId); } byCode[s.systemId].push(s); });
+    var merges = [];
+    var out = order.map(function (code) {
+      var rows = byCode[code];
+      if (rows.length === 1) return rows[0];
+      var same = rows.every(function (r) { return String(r.name).trim() === String(rows[0].name).trim(); });
+      var keep = same ? rows[0] : rows.slice().sort(function (a, b) { return b.salesRef - a.salesRef; })[0];
+      var o = copy(keep);
+      o.id = String(code);
+      if (same) {
+        o.salesRef = calc.sum(rows.map(function (r) { return r.salesRef; }));
+        rows.forEach(function (r) { if (!o.province && r.province) o.province = r.province; });
+      }
+      merges.push({ code: String(code), name: o.name, action: same ? 'merged' : 'kept', rows: rows.map(function (r) { return { name: r.name, salesRef: r.salesRef, active: r.active }; }), salesRef: o.salesRef });
+      return o;
+    });
+    return { stores: out, merges: merges };
   }
 
   var result = build(SP.data);
@@ -477,6 +502,7 @@
     D.provinceSuggestions = result.provinceSuggestions;
     D.storeMoves = [];
     D.storeChannels = result.channels;
+    D.storeCodeMerges = result.codeMerges;
     // ยอดขายปีก่อนของเขต สำหรับปีแผนตั้งต้น
     var planYear = D.settings.DEFAULT_PLAN_YEAR;
     var hy = D.history && D.history.years[planYear - 1];

@@ -56,7 +56,9 @@
     var tab = hash && hash[1] === 'monthly' ? 'monthly' : hash ? 'list' : store.get('ui.peopleTab');
     if (TABS.indexOf(tab) < 0) tab = 'list';
     var filters = { q: '', channel: '', role: '', status: 'active' };
-    var monthly = { channel: '', person: '', year: store.year(), view: 'unit' };   // CR-32: view = 'unit' (ตามหน่วยขาย) | 'person' (ตามบุคคล)
+    // CR-32: view = 'unit' (ตามหน่วยขาย) | 'person' (ตามบุคคล) · CR-35 ปีเริ่มต้น = ปีของเดือนสุดแผน (PLAN_HORIZON_END)
+    var monthly = { channel: '', person: '', year: Number(SP.core.clock.horizonEnd().slice(0, 4)), view: 'unit' };
+    function canEditPage() { return SP.core.permissions.can(SP.core.permissions.user(), 'people'); }
     var ops = [];                 // CR-32: การยืนยันกล่องแทนที่ 1 ครั้ง = 1 รายการที่ยังไม่บันทึก (Key ของสิ่งที่เปลี่ยนในครั้งนั้น)
     var collapsed = {};
     var sel = null;               // ผู้รับผิดชอบรายเดือน: { unitId, from, to } (index เดือน)
@@ -125,6 +127,14 @@
       redrawDrawer();
     }
 
+    // CR-35: ยกเลิกการเลือกเดือน (Esc · คลิกนอกตารางและแถบกำหนดผู้รับผิดชอบ · ไม่นับกล่องถาม / Popover)
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && editing && sel && !document.querySelector('dialog[open]')) { sel = null; message = null; draw(); } });
+    document.addEventListener('mousedown', function (e) {
+      if (!editing || !sel || !e.target.closest) return;
+      if (e.target.closest('.tl-table, .sp-assign, dialog, .popover, .edit-banner, .wf-bar')) return;
+      sel = null; message = null; draw();
+    });
+
     // =====================================================================
     function draw() {
       C.clear(root);
@@ -137,7 +147,15 @@
         h('span', { class: 'pp-tools-end' }, editing && tab === 'list' ? h('button', { type: 'button', class: 'btn btn-secondary btn-sm pp-add', onClick: function () { addDialog(); } }, page.add) : null)));
       if (tab === 'list') root.appendChild(h('div', { class: 'tool-row pp-toolbar-2' },
         h('label', { class: 'pp-group-toggle' }, h('input', { type: 'checkbox', checked: groupBy(), onChange: function (e) { store.set('ui.peopleGroupByChannel', e.target.checked); draw(); } }), page.groupBy)));
-      if (editing) { var banner = C.editBanner(); root.appendChild(banner); banner.update(dirty()); }
+      if (editing) {
+        // CR-35: ต่อท้ายแถบโหมดแก้ไขด้วยวิธีแก้ไขของแท็บ / มุมมอง (ตามบุคคล = ดูอย่างเดียว + ปุ่มสลับเป็นตามหน่วยขาย)
+        var Mo = page.monthly;
+        var suffix = tab === 'list' ? page.listEditHint : monthly.view === 'unit' ? Mo.hint
+          : h('span', null, ' · ' + Mo.byPerson.readOnly + ' ', h('button', { type: 'button', class: 'link-btn pp-switch-unit', onClick: function () { monthly.view = 'unit'; sel = null; draw(); } }, Mo.byPerson.switchUnit));
+        var banner = C.editBanner({ suffix: suffix });
+        root.appendChild(banner);
+        banner.update(dirty());
+      }
       if (message) root.appendChild(h('p', { class: 'pm-msg is-error', role: 'alert' }, message));
       root.appendChild(tab === 'list' ? listCard(c, d) : monthlyCard(c, d));
     }
@@ -158,13 +176,14 @@
         C.select({ label: X.status, value: filters.status, className: 'pp-f-status', options: ['active', 'ended', 'all'].map(function (v) { return { value: v, label: X.status + ': ' + page.statusOptions[v] }; }),
           onChange: function (v) { filters.status = v; draw(); } })];
     }
-    // CR-32: ปุ่มปี = ปีของเดือนปัจจุบัน ถึงปีสุดแผน (clock.horizonYears) · ตามหน่วยขาย | ตามบุคคล · Channel · บุคคล
+    // CR-35: ตัวเลือกปี ‹ 2027 ▾ › (components.yearPicker · ปีแรก = ปีเก่าสุดที่มีข้อมูลผู้รับผิดชอบ · ปีสุดท้าย = ปีของ PLAN_HORIZON_END) · ตามหน่วยขาย | ตามบุคคล · Channel · บุคคล
     function monthlyFilters(c) {
       var X = page.filters, Mo = page.monthly;
-      var years = SP.core.clock.horizonYears();
+      var YP = SP.data.content.labels.yearPicker;
+      var years = calc.ownerYears(c.assignments);
       if (years.indexOf(monthly.year) < 0) monthly.year = years[years.length - 1];
       return [
-        C.segmented({ label: Mo.year, value: monthly.year, options: years.map(function (y) { return { value: y, label: String(y) }; }), onChange: function (v) { monthly.year = v; sel = null; draw(); } }),
+        C.yearPicker({ label: Mo.year, years: years, value: monthly.year, tagOf: function (y) { return YP[calc.yearKind(y)]; }, onChange: function (v) { monthly.year = v; sel = null; draw(); } }),
         C.segmented({ label: Mo.viewLabel, value: monthly.view, options: ['unit', 'person'].map(function (v) { return { value: v, label: Mo.views[v] }; }), onChange: function (v) { monthly.view = v; sel = null; draw(); } }),
         C.select({ label: X.channel, value: monthly.channel, className: 'pp-m-channel', options: [{ value: '', label: X.channelAll }].concat(channels().filter(function (ch) { return ch.active !== false; }).map(function (ch) { return { value: ch.id, label: ch.name }; })),
           onChange: function (v) { monthly.channel = v; sel = null; draw(); } }),
@@ -264,21 +283,24 @@
     function personRow(c, d, p) {
       var team = M.personType(p) === 'team';
       var original = person(saved, p.id);
-      var tr = h('tr', { class: 'is-clickable' + (stateOf(c, p).status === 'ended' ? ' is-inactive' : '') + (drawerId === p.id ? ' is-selected' : '') + (editing && (!original || !same(original, p)) ? ' is-dirty-row' : ''), dataset: { person: p.id } },
+      // CR-35: โหมดแก้ไข = ทั้งแถวคลิกได้ (Hover · Cursor มือ) + ปุ่ม แก้ไข ขวาสุด · โหมดดู = ชื่อเป็นลิงก์ดูรายละเอียด (ไม่มี Hover)
+      var tr = h('tr', { class: 'pp-row' + (editing ? ' is-editable' : '') + (stateOf(c, p).status === 'ended' ? ' is-inactive' : '') + (drawerId === p.id ? ' is-selected' : '') + (editing && (!original || !same(original, p)) ? ' is-dirty-row' : ''), dataset: { person: p.id } },
         h('th', { scope: 'row' }, h('span', { class: 'pp-name' },
           team ? h('span', { class: 'pp-team-icon', title: page.teamIcon, 'aria-label': page.teamIcon }, page.teamBadge) : h('span', { class: 'sp-person-dot', style: { '--seg': C.tokenVar(C.personColor(c.people, p.id)) } }),
-          h('strong', null, p.name))),
+          editing ? h('strong', null, p.name) : h('button', { type: 'button', class: 'link-btn pp-name-link', title: fill(page.openTip, { name: p.name }), onClick: function () { openDrawer(p.id); } }, h('strong', null, p.name)))),
         h('td', null, h('span', { class: 'pp-teams' }, teamChips(c, p))),
         h('td', { class: 'pp-units' }, unitsCell(c, d, p)),
         h('td', { class: 'pp-account' }, accountCell(c, p)),
-        h('td', { class: 'pp-status' }, statusCell(c, p)));
-      tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input')) return; openDrawer(p.id); });
+        h('td', { class: 'pp-status' }, statusCell(c, p)),
+        editing ? h('td', { class: 'pp-edit-cell' }, h('button', { type: 'button', class: 'btn btn-ghost btn-sm pp-row-edit', title: fill(page.rowEditTip, { name: p.name }), onClick: function (e) { e.stopPropagation(); openDrawer(p.id); } }, page.rowEdit)) : null);
+      if (editing) tr.addEventListener('click', function (e) { if (e.target.closest('a, button, input')) return; openDrawer(p.id); });
       return tr;
     }
     function listCard(c, d) {
       var Cl = page.columns;
+      var cols = editing ? '6' : '5';
       var head = h('tr', null, h('th', { scope: 'col' }, Cl.name), h('th', { scope: 'col' }, Cl.teams), h('th', { scope: 'col' }, fill(Cl.units, { month: F.date(now) })),
-        h('th', { scope: 'col' }, Cl.account), h('th', { scope: 'col' }, Cl.status));
+        h('th', { scope: 'col' }, Cl.account), h('th', { scope: 'col' }, Cl.status), editing ? h('th', { scope: 'col', class: 'pp-edit-cell', 'aria-label': page.rowEdit }) : null);
       var body = h('tbody');
       var people = c.people.filter(function (p) { return passes(c, p); });
       if (groupBy()) {
@@ -291,7 +313,7 @@
           var open = !collapsed[key];
           // CR-32: หัวกลุ่ม = Badge + ชื่อ Channel เต็ม (ไม่มีตัวนับ) · พับได้
           var headRow = h('tr', { class: 'pp-group', style: ch ? { '--c': C.tokenVar(calc.channelColor(ch)) } : null, dataset: { group: key } },
-            h('th', { colspan: '5', scope: 'rowgroup' }, h('button', { type: 'button', class: 'pp-group-btn', 'aria-expanded': open ? 'true' : 'false', onClick: function () { collapsed[key] = open; draw(); } },
+            h('th', { colspan: cols, scope: 'rowgroup' }, h('button', { type: 'button', class: 'pp-group-btn', 'aria-expanded': open ? 'true' : 'false', onClick: function () { collapsed[key] = open; draw(); } },
               h('span', { class: 'pp-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'),
               ch ? h('span', { class: 'ch-tag' }, ch.name) : null,
               h('strong', { class: 'pp-group-name' }, ch ? ch.fullName : G.allChannels))));
@@ -301,8 +323,8 @@
       } else {
         people.slice().sort(byKey(c)).forEach(function (p) { body.appendChild(personRow(c, d, p)); });
       }
-      if (!body.children.length) body.appendChild(h('tr', null, h('td', { colspan: '5', class: 'master-empty' }, page.monthly.empty)));
-      return h('div', { class: 'card fit-card master-card pp-card' }, h('div', { class: 'fit-scroll table-scroll' }, h('table', { class: 'data-table master-table pp-table' }, h('thead', null, head), body)));
+      if (!body.children.length) body.appendChild(h('tr', null, h('td', { colspan: cols, class: 'master-empty' }, page.monthly.empty)));
+      return h('div', { class: 'card fit-card master-card pp-card' }, h('div', { class: 'fit-scroll table-scroll' }, h('table', { class: 'data-table master-table pp-table' + (editing ? ' is-editing' : '') }, h('thead', null, head), body)));
     }
 
     // =====================================================================
@@ -315,7 +337,8 @@
       }).filter(function (g) { return g.units.length; });
     }
     function monthlyCard(c, d) { return monthly.view === 'person' ? personCard(c, d) : unitCard(c, d); }
-    function hintText(X) { return (editing ? X.hint : X.note) + ' · ' + fill(X.horizon, { month: F.date(horizon) }); }
+    // CR-35: ขวาบน = สิ้นสุดแผน (โหมดแก้ไข · คำอธิบายย้ายไปแถบโหมดแก้ไข) · โหมดดู = กด แก้ไข เพื่อเปลี่ยนผู้รับผิดชอบ (เฉพาะผู้มีสิทธิ์แก้)
+    function hintText(X) { var hz = fill(X.horizon, { month: F.date(horizon) }); return !editing && canEditPage() ? X.viewHint + ' · ' + hz : hz; }
 
     // ---------- มุมมองตามหน่วยขาย (ตารางเดิม · ช่องเดือนละ 1 ช่อง ช่องไฟเท่ากัน · ไฮไลต์รายบุคคล) ----------
     function unitCard(c, d) {
@@ -334,6 +357,7 @@
           var months = calc.ownerMonths(d.assignments, d.salespeople, u.id, year);
           months.forEach(function (o, m) {
             var picked = editing && sel && sel.unitId === u.id && m >= Math.min(sel.from, sel.to) && m <= Math.max(sel.from, sel.to);
+            var anchor = editing && sel && sel.pending && sel.unitId === u.id && m === sel.from;
             var name = o.state === 'owner' ? C.personName(d.salespeople, o.personId) : o.state === 'resigned' ? fill(X.ended, { name: C.personName(d.salespeople, o.assignedId) }) : X.none;
             var prev = m > 0 ? months[m - 1] : null;
             var startSeg = !prev || prev.personId !== o.personId || prev.state !== o.state;
@@ -341,12 +365,18 @@
             var who = o.personId || o.assignedId || null;
             var mark = focus ? (who === focus ? ' is-focus' : ' is-dim') : '';
             var td = h('td', {
-              class: 'owner-seg tl-cell is-' + o.state + (past ? ' is-past' : '') + (picked ? ' is-picked' : '') + (startSeg ? ' is-start' : '') + mark,
+              class: 'owner-seg tl-cell is-' + o.state + (past ? ' is-past' : '') + (picked ? ' is-picked' : '') + (anchor ? ' is-anchor' : '') + (startSeg ? ' is-start' : '') + mark,
               style: o.state === 'owner' ? { '--seg': C.tokenVar(C.personColor(d.salespeople, o.personId)) } : null,
+              dataset: { m: String(m) },
               title: (past ? X.past + ' · ' : '') + name + ' · ' + F.monthYear(m, year), tabindex: editing && !past ? '0' : null, role: editing && !past ? 'button' : null
-            }, startSeg ? h('span', { class: 'owner-name' }, name) : null);
+            }, startSeg ? h('span', { class: 'owner-name' }, name) : null, anchor ? h('span', { class: 'tl-start-tag' }, X.startTag) : null);
             if (editing && !past) {
-              var pick = function () { if (!sel || sel.unitId !== u.id) sel = { unitId: u.id, from: m, to: m }; else sel.to = m; message = null; draw(); };
+              // CR-35: คลิกแรก = เดือนเริ่ม (ค้างขอบ + ป้าย เริ่ม · ชี้เดือนอื่นในแถวเดียวกัน = ไฮไลต์ช่วง) · คลิกที่สอง = เดือนสุดท้าย
+              var pick = function () {
+                if (sel && sel.pending && sel.unitId === u.id) { sel.to = m; sel.pending = false; }
+                else sel = { unitId: u.id, from: m, to: m, pending: true };
+                message = null; draw();
+              };
               td.addEventListener('click', pick);
               td.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
             }
@@ -356,10 +386,25 @@
         });
       });
       if (!groups.length) body.appendChild(h('tr', null, h('td', { colspan: '13', class: 'master-empty' }, X.empty)));
+      var pending = editing && sel && sel.pending;
+      var table = h('table', { class: 'tl-table' + (editing ? ' is-editing' : '') + (focus ? ' has-focus' : '') + (pending ? ' is-picking' : ''), dataset: pending ? { pick: sel.unitId } : null }, h('thead', null, head), body);
+      if (pending) {
+        // ชี้เดือนอื่นในแถวเดียวกัน = ไฮไลต์ตั้งแต่เดือนแรกถึงเดือนที่ชี้ (ไม่วาดตารางใหม่)
+        var row = body.querySelector('tr[data-unit="' + sel.unitId + '"]');
+        row.classList.add('is-pick-row');
+        var preview = function (to) {
+          Array.prototype.forEach.call(row.querySelectorAll('td.tl-cell'), function (td) {
+            var k = Number(td.dataset.m);
+            td.classList.toggle('is-range', to != null && k >= Math.min(sel.from, to) && k <= Math.max(sel.from, to));
+          });
+        };
+        row.addEventListener('mouseover', function (e) { var td = e.target.closest ? e.target.closest('td.tl-cell') : null; if (td && !td.classList.contains('is-past')) preview(Number(td.dataset.m)); });
+        row.addEventListener('mouseleave', function () { preview(null); });
+      }
       return h('section', { class: 'card fit-card pp-monthly' },
         h('div', { class: 'sp-card-head' }, h('h2', null, fill(X.title, { year: year })), h('span', { class: 'master-hint' }, hintText(X))),
         editing && sel ? assignBar(c, d) : null,
-        h('div', { class: 'fit-scroll table-scroll' }, h('table', { class: 'tl-table' + (editing ? ' is-editing' : '') + (focus ? ' has-focus' : '') }, h('thead', null, head), body)));
+        h('div', { class: 'fit-scroll table-scroll' }, table));
     }
 
     // ---------- มุมมองตามบุคคล (อ่านอย่างเดียว · calc.personMonthlyLoad) ----------
@@ -367,16 +412,24 @@
       var X = page.monthly, B = X.byPerson;
       var year = monthly.year;
       var mv = SP.core.report.unitMonthlyValues(year);
-      var load = calc.personMonthlyLoad(d, year, mv.values);
+      var load = calc.personMonthlyLoad(d, year, mv.values, { allOwners: true });   // CR-35: ผู้รับผิดชอบหน่วยขายที่ไม่มีเป้า (เช่น ทีม KAM กลาง) = แถว –
       var has = F.MONTHS.map(function (x, m) { return Object.keys(mv.values).some(function (k) { return mv.values[k] && mv.values[k][m] != null; }); });
       var title = mv.kind === 'actual' ? fill(B.actualTitle, { year: year }) : mv.allocated ? fill(B.targetTitle, { year: year }) : fill(B.notAllocated, { year: year });
+      // CR-35: พันบาท จำนวนเต็ม (calc คืนบาท · แปลงที่หน้าจอ) · Tooltip = บาทเต็ม · แถวที่ทั้งปีเป็น 0 = – สีเทา
+      function k(v) { return F.number(Math.round((v || 0) / 1000)); }
       function num(v, m, blankZero) {
         if (m != null && !has[m]) return '–';
         if (v == null || (blankZero && !v)) return '';
-        return F.millionPlain(v, 1);
+        return k(v);
       }
-      function cells(months, total, blankZero, cls) {
-        return F.MONTHS.map(function (x, m) { return h('td', { class: 'num ' + (cls || '') }, num(months[m], m, blankZero)); }).concat([h('td', { class: 'num pp-l-total ' + (cls || '') }, has.some(Boolean) ? F.millionPlain(total || 0, 1) : '–')]);
+      function cells(months, total, blankZero, cls, who) {
+        var zero = !(total > 0) && !(total < 0);
+        return F.MONTHS.map(function (x, m) {
+          var v = months[m];
+          return h('td', { class: 'num ' + (cls || '') + (zero ? ' is-zero' : ''), title: v ? fill(B.cellTip, { name: who || '', month: F.monthYear(m, year), amount: F.baht(v) }) : null },
+            zero ? '–' : num(v, m, blankZero));
+        }).concat([h('td', { class: 'num pp-l-total ' + (cls || '') + (zero ? ' is-zero' : ''), title: total ? fill(B.cellTip, { name: who || '', month: String(year), amount: F.baht(total) }) : zero ? B.noTarget : null },
+          has.some(Boolean) && !zero ? k(total || 0) : '–')]);
       }
       var head = h('tr', null, h('th', { scope: 'col', class: 'pp-l-name' }, B.person), F.MONTHS.map(function (m) { return h('th', { scope: 'col', class: 'num' }, m); }), h('th', { scope: 'col', class: 'num pp-l-total' }, B.yearTotal));
       var body = h('tbody');
@@ -384,23 +437,23 @@
         if (monthly.channel && g.channelId !== monthly.channel) return;
         var ch = channel(g.channelId);
         body.appendChild(h('tr', { class: 'pp-l-group', style: ch ? { '--c': C.tokenVar(calc.channelColor(ch)) } : null },
-          h('th', { scope: 'rowgroup', class: 'pp-l-name' }, h('span', { class: 'ch-tag' }, ch ? ch.name : g.channelId), ' ', ch ? ch.fullName : ''), cells(g.total, g.yearTotal, false, 'is-strong')));
+          h('th', { scope: 'rowgroup', class: 'pp-l-name' }, h('span', { class: 'ch-tag' }, ch ? ch.name : g.channelId), ' ', ch ? ch.fullName : ''), cells(g.total, g.yearTotal, false, 'is-strong', ch ? ch.name : g.channelId)));
         g.people.forEach(function (p) {
           if (monthly.person && p.personId !== monthly.person) return;
           var pp = person(c, p.personId);
           var team = pp && M.personType(pp) === 'team';
           body.appendChild(h('tr', { class: 'pp-l-person', dataset: { person: p.personId } },
-            h('th', { scope: 'row', class: 'pp-l-name' }, team ? h('span', { class: 'pp-team-icon', title: page.teamIcon }, page.teamBadge) : null, ' ', pp ? pp.name : p.personId), cells(p.months, p.total, true)));
+            h('th', { scope: 'row', class: 'pp-l-name' }, team ? h('span', { class: 'pp-team-icon', title: page.teamIcon }, page.teamBadge) : null, ' ', pp ? pp.name : p.personId), cells(p.months, p.total, true, '', pp ? pp.name : p.personId)));
           p.units.forEach(function (u) {
-            body.appendChild(h('tr', { class: 'pp-l-unit', dataset: { unit: u.unitId } }, h('th', { scope: 'row', class: 'pp-l-name is-sub' }, unitName(d, u.unitId)), cells(u.months, u.total, true, 'is-sub')));
+            body.appendChild(h('tr', { class: 'pp-l-unit', dataset: { unit: u.unitId } }, h('th', { scope: 'row', class: 'pp-l-name is-sub' }, unitName(d, u.unitId)), cells(u.months, u.total, true, 'is-sub', unitName(d, u.unitId))));
           });
         });
         if (!monthly.person || g.vacant.total) {
-          body.appendChild(h('tr', { class: 'pp-l-vacant' }, h('th', { scope: 'row', class: 'pp-l-name' }, B.vacant), cells(g.vacant.months, g.vacant.total, true, 'is-vacant')));
+          body.appendChild(h('tr', { class: 'pp-l-vacant' + (g.vacant.total > 0 ? ' has-value' : '') }, h('th', { scope: 'row', class: 'pp-l-name' }, B.vacant), cells(g.vacant.months, g.vacant.total, true, 'is-vacant', B.vacant)));
         }
       });
       return h('section', { class: 'card fit-card pp-monthly pp-load' },
-        h('div', { class: 'sp-card-head' }, h('h2', null, title), h('span', { class: 'master-hint' }, editing ? B.editNote : fill(X.horizon, { month: F.date(horizon) }))),
+        h('div', { class: 'sp-card-head' }, h('h2', null, title), h('span', { class: 'master-hint' }, fill(X.horizon, { month: F.date(horizon) }))),
         h('div', { class: 'fit-scroll table-scroll' }, h('table', { class: 'data-table pp-load-table' }, h('thead', null, head), body)));
     }
 

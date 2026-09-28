@@ -9,9 +9,12 @@
  *   vsLastYearBar(target, lastYear, scaleMax, { colorToken, year }) แท่งเป้าหมายเทียบปีก่อน สเกลจริงเดียวกันทั้งตาราง → .info
  *   barLine({ bars, line, dashed, months, labels, tick, endText, tip }) แท่งเป้าหมาย 12 เดือน + เส้นแผน + เส้นประยอดปีก่อน (รายงานสรุปแผน)
  *   stackedBars({ stacks, line, mode, labels, tick, tip, onLegend }) แท่งซ้อน 12 เดือน + เส้นประ (มุมมองรวมของหน้าจัดสรรเป้าหมายรายเดือน — CR-13)
- *   hbars({ items })                          แท่งแนวนอนรายการเดียว (รายงาน: สัดส่วนตามกลุ่มสินค้า)
+ *   hbars({ items })                          แท่งแนวนอนรายการเดียว
+ *   planTargetBars({ months, stacks, target, reference, diff, labels, tick, tip }) CR-34 แผนซ้อนตามประเภท 12 เดือน + ขีดเป้าหมาย + เส้นประยอดอ้างอิง (ซ่อนได้) + แถวส่วนต่าง
+ *   partBars({ rows, max, minPx })            CR-34 แท่งแนวนอนซ้อนหลายส่วน สเกลจริงเริ่ม 0 (รายงาน: สัดส่วนแผนตามประเภท / ตามกลุ่มสินค้า)
  *   splitBar(split, parts, opts)           แถบแบ่งเงิน Net Sales / GP / VAT (calc.moneySplit)
  *   waterfall({ start, steps, end, format, signed, tick, axisNote, onHover }) ที่มาของการเติบโต แนวนอน (รายงาน) → .info, .update(o), .highlight(id)
+ *   waterfallColumns({ …เหมือน waterfall }) CR-36 ที่มาของการเติบโต แนวตั้ง เต็มกรอบการ์ด (Annual Target) → .info, .update(o), .highlight(id)
  *   stackedShare({ rows, legend, minLabel, onHover })    แท่ง 100% แนวนอน (สัดส่วน Channel ปีก่อนเทียบปีนี้) → .update(rows, legend), .highlight(id)
  * สไตล์อยู่ที่ styles/components.css (ส่วน "กราฟ")
  */
@@ -252,6 +255,134 @@
   }
 
   // ---------------------------------------------------------------------
+  // CR-34: แผนซ้อนตามประเภท 12 เดือน (Plan Summary · เป้าหมายเทียบแผนรายเดือน)
+  //   แท่งซ้อนล่าง → บนตามลำดับ stacks (ส่วนที่เป็น 0 ไม่วาด) · ขีดเป้าหมายรายเดือนหนา 3px กว้างกว่าแท่งข้างละ TARGET_OVERHANG px ไม่เชื่อมระหว่างเดือน ·
+  //   เส้นประยอดขายอ้างอิง (กดที่ Legend เพื่อซ่อน/แสดง · ค่าเริ่มต้นแสดง) · แถวส่วนต่างใต้ชื่อเดือน (ข้อความ + สถานะสีตามแถวคงเหลือ)
+  // o = { months: [ป้าย 12], stacks: [{ id, label, colorToken, borderToken, hatch (ลายเส้น), dots (CR-36 ลายจุด), values: [12], legend (แสดงใน Legend แม้ไม่มีค่า) }],
+  //       target: [12], reference: [12] | null, diff: [{ text, status: ok | short | over | empty }] × 12,
+  //       labels: { target, reference, diff, refToggle }, tick(v, step), tip(m) → [[ป้าย, ค่า]] }
+  //   แกน Y เริ่ม 0 ค่าสูงสุด = niceScaleMax(แท่งรวม · เป้าหมาย · ยอดอ้างอิง, headroom CHART_HEADROOM) → .info = { top, step, ticks, totals }
+  // ---------------------------------------------------------------------
+  var TARGET_OVERHANG = 6;
+  function segStyle(s, grow) {
+    var st = { '--c': C.tokenVar(s.colorToken || '--c-bar') };
+    if (s.borderToken) st['--c-bd'] = C.tokenVar(s.borderToken);
+    if (grow != null) st.flexGrow = String(grow);
+    return st;
+  }
+  function planTargetBars(o) {
+    var S = SP.data.settings;
+    var calc = SP.core.calc;
+    var stacks = o.stacks || [];
+    var totals = [];
+    for (var i = 0; i < 12; i++) totals.push(calc.sum(stacks.map(function (s) { return Math.max(0, s.values[i] || 0); })));
+    var all = totals.concat(o.target || [], o.reference || []).filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var axis = calc.niceAxis(0, calc.niceScaleMax(all, { headroom: S.CHART_HEADROOM }) || 1);
+    var top = axis.end;
+    function y(v) { return (1 - Math.max(0, v || 0) / top) * 100; }
+    function pct(v) { return Math.round(v * 1000) / 1000 + '%'; }
+    var tick = o.tick || function (v) { return F.number(v); };
+    var L = o.labels || {};
+    var plot = h('div', { class: 'barline-plot ptb-plot' });
+    var yAxis = h('div', { class: 'barline-yaxis', 'aria-hidden': 'true' });
+    axis.ticks.forEach(function (v) {
+      plot.appendChild(h('span', { class: 'barline-grid' + (v === 0 ? ' is-base' : ''), style: { top: pct(y(v)) } }));
+      yAxis.appendChild(h('span', { class: 'barline-tick', style: { top: pct(y(v)) } }, tick(v, axis.step)));
+    });
+    var bands = [];
+    for (var m = 0; m < 12; m++) {
+      var band = h('span', { class: 'barline-band', style: { left: pct(m / 12 * 100), width: pct(100 / 12) } });
+      bands.push(band);
+      plot.appendChild(band);
+      var left = pct((m + 0.2) / 12 * 100), width = pct(0.6 / 12 * 100);
+      var stack = h('span', { class: 'ptb-stack', dataset: { m: String(m) }, style: { left: left, width: width, height: pct(totals[m] / top * 100) } });
+      stacks.forEach(function (s) {
+        var v = Math.max(0, s.values[m] || 0);
+        if (v > 0) stack.appendChild(h('span', { class: 'ptb-seg' + (s.hatch ? ' is-hatch' : '') + (s.dots ? ' is-dots' : ''), dataset: { id: s.id }, style: segStyle(s, v) }));
+      });
+      plot.appendChild(stack);
+      if (o.target && o.target[m] > 0) {
+        plot.appendChild(h('span', { class: 'ptb-target', dataset: { m: String(m) },
+          style: { left: 'calc(' + left + ' - ' + TARGET_OVERHANG + 'px)', width: 'calc(' + width + ' + ' + (2 * TARGET_OVERHANG) + 'px)', top: pct(y(o.target[m])) } }));
+      }
+    }
+    if (o.reference) {
+      var lines = svg('svg', { class: 'barline-lines ptb-ref', viewBox: '0 0 1200 1000', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+      lines.appendChild(svg('path', { d: o.reference.map(function (v, k) { return (k ? 'L' : 'M') + ((k + 0.5) / 12 * 1200).toFixed(1) + ' ' + (y(v) * 10).toFixed(1); }).join(' '),
+        class: 'barline-dashed ptb-ref-line', fill: 'none', 'vector-effect': 'non-scaling-stroke' }));
+      plot.appendChild(lines);
+    }
+    var hits = h('div', { class: 'barline-hits' }, (o.months || []).map(function (mn, k) {
+      return h('span', { class: 'barline-hit', dataset: { m: String(k) }, tabindex: '0', 'aria-label': mn, style: { left: pct(k / 12 * 100), width: pct(100 / 12) } });
+    }));
+    plot.appendChild(hits);
+    var months = h('div', { class: 'barline-months', 'aria-hidden': 'true' }, (o.months || []).map(function (mn) { return h('span', null, mn); }));
+    var diffRow = o.diff ? h('div', { class: 'ptb-diff' }, o.diff.map(function (d, k) {
+      return h('span', { class: 'ptb-diff-cell is-' + d.status, title: (o.months || [])[k] + ' · ' + d.text }, d.text);
+    })) : null;
+    function sym(kind, s) {
+      if (kind === 'seg') return h('span', { class: 'ptb-swatch' + (s.hatch ? ' is-hatch' : '') + (s.dots ? ' is-dots' : ''), style: segStyle(s) });
+      var el = svg('svg', { class: 'barline-sym', viewBox: '0 0 28 14', 'aria-hidden': 'true' });
+      if (kind === 'target') el.appendChild(svg('path', { d: 'M3 7 L25 7', class: 'ptb-target-sym' }));
+      if (kind === 'ref') el.appendChild(svg('path', { d: 'M1 7 L27 7', class: 'barline-dashed' }));
+      return el;
+    }
+    var wrap;
+    var refBtn = o.reference ? h('button', { type: 'button', class: 'legend-item ptb-ref-btn', 'aria-pressed': 'true', title: L.refToggle || null, onClick: function () {
+      var off = !wrap.classList.contains('is-ref-off');
+      wrap.classList.toggle('is-ref-off', off);
+      refBtn.setAttribute('aria-pressed', off ? 'false' : 'true');
+    } }, sym('ref'), L.reference) : null;
+    var legend = h('div', { class: 'legend barline-legend ptb-legend' },
+      stacks.filter(function (s, k) { return s.legend || calc.sum(s.values.map(function (v) { return Math.max(0, v || 0); })) > 0; })
+        .map(function (s) { return h('span', { class: 'legend-item' }, sym('seg', s), s.label); }),
+      o.target ? h('span', { class: 'legend-item' }, sym('target'), L.target) : null,
+      refBtn);
+    wrap = h('div', { class: 'barline ptb', role: 'img', 'aria-label': stacks.map(function (s) { return s.label; }).concat([L.target, L.reference]).filter(Boolean).join(' · ') },
+      h('div', { class: 'ptb-body' }, yAxis, h('div', { class: 'barline-main' }, plot, months),
+        diffRow ? h('span', { class: 'ptb-diff-label' }, L.diff) : null, diffRow),
+      legend);
+    if (o.tip) {
+      C.hoverTip(hits, '.barline-hit', function (el) {
+        var k = Number(el.dataset.m);
+        return h('div', { class: 'barline-tip' }, h('strong', null, o.months[k]),
+          h('table', { class: 'tip-table' }, h('tbody', null, o.tip(k).map(function (r) { return h('tr', { class: r[2] || null }, h('td', null, r[0]), h('td', { class: 'num' }, r[1])); }))));
+      });
+      hits.addEventListener('mouseover', function (e) {
+        var t = e.target.closest ? e.target.closest('.barline-hit') : null;
+        bands.forEach(function (b, k) { b.classList.toggle('is-hl', !!t && Number(t.dataset.m) === k); });
+      });
+      hits.addEventListener('mouseleave', function () { bands.forEach(function (b) { b.classList.remove('is-hl'); }); });
+    }
+    wrap.info = { top: top, step: axis.step, ticks: axis.ticks, totals: totals };
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-34: แท่งแนวนอนซ้อนหลายส่วน (สเกลจริงเริ่ม 0 · ค่าสูงสุดเดียวกันทุกแถว = o.max หรือผลรวมแถวที่มากที่สุด)
+  //   แท่งที่มีค่า > 0 แต่แคบกว่า minPx ให้กว้าง minPx (ค่าเล็กยังเห็น) · ตัวเลขท้ายแท่งแสดงเสมอ
+  // o = { rows: [{ label, sub (บรรทัดเล็กใต้ชื่อ), note (ข้อความเตือนสีแดง), parts: [{ id, colorToken, borderToken, hatch, value }], text, title }], max, minPx }
+  // ---------------------------------------------------------------------
+  function partBars(o) {
+    var calc = SP.core.calc;
+    var rows = o.rows || [];
+    var totals = rows.map(function (r) { return calc.sum((r.parts || []).map(function (p) { return Math.max(0, p.value || 0); })); });
+    var max = o.max || Math.max.apply(null, totals.concat([1]));
+    var minPx = o.minPx == null ? 4 : o.minPx;
+    return h('div', { class: 'hbars ptbars' }, rows.map(function (r, i) {
+      var fill = h('span', { class: 'ptbar-fill', style: { width: Math.max(0, totals[i] / max * 100) + '%', minWidth: totals[i] > 0 ? minPx + 'px' : '0' } },
+        (r.parts || []).filter(function (p) { return p.value > 0; }).map(function (p) {
+          return h('span', { class: 'ptb-seg' + (p.hatch ? ' is-hatch' : '') + (p.dots ? ' is-dots' : ''), dataset: { id: p.id }, style: segStyle(p, p.value) });
+        }));
+      return h('div', { class: 'hbar-row ptbar-row', title: r.title || r.label },
+        h('span', { class: 'hbar-label ptbar-label' }, h('span', { class: 'ptbar-name' }, r.label),
+          r.sub ? h('span', { class: 'ptbar-sub' }, r.sub) : null, r.note ? h('span', { class: 'ptbar-note' }, r.note) : null),
+        h('span', { class: 'hbar-track ptbar-track' }, fill),
+        h('span', { class: 'hbar-text' }, r.text));
+    }));
+  }
+
+  // ---------------------------------------------------------------------
   // แถบแบ่งเงิน: split = calc.moneySplit(sellOutExVat, gp, hasGP) / parts = ป้าย { net, gp, vat }
   // opts: { vatLabel (ป้าย VAT พร้อม %), format }
   // ---------------------------------------------------------------------
@@ -334,6 +465,86 @@
         })), h('span')));
       if (o.axisNote && lo > 0) wrap.appendChild(h('p', { class: 'wfc-axis' }, o.axisNote(lo)));
       wrap.info = { start: lo, end: hi, step: axis.step, ticks: axis.ticks };
+      if (current) highlight(current);
+    }
+    function highlight(id) {
+      current = id;
+      Object.keys(nodes).forEach(function (k) { nodes[k].classList.toggle('is-hl', k === id); });
+      wrap.classList.toggle('has-hl', !!id && !!nodes[id]);
+    }
+    render(o);
+    wrap.update = render;
+    wrap.highlight = highlight;
+    return wrap;
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-36 Waterfall แนวตั้ง: แท่งแรก / แท่งสุดท้าย (เทาเข้ม) เริ่มจากฐานแกน · แท่งส่วนต่าง (เพิ่ม = เขียว · ลด = แดง) ลอยจากยอดสะสม ·
+  //   เส้นประเชื่อมยอดสะสมระหว่างแท่ง · ค่าบนแท่ง (แท่งเทา = format · แท่งส่วนต่าง = signed สีตามแท่ง) · แกน Y ซ้าย เริ่มที่เลขกลม (calc.axisStart)
+  //   ปลายแกนปัดขึ้น (calc.niceAxis) · แกนไม่เริ่มที่ 0 = สัญลักษณ์ตัดแกนที่ฐาน + axisNote(lo) ใต้กราฟ · ความสูงเต็มพื้นที่ของผู้วาง (flex)
+  // o = { start: { label, sub, value, title }, steps: [{ id, label, value, tag, title }], end: { label, sub, value, title }, format, signed, tick, axisNote, onHover }
+  // → element ที่มี .info = { start, end, step, ticks, points }, .update(o), .highlight(id)
+  // ---------------------------------------------------------------------
+  function waterfallColumns(o) {
+    var wrap = h('div', { class: 'wfv' });
+    var nodes = {};
+    var current = null;
+    function hover(id) { highlight(id); if (o.onHover) o.onHover(id); }
+    function render(opts) {
+      o = opts;
+      clearNode(wrap);
+      nodes = {};
+      var calc = SP.core.calc;
+      var run = o.start.value || 0;
+      var points = [run];
+      var bars = [{ cls: 'is-total', label: o.start.label, sub: o.start.sub, from: null, to: run, text: o.format(run), title: o.start.title }];
+      o.steps.forEach(function (s) {
+        var from = run, to = run + (s.value || 0);
+        run = to;
+        points.push(to);
+        bars.push({ cls: to >= from ? 'is-up' : 'is-down', id: s.id, label: s.label, tag: s.tag, from: from, to: to, text: o.signed(s.value || 0), title: s.title });
+      });
+      var endV = o.end.value || 0;
+      points.push(endV);
+      bars.push({ cls: 'is-total is-end', label: o.end.label, sub: o.end.sub, from: null, to: endV, text: o.format(endV), title: o.end.title });
+      var lo = calc.axisStart(points);
+      var axis = calc.niceAxis(lo, Math.max.apply(null, points));
+      var hi = axis.end;
+      function pos(v) { return Math.max(0, Math.min(1, (v - lo) / ((hi - lo) || 1))); }
+      var tick = o.tick || function (v) { return F.number(v); };
+      var plot = h('div', { class: 'wfv-plot' });
+      var yAxis = h('div', { class: 'wfv-yaxis', 'aria-hidden': 'true' });
+      axis.ticks.forEach(function (v) {
+        plot.appendChild(h('span', { class: 'wfv-grid' + (v === lo ? ' is-base' : ''), style: { bottom: pctStyle(pos(v)) } }));
+        yAxis.appendChild(h('span', { class: 'wfv-tick', style: { bottom: pctStyle(pos(v)) } }, tick(v, axis.step)));
+      });
+      if (lo > 0) {
+        var brk = svg('svg', { class: 'wfv-break', viewBox: '0 0 12 12', 'aria-hidden': 'true' });
+        brk.appendChild(svg('path', { d: 'M6 12 L2 10 L10 7 L2 4 L6 2 L6 0', fill: 'none' }));
+        plot.appendChild(brk);
+      }
+      var cols = h('div', { class: 'wfv-cols' });
+      var xlabels = h('div', { class: 'wfv-xlabels', 'aria-hidden': 'true' });
+      bars.forEach(function (b, i) {
+        var a = b.from == null ? lo : b.from;
+        var bottom = pos(Math.min(a, b.to)), top = pos(Math.max(a, b.to));
+        var col = h('div', { class: 'wfv-col ' + b.cls, dataset: b.id ? { id: b.id } : null, title: b.title || null },
+          h('span', { class: 'wfv-bar', style: { bottom: pctStyle(bottom), height: 'max(2px, ' + pctStyle(top - bottom) + ')' } }),
+          h('span', { class: 'wfv-value', style: { bottom: pctStyle(top) } }, b.text),
+          i < bars.length - 1 ? h('span', { class: 'wfv-link', style: { bottom: pctStyle(pos(b.to)) } }) : null);
+        if (b.id) {
+          col.addEventListener('mouseenter', function () { hover(b.id); });
+          col.addEventListener('mouseleave', function () { hover(null); });
+          nodes[b.id] = col;
+        }
+        cols.appendChild(col);
+        xlabels.appendChild(h('span', { class: 'wfv-xlabel ' + b.cls }, b.label, b.tag ? h('span', { class: 'badge tag-muted wfv-tag' }, b.tag) : null, b.sub ? h('small', null, b.sub) : null));
+      });
+      plot.appendChild(cols);
+      wrap.appendChild(h('div', { class: 'wfv-body' }, yAxis, plot));
+      wrap.appendChild(h('div', { class: 'wfv-xrow' }, h('span'), xlabels));
+      if (o.axisNote && lo > 0) wrap.appendChild(h('p', { class: 'wfv-axis' }, o.axisNote(lo)));
+      wrap.info = { start: lo, end: hi, step: axis.step, ticks: axis.ticks, points: points };
       if (current) highlight(current);
     }
     function highlight(id) {
@@ -489,5 +700,5 @@
 
   function clearNode(el) { while (el.firstChild) el.removeChild(el.firstChild); return el; }
 
-  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, splitBar: splitBar, waterfall: waterfall, stackedShare: stackedShare, stackedColumns: stackedColumns };
+  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, planTargetBars: planTargetBars, partBars: partBars, splitBar: splitBar, waterfall: waterfall, waterfallColumns: waterfallColumns, stackedShare: stackedShare, stackedColumns: stackedColumns };
 })(window.SP);

@@ -1,7 +1,7 @@
 /*
- * modules/territories/territories.js — หน้าเขตและร้านค้า (TT) เดิม (CR-32 รวมเป็น Sales Unit & Customer · registry visible: false · ใช้สิทธิ์ของ salesUnits)
+ * modules/territories/territories.js — หน้าเขตและร้านค้า (TT) เดิม (CR-32 รวมเป็น Account Master · registry visible: false · ใช้สิทธิ์ของ salesUnits)
  *
- * หน้าที่:        ลิงก์เดิมพาไปหน้า Sales Unit & Customer แท็บของ Channel ที่แบ่งเป้าตามเขต (#<channelId>) ทันที
+ * หน้าที่:        ลิงก์เดิมพาไปหน้า Account Master แท็บของ Channel ที่แบ่งเป้าตามเขต (#<channelId>) ทันที
  * อ่านจาก data/:  channels, content (pages.territories) · store: –
  */
 (function (SP) {

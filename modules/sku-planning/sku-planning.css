@@ -202,13 +202,16 @@
 .sku-line1 { display: flex; align-items: center; gap: var(--sp-1); min-width: 0; }
 /* CR-27: ชื่อตัดขึ้นบรรทัดที่สองได้ (สูงสุด 2 บรรทัด แล้วจึง …) · Tooltip ชื่อเต็มที่ชื่อ (hoverTip) */
 .sku-name { font-weight: var(--fw-bold); overflow: hidden; min-width: 0; white-space: normal; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
-.sku-line1 .badge { font-size: 10.5px; padding: 0 6px; line-height: 1.5; flex: none; }
+.sku-line1 .badge, .sku-line1 .type-badge { font-size: 10.5px; padding: 0 6px; line-height: 1.5; flex: none; }
 .sku-line2 { display: flex; align-items: center; gap: 0 var(--sp-1); font-size: 11px; font-weight: normal; color: var(--c-text-muted); white-space: nowrap; overflow: hidden; min-width: 0; }
 .sku-line2 > * + *::before { content: '· '; }
 .sku-code { font-variant-numeric: tabular-nums; }
 .sp-row-menu { float: right; min-width: 22px; height: 22px; font-size: 16px; padding: 0 4px; margin-top: 8px; }
-.sp-start { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: normal; color: var(--c-text-muted); }
-.sp-start .select { font-size: 11px; padding: 0 var(--sp-4) 0 var(--sp-1); min-width: 0; height: 18px; }
+/* CR-34: เดือนเริ่มขายในคอลัมน์ช่วงเวลาขาย (โหมดแก้ไข · สินค้าใหม่ 3 ประเภท) */
+.sp-start { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: var(--fw-bold); color: var(--c-text); }
+.sp-start .select { font-size: 11.5px; padding: 0 var(--sp-4) 0 var(--sp-1); min-width: 0; height: 22px; }
+.sku-grid .sp-range.is-start-edit { cursor: default; }
+.sp-start-select option:disabled { color: var(--c-text-muted); }
 .row-stopped .row-head, .row-stopped td { opacity: 0.7; }
 .sp-empty { text-align: center !important; color: var(--c-text-muted); padding: var(--sp-4) !important; }
 .sku-grid td[data-cell] { cursor: default; }
@@ -270,7 +273,12 @@
   .page-skuPlanning .wf-hint { white-space: normal; }
 }
 
-/* CR-20: Drawer เพิ่ม SKU จาก Product Master · ฟอร์มสร้าง NPD · ข้อความแนะนำในแถวคงเหลือ · จุดเตือนสินค้าจาก Sales ที่ทีม Product แก้ */
+/* CR-20 / CR-34: Drawer เพิ่มสินค้าในแผน (3 แท็บ) · ฟอร์มขอ NPD · ข้อความแนะนำในแถวคงเหลือ · จุดเตือนสินค้าจาก Sales ที่ทีม Product แก้ */
+.sp-add-tabs { margin-top: var(--sp-2); }
+.sp-add-tabs .segmented { flex-wrap: wrap; }
+.sp-add-lead { margin: 0 0 var(--sp-2); }
+.sp-add-error { margin: 0 auto 0 0; }
+.sp-add-link { margin-left: var(--sp-1); }
 .sp-drawer .sp-add-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
 .sp-drawer .sp-add-search { flex: 1 1 12em; min-width: 10em; }
 .sp-add-list { display: grid; gap: var(--sp-3); margin-top: var(--sp-3); }
@@ -286,9 +294,9 @@
   margin-bottom: calc(-1 * var(--sp-5)); padding: var(--sp-2) 0 calc(var(--sp-2) + var(--sp-5)); background: var(--c-surface); border-top: 1px solid var(--c-border); }
 .sp-add-count { font-size: var(--fs-sm); color: var(--c-text-muted); }
 .sp-npd-units { display: flex; flex-wrap: wrap; gap: 4px var(--sp-3); }
-.sp-npd-note { width: 100%; }
+.sp-npd-note, .sp-npd-reason { width: 100%; }
 .sp-rem-hint { display: block; margin: 2px 0; font-size: var(--fs-xs); font-weight: normal; color: var(--status-short-fg); white-space: normal; }
-.row-remaining .sp-fill-target, .row-remaining .sp-new-npd { margin: 2px 4px 2px 0; }
+.row-remaining .sp-fill-target, .row-remaining .sp-add-plan { margin: 2px 4px 2px 0; }
 .sp-req-warn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: var(--fw-bold);
   background: var(--status-over-bg); color: var(--status-over-fg); border: 1px solid var(--status-over-fg); cursor: help; }
 

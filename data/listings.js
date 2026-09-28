@@ -31,6 +31,12 @@
       { unit: 'shopee',       from: 'eveandboy' },
       { unit: 'lazada',       from: 'eveandboy', excludeTypes: ['type-brow'] },
       { unit: 'tiktok',       from: 'eveandboy', excludeTypes: ['type-primer', 'type-toner-pad'] }
+    ],
+    // CR-34: Listing ที่ Sales สร้างจาก SKU Planning (source skuPlanning) — สินค้าเดิมที่ยังไม่เคยขายในหน่วยนั้น (ประเภท Listing ใหม่)
+    //   core/seed.js เพิ่มหลังสร้างยอดขายย้อนหลัง (จึงไม่มียอดปีก่อนในหน่วยนั้น) · สินค้าที่ Sales ขอ NPD ได้ Listing จาก SKU Planning ตาม units ของสินค้า
+    salesListings: [
+      { productKey: '53021', unit: 'watsons', fromMonth: '2027-01', by: 'พิมพ์ลดา ใจดี', at: '2026-09-20T10:00:00' },
+      { productKey: '22010', unit: 'TT-01',   fromMonth: '2027-03', by: 'สิริกาญจน์ ขุนเสนา', at: '2026-09-21T09:30:00' }
     ]
   };
 

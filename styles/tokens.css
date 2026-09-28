@@ -71,6 +71,20 @@
   --c-st-clearance-fg: var(--c-src-clearance-fg);
   --c-st-discontinued-bg: #f3d9d9;
   --c-st-discontinued-fg: #7c1d1d;
+  --c-st-request-bg: #ffffff;           /* CR-35 Request = คำขอ NPD (ขอบประม่วง) */
+  --c-st-request-fg: #5b3f9a;
+  --c-st-delete-bg: #d3d6db;            /* CR-35 Delete = เทาเข้ม ตัวอักษรขีดฆ่า */
+  --c-st-delete-fg: #33373d;
+  /* CR-34 ประเภทสินค้าในแผน: สินค้าเดิม / Listing ใหม่ = สีหลัก · NPD ยืนยันแล้ว = ม่วง (เดียวกับ NPD) · ขอ NPD = ม่วงอ่อนลายเส้นทแยง · Clearance = เทา */
+  --c-type-existing: var(--c-primary);
+  --c-type-npd: #6a4fa0;
+  --c-type-npd-bg: var(--c-st-new-bg);
+  --c-type-request: #bba9e2;
+  --c-type-request-bd: #7d63b8;
+  --c-type-clearance: #9aa1ab;
+  --c-type-clearance-bg: #eceef1;
+  --c-type-clearance-plan: #6f7682;      /* CR-36 แผน Clearance (ไม่นับในเป้าหมาย) ลายจุด */
+  --c-type-clearance-plan-bg: #f1f2f4;
   /* ป้ายทั่วไปสีม่วงอ่อน (แถวรวม Series ที่เลือก) */
   --c-accent-soft-bg: #ece3fb;
   --c-accent-soft-fg: #4a2a8c;
@@ -112,6 +126,7 @@
   --chart-lastyear: #9aa0a8;
   --chart-grid: #e7e3dd;
   --chart-hover: rgba(31, 63, 102, 0.07);
+  --chart-target-tick: var(--chart-plan);   /* CR-34 ขีดเป้าหมาย Top-down รายเดือน (Plan Summary) */
   /* ลายน้ำรายงานฉบับร่าง (บนจอและตอนพิมพ์) */
   --watermark-fg: rgba(140, 28, 22, 0.10);
 

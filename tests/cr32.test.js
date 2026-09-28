@@ -1,10 +1,10 @@
 /*
- * tests/cr32.test.js — Test ของ CR-32 (Sales Unit & Customer · Sales Person Management)
+ * tests/cr32.test.js — Test ของ CR-32 (Account Master · Sales Person Management)
  *
  * รันด้วย Node: node tests/run.js cr32 / ในเบราว์เซอร์: tests/calc.test.html รวม Test ชุดนี้ด้วย
  *   รอบ 1: cr32-1..8 = ค่าคงที่สุดแผน · Seed คู่ค้า (ยอด L12M · ID หน่วยขายเดิม · 1 หน่วยขายต่อเดือน) · suggestSalesUnit
  *   (การล้างข้อมูลรุ่นเก่า + ข้อความแจ้ง 1 ครั้ง ตรวจในเบราว์เซอร์ เพราะ core/store.js ไม่โหลดใน Node)
- *   รอบ 2: cr32-9..14 = Permissions (key ใหม่ · Migration สูงสุดของ key เดิม) · ย้ายคู่ค้าทุก Channel · ข้อมูลที่ต้องตรวจของ Sales Unit & Customer · dataCheck (DOM)
+ *   รอบ 2: cr32-9..14 = Permissions (key ใหม่ · Migration สูงสุดของ key เดิม) · ย้ายคู่ค้าทุก Channel · ข้อมูลที่ต้องตรวจของ Account Master · dataCheck (DOM)
  *   รอบ 3: cr32-15..19 = ผู้ใช้–บุคลากร 1:1 (person.userId) · สิทธิ์ของผู้ใช้ตัวอย่างเท่าเดิม · ข้อมูลที่ต้องตรวจของ Sales Person Management · บทบาทตั้งต้นของบัญชีใหม่
  *   รอบ 4: cr32-20..25 = การแทนที่ผู้รับผิดชอบ (4.4) · personMonthlyLoad · UAT S10
  */
@@ -87,8 +87,8 @@
       }
     },
     {
-      name: 'cr32-6. suggestSalesUnit ของร้านค้า TT ได้ผลเท่ากับเขตแนะนำเดิม (stores.suggestTerritory) ทั้ง 220 ร้าน · มีคำแนะนำ 157 ร้าน',
-      expected: [220, 0, 157],
+      name: 'cr32-6. suggestSalesUnit ของร้านค้า TT ได้ผลเท่ากับเขตแนะนำเดิม (stores.suggestTerritory) ทั้ง 211 ร้าน (CR-35 รวมรหัสซ้ำ) · มีคำแนะนำ 152 ร้าน',
+      expected: [211, 0, 152],
       actual: function () {
         var u = units();
         var tt = U().customers(D()).filter(function (c) { return c.kind === 'store'; });
@@ -116,8 +116,8 @@
       }
     },
     {
-      name: 'cr32-8. คู่ค้าโครงเดียวทุก Channel: ร้าน TT ใช้ System ID เป็นรหัส TRCLOUD · ประเภทคู่ค้า TRCLOUD = ประเภทร้าน · ร้านบุคคลธรรมดายังซ่อนชื่อ (29 ร้าน) · ข้อความแจ้งโหลดข้อมูลใหม่อยู่ใน content',
-      expected: [['1889', 'Wholesale', 'store', 179145], 29, true],
+      name: 'cr32-8. คู่ค้าโครงเดียวทุก Channel: ร้าน TT ใช้ System ID เป็นรหัส TRCLOUD · ประเภทคู่ค้า TRCLOUD = ประเภทร้าน · ร้านบุคคลธรรมดายังซ่อนชื่อ (26 ร้าน · CR-35 รวมรหัสซ้ำ) · ข้อความแจ้งโหลดข้อมูลใหม่อยู่ใน content',
+      expected: [['1889', 'Wholesale', 'store', 179145], 26, true],
       actual: function () {
         var all = U().customers(D());
         var s = all.filter(function (c) { return c.id === '1889'; })[0];
@@ -125,7 +125,7 @@
       }
     },
     {
-      name: 'cr32-9. Permissions: หน้า Account & Platform / เขตและร้านค้า (TT) เดิมไม่มีแถวในเมทริกซ์ · มี Sales Unit & Customer + GP + ตั้งค่า Channel · หน้าเดิมซ่อนและใช้สิทธิ์ salesUnits',
+      name: 'cr32-9. Permissions: หน้า Account & Platform / เขตและร้านค้า (TT) เดิมไม่มีแถวในเมทริกซ์ · มี Account Master + GP + ตั้งค่า Channel · หน้าเดิมซ่อนและใช้สิทธิ์ salesUnits',
       expected: [false, false, true, true, true, [false, 'salesUnits'], [false, 'salesUnits'], true],
       actual: function () {
         var P = SP.core.permissions, R = SP.core.registry;
@@ -174,8 +174,8 @@
       }
     },
     {
-      name: 'cr32-13. ข้อมูลที่ต้องตรวจของ Sales Unit & Customer ณ ก.ย. 2026: ยังไม่จัดสรร (TT + สาขาทดสอบ 3) · ไม่มีผู้รับผิดชอบ = MR.DIY · คำนำหน้าชี้หน่วยอื่น (หลังย้ายสาขา) · เกณฑ์เดิมของเขต · หน่วยขายไม่มีคู่ค้า',
-      expected: [[3, ['mrdiy'], 0, 15, 8, 0], true, [['3108', 'beautrium']], ['konvy']],
+      name: 'cr32-13. ข้อมูลที่ต้องตรวจของ Account Master ณ ก.ย. 2026: ยังไม่จัดสรร (TT + สาขาทดสอบ 3) · ไม่มีผู้รับผิดชอบ = MR.DIY · คำนำหน้าชี้หน่วยอื่น (หลังย้ายสาขา) · เกณฑ์เดิมของเขต (CR-35 ไม่มีเกณฑ์ System ID ซ้ำ) · หน่วยขายไม่มีคู่ค้า',
+      expected: [[3, ['mrdiy'], 0, 13, false, 0], true, [['3108', 'beautrium']], ['konvy']],
       actual: function () {
         var U = SP.core.units, M = SP.core.master, d = SP.data;
         function g(k, key) { return k.groups.filter(function (x) { return x.key === key; })[0].items; }
@@ -187,7 +187,7 @@
         var none = U.moveCustomers(d, ['90013', '90014', '90015', '90016'], null, '2026-09', {});
         var d3 = {}; Object.keys(d).forEach(function (x) { d3[x] = d[x]; }); d3.customerAssignments = none.customerAssignments;
         return [[g(k, 'unassigned').filter(function (x) { return x.channelId === 'mt'; }).length, g(k, 'noOwner').map(function (x) { return x.id; }), g(k, 'prefix').length,
-          g(k, 'noProvince').length, g(k, 'duplicate').length, g(k, 'noCustomers').length], ttUn === tt.unassigned.length,
+          g(k, 'noProvince').length, k.groups.some(function (x) { return x.key === 'duplicate'; }), g(k, 'noCustomers').length], ttUn === tt.unassigned.length,
           g(U.checks(d2, '2026-09'), 'prefix').map(function (x) { return [x.id, x.suggested]; }), g(U.checks(d3, '2026-09'), 'noCustomers').map(function (x) { return x.id; })];
       }
     },
@@ -235,7 +235,7 @@
       }
     },
     {
-      name: 'cr32-17. ข้อมูลที่ต้องตรวจของ Sales Person Management (ก.ย. 2026 – สุดแผน ธ.ค. 2027): MR.DIY ไม่มีผู้รับผิดชอบ (เกณฑ์เดียวกับ Sales Unit & Customer) · ผู้รับผิดชอบจะสิ้นสุดแต่ไม่มีคนรับช่วง (ไม่นับซ้ำข้อ 1) · Sales Officer ไม่ได้ดูแลหน่วยใด · สิ้นสุดแล้วแต่บัญชียังใช้งาน',
+      name: 'cr32-17. ข้อมูลที่ต้องตรวจของ Sales Person Management (ก.ย. 2026 – สุดแผน ธ.ค. 2027): MR.DIY ไม่มีผู้รับผิดชอบ (เกณฑ์เดียวกับ Account Master) · ผู้รับผิดชอบจะสิ้นสุดแต่ไม่มีคนรับช่วง (ไม่นับซ้ำข้อ 1) · Sales Officer ไม่ได้ดูแลหน่วยใด · สิ้นสุดแล้วแต่บัญชียังใช้งาน',
       expected: [[['mrdiy'], [], [], []], true, [[], ['eveandboy'], [], []], [['mrdiy'], [], ['sp-new'], ['SP-TT-05']]],
       actual: function () {
         var U = SP.core.units, D = SP.data;
@@ -334,7 +334,7 @@
     },
     {
       name: 'cr32-24. UAT S10: เปลี่ยนผู้รับผิดชอบ EVEANDBOY เป็นอนันต์ตั้งแต่ มิ.ย. 2027 แบบแทนที่ช่วงที่เหลือ → อนันต์ มิ.ย.–ธ.ค. 2027 · ข้อมูลที่ต้องตรวจไม่เพิ่ม · มุมมองตามบุคคลของอนันต์มีเป้า EVEANDBOY ตั้งแต่ มิ.ย.',
-      expected: [['sp-pim', 'sp-anan', 'sp-anan'], 1, [null, null, null, null, null, 1, 1, 1, 1, 1, 1, 1], ['S10', 'people']],
+      expected: [['sp-pim', 'sp-anan', 'sp-anan'], 1, [null, null, null, null, null, 1, 1, 1, 1, 1, 1, 1]],   // CR-36 ตัดสถานการณ์ S10 (UAT) ออกจากคู่มือ
       actual: function () {
         var c = SP.core.calc, U = SP.core.units, D = SP.data;
         var plan = c.ownerReplace(D.assignments, 'eveandboy', 'sp-anan', '2027-06', '2027-06', SP.core.clock.horizonEnd());
@@ -344,9 +344,8 @@
         var mt = c.personMonthlyLoad(d, 2027, values).channels.filter(function (g) { return g.channelId === 'mt'; })[0];
         var anan = mt.people.filter(function (p) { return p.personId === 'sp-anan'; })[0];
         var eve = anan.units.filter(function (u) { return u.unitId === 'eveandboy'; })[0];
-        var s = SP.data.guide.scenarios.filter(function (x) { return x.id === 'S10'; })[0];
         return [['2027-05', '2027-06', '2027-12'].map(function (k) { return c.ownerOf(list, D.salespeople, 'eveandboy', k); }), U.personChecks(d, '2026-09', '2027-12').total,
-          eve.months.map(function (v) { return v == null ? null : 1; }), s ? [s.id, s.pageId] : null];
+          eve.months.map(function (v) { return v == null ? null : 1; })];
       }
     }
   ];

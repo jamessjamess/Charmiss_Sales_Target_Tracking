@@ -1,4 +1,9 @@
-# Listing (`modules/product-master`, id `productMaster`)
+# Launch & Listing · แท็บ Listing (เดิมหน้า Listing `modules/product-master`, id `productMaster`)
+
+CR-35 ย้ายเป็นแท็บ Listing ของ [launch-listing.md](launch-listing.md) (โค้ดเดิม · `renderListing`) · หน้าเดิมพาไป `launch-listing/index.html#listing` · สิทธิ์ `launchListing` (สิทธิ์ย่อย `listing.clearance` คงเดิม)
+
+- CR-35 Chip `เฉพาะสินค้าใหม่` (Request · Planned · NPD ณ เดือนที่เลือก) · ค้นหาด้วย Product Code / รหัสชั่วคราว · มาจาก `ดู Listing` = ค้นหาสินค้านั้นครั้งเดียว (`ui.listingFocus`)
+- CR-35 Clearance: เดือนสิ้นสุดว่างได้ (= จนสินค้าหมด) · แก้ช่วงเดือนแล้วราคา / หน่วยขาย / หมายเหตุคงเดิม (แก้ที่ Price & Promotion แท็บ Clearance)
 
 Product Master · fit · ข้อมูล ณ เดือน (ไม่อิงปีแผน · CR-30) · ผู้แก้ไขตั้งต้น: ทีม Product (สิทธิ์ `listing`) · Supply Chain (สิทธิ์ย่อย `listing.clearance`)
 

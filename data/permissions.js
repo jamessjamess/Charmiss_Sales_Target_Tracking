@@ -42,20 +42,26 @@
         { id: 'skuPlan', label: 'แผนยอดขายราย SKU', main: true, scopable: true },
         { id: 'skuPlan.createNpd', label: 'สร้าง NPD', scopable: true, action: true }
       ],
+      // CR-36: Product List = หน้าหลัก + ส่วนของหน้า Product Level (key เดิม taxonomy ของหน้า Category & Series · ค่าเดิมคงไว้)
+      productList: [
+        { id: 'productList', label: 'Product List', main: true },
+        { id: 'taxonomy', label: 'Product Level' }
+      ],
       // CR-30: หน้าราคาและ Promotion = หน้าหลัก + ส่วนของหน้า ราคาหลัก (ทีม Product) · Promotion Price (Sales ตาม Channel ในทีม)
       promotionPrice: [
-        { id: 'prices', label: 'ราคาและ Promotion', main: true },
+        { id: 'prices', label: 'Price & Promotion', main: true },
         { id: 'prices.base', label: 'ราคาหลัก' },
         { id: 'prices.promo', label: 'Promotion Price', scopable: true }
       ],
-      productMaster: [
-        { id: 'listing', label: 'Listing', main: true },
+      // CR-35: Launch & Listing = สิทธิ์เดียวของหน้า (สูงสุดของแผน NPD และ Listing เดิม · core/permissions.js LEGACY) · Clearance ใช้ร่วมกับแท็บ Clearance ของ Price & Promotion
+      launchListing: [
+        { id: 'launchListing', label: 'Launch & Listing', main: true },
         { id: 'listing.clearance', label: 'Clearance' }
       ],
       // CR-29: หน้า Account & Platform = หน้าหลัก + ส่วนของหน้า GP / Platform Fee และตั้งค่า Channel (สิทธิ์ย่อยสูงกว่าหน้าหลักได้)
-      // CR-32: ย้ายมาอยู่ใต้หน้า Sales Unit & Customer (ค่าเดิมของ accounts / territories แปลงให้เอง · core/permissions.js LEGACY)
+      // CR-32: ย้ายมาอยู่ใต้หน้า Account Master (ค่าเดิมของ accounts / territories แปลงให้เอง · core/permissions.js LEGACY)
       salesUnits: [
-        { id: 'salesUnits', label: 'Sales Unit & Customer', main: true },
+        { id: 'salesUnits', label: 'Partner List', main: true },   // CR-36 ชื่อหน้า
         { id: 'salesUnits.gp', label: 'GP / Platform Fee' },
         { id: 'salesUnits.channelSettings', label: 'ตั้งค่า Channel' }
       ],
@@ -79,13 +85,12 @@
     'skuPlan.createNpd': 'N N T T N N N E',
     summary:             'V V V V V V V V',
     productList:         'N V V V E V N E',
-    npdPlan:             'N V V V E V N E',
+    launchListing:       'N V V V E V N E',   // CR-35 = สูงสุดของ npdPlan และ listing เดิม (เท่ากันทุกบทบาท)
     prices:              'N V V V V N N E',
     'prices.base':       'N V V V E N N E',
     'prices.promo':      'N E T T V N N E',
-    listing:             'N V V V E V N E',
     'listing.clearance': 'N V V V V E N E',
-    taxonomy:            'N N N N E N N E',
+    taxonomy:            'N N N N E N N E',   // CR-36 ส่วนของหน้า Product List (แท็บ Product Level)
     // CR-32: salesUnits = สิทธิ์สูงสุดของ accounts (N E V N N N N E) และ territories (N E V V N N N E) เดิม · สิทธิ์ย่อยคงค่าเดิม
     salesUnits:          'N E V V N N N E',
     'salesUnits.gp':     'N E V N N N N E',

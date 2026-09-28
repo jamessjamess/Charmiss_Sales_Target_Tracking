@@ -1,7 +1,12 @@
 /*
  * modules/promotions/promotions.js — Product Master · ราคาและ Promotion (CR-30 แทนหน้าราคาขายต่อ Account และปฏิทิน Promotion)
  *
- * หน้าที่:        แท็บ ราคาหลัก | Promotion Price (จำที่ ui.pricesTab)
+ * หน้าที่:        แท็บ ราคาหลัก | Promotion Price | Clearance (จำที่ ui.pricesTab · CR-35 ชื่อหน้า Price & Promotion · คำอธิบายอยู่ในปุ่ม ?)
+ *                 CR-35 แท็บ Clearance: 1 แถวต่อ SKU × ช่วง Clearance (product.clearance) · ราคาหลัก (RSP เดือนเริ่ม) · ราคา Clearance · ส่วนลด (calc.clearanceDiscount) ·
+ *                   ช่วงเดือน (สิ้นสุดว่าง = จนสินค้าหมด) · หน่วยขาย · วันหมดอายุ · หมายเหตุ · + เพิ่ม Clearance (Active / Discontinued · ถามยืนยันเปลี่ยน Status ตอนบันทึก) ·
+ *                   แก้ได้เฉพาะสิทธิ์ย่อย listing.clearance · แถวของ SKU Clearance ในแท็บอื่นมีป้าย Clearance + ใช้ราคา Clearance {ช่วงเดือน}
+ *                 CR-36 แผน Clearance (ไม่นับในเป้าหมายและคงเหลือ): สต็อกที่ต้องระบาย · แผนระบาย · คงเหลือสต็อก (ครบ · ยังระบายไม่หมด · เกินสต็อก) · Net Sales แผน ·
+ *                   คลิกแถว = ตารางย่อย หน่วยขายที่เลือก × เดือนในช่วง Clearance ของปีแผน (กรอกชิ้น · กระจายเท่ากันทุกเดือน · แถวรวมชิ้นและ Net Sales) · calc.clearance*
  *                 ราคาหลัก: ราคา ณ เดือน [ก.ย. 2026 ▾] · ตาราง SKU (จัดกลุ่มตาม Series) × ประเภทราคา (settings.PRICE_TYPES) ·
  *                   ช่องที่เปลี่ยนในเดือนที่เลือกมีจุดเล็ก · คลิกช่อง → ประวัติราคา (เดือนที่มีผล · ราคา · ผู้บันทึก)
  *                   โหมดแก้ไข (สิทธิ์ prices.base): + บันทึกราคาใหม่ → เลือกเดือนที่มีผล (เดือนปัจจุบันหรืออนาคต) → กรอกเฉพาะ SKU ที่เปลี่ยน
@@ -33,6 +38,7 @@
   var promoLevel = '';         // '' = ทั้ง Channel · unitId
   var promoMonth = null;       // 'YYYY-MM' ของมุมมองภาพรวมเดือน
   var hideEmpty = false;
+  var clOpen = {};             // CR-36: แถว Clearance ที่กางตารางแผนรายหน่วยขาย × เดือน
 
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
   function priceText(v) {
@@ -48,12 +54,16 @@
     var TYPES = S.PRICE_TYPES;
     var year = store.year();
     var now = SP.core.clock.currentMonth();
-    var tab = store.get('ui.pricesTab') === 'promo' ? 'promo' : 'base';
+    // CR-35: แท็บตามสิทธิ์ — ราคาหลัก / Promotion ต้องเห็นสิทธิ์ราคา · Clearance ต้องเห็นสิทธิ์ย่อย Clearance (Supply Chain เห็นเฉพาะแท็บ Clearance)
+    var seePrices = ['prices', 'prices.base', 'prices.promo'].some(function (id) { return Perm.level(Perm.user(), id) !== 'NONE'; });
+    var TABS = (seePrices ? ['base', 'promo'] : []).concat(Perm.level(Perm.user(), 'listing.clearance') !== 'NONE' ? ['clearance'] : []);
+    if (!TABS.length) TABS = ['base'];
+    var tab = TABS.indexOf(store.get('ui.pricesTab')) >= 0 ? store.get('ui.pricesTab') : TABS[0];
     var baseMonth = now;
     var pending = null;   // เดือนที่มีผลของรอบบันทึกราคาใหม่ (โหมดแก้ไข)
     if (!promoMonth || promoMonth.slice(0, 4) !== String(year)) promoMonth = now.slice(0, 4) === String(year) ? now : calc.monthKey(year, 0);
     var editing = false;
-    function snapshot() { return { basePrices: store.get('master.basePrices'), promoPrices: store.get('master.promoPrices') }; }
+    function snapshot() { return { basePrices: store.get('master.basePrices'), promoPrices: store.get('master.promoPrices'), products: store.get('master.products') }; }
     var saved = snapshot();
     var draft = clone(saved);
     var undo = C.undoStack(S.UNDO_LIMIT);
@@ -63,6 +73,10 @@
     function byName() { return C.roleName(store.role()); }
     function canBase() { return editing && Perm.can(Perm.user(), 'prices.base'); }
     function canPromo(chId) { return editing && Perm.can(Perm.user(), 'prices.promo', { channelId: chId }); }
+    function canClearance() { return editing && Perm.can(Perm.user(), 'listing.clearance'); }   // CR-35 สิทธิ์ย่อย Clearance เดิม (Supply Chain)
+    function clearanceDiff() {
+      return draft.products.filter(function (p) { var o = calc.findProduct(saved.products, calc.productKey(p)); return JSON.stringify((o && o.clearance) || null) !== JSON.stringify(p.clearance || null); });
+    }
     function unitName(id) { var i = calc.unitInfo(store.data(), id); return i ? i.unit.name : id; }
 
     // ------------------------------------------------------------------ ความต่างก่อนบันทึก + Audit
@@ -84,7 +98,7 @@
       Object.keys(a).forEach(function (k) { if (!b[k]) out.push({ before: a[k], after: null }); });
       return out;
     }
-    function dirty() { return editing ? baseDiff().length + promoDiff().length : 0; }
+    function dirty() { return editing ? baseDiff().length + promoDiff().length + clearanceDiff().length : 0; }
     C.guardUnsaved(dirty);
 
     function save() {
@@ -100,10 +114,16 @@
         var level = r.unitId ? unitName(r.unitId) : fill(page.promo.wholeChannel, { channel: (calc.findById(SP.data.channels, r.channelId) || {}).name || r.channelId });
         entries.push({ entity: 'promoPrice', key: r.productKey + ' · ' + level, field: r.month, oldValue: d.before ? d.before.price : null, newValue: d.after ? d.after.price : null, by: by, at: at });
       });
+      var cls = clearanceDiff();
+      cls.forEach(function (p) {
+        var o = calc.findProduct(saved.products, calc.productKey(p));
+        entries.push({ entity: 'product', key: calc.productKey(p), field: 'clearance', oldValue: (o && o.clearance) || null, newValue: p.clearance || null, by: by, at: at });
+      });
       draft.basePrices.forEach(function (r) { if (!r.by) { r.by = by; r.at = at; } });
       draft.promoPrices.forEach(function (r) { if (!r.by) { r.by = by; r.at = at; } });
       store.set('master.basePrices', draft.basePrices);
       store.set('master.promoPrices', draft.promoPrices);
+      if (cls.length) store.set('master.products', draft.products);
       store.appendAudit(entries);
       saved = clone(draft);
       editing = false;
@@ -115,12 +135,23 @@
     var exportBtn = C.exportButton({ unsaved: dirty, build: exportSpec });
     var bar = C.workflowBar({
       simple: true, extra: exportBtn,
+      // CR-35: สิทธิ์ย่อย Clearance (Launch & Listing) แก้แท็บ Clearance ได้แม้ไม่มีสิทธิ์ราคา (registry alsoPerms)
+      modules: SP.core.permissions.pageModules('promotionPrice').concat(['listing.clearance']),
       editing: function () { return editing; },
       onEdit: function () { editing = true; draft = clone(saved); pending = null; undo.clear(); draw(); },
-      onSave: save,
+      onSave: function () { confirmClearance().then(function (ok) { if (ok) save(); }); },
       onCancel: function () { editing = false; draft = clone(saved); pending = null; undo.clear(); draw(); }
     });
     if (ctx.intro) ctx.intro.appendChild(bar);
+
+    // CR-35: สินค้าที่เพิ่มช่วง Clearance ใหม่ → ถามยืนยัน เปลี่ยน Status ของ {ชื่อ} เป็น Clearance ตั้งแต่ {เดือน}
+    function confirmClearance() {
+      var X = page.clearance;
+      var added = clearanceDiff().filter(function (p) { var o = calc.findProduct(saved.products, calc.productKey(p)); return p.clearance && !(o && o.clearance); });
+      if (!added.length) return Promise.resolve(true);
+      return C.dialog({ title: X.confirmTitle, lines: added.map(function (p) { return fill(X.confirmStatus, { name: calc.productCode(p) + ' ' + p.name, month: F.date(p.clearance.fromMonth) }); }), confirmLabel: X.confirm })
+        .then(function (r) { return r.ok; });
+    }
 
     // ------------------------------------------------------------------ ข้อมูลของแท็บ
     function monthsFrom(from, to) {
@@ -153,8 +184,16 @@
     function skuHead(p) {
       var key = calc.productKey(p);
       return h('th', { class: 'pr-sku', scope: 'row' }, h('span', { class: 'pr-sku-line' }, C.productThumb(p, tax(), { size: 'sm' }),
-        h('span', { class: 'pr-sku-text' }, h('span', { class: 'pr-code' }, key), h('span', { class: 'pr-name', title: p.name }, calc.displayName(p)))));
+        h('span', { class: 'pr-sku-text' }, h('span', { class: 'pr-code' }, calc.productCode(p)), h('span', { class: 'pr-name', title: p.name }, calc.displayName(p), ' ', C.tempNameTag(p)),
+          // CR-35: SKU ที่มีช่วง Clearance = ป้าย Clearance + ใช้ราคา Clearance {ช่วงเดือน}
+          p.clearance && p.clearance.fromMonth ? clTag(p.clearance) : null)));
     }
+    // ช่วงเดือนไม่ตัดบรรทัดกลางคำ (ข้อความก่อน / หลัง {range} จาก content)
+    function clTag(cl) {
+      var parts = page.clearance.usesPrice.split('{range}');
+      return h('span', { class: 'pr-cl-tag', title: fill(page.clearance.usesPrice, { range: clRange(cl) }) }, C.statusBadge('clearance'), ' ', parts[0], h('span', { class: 'pr-cl-range' }, clRange(cl)), parts[1] || '');
+    }
+    function clRange(cl) { return F.keyRange(cl.fromMonth, cl.toMonth, page.clearance.untilSold); }
 
     // ------------------------------------------------------------------ วาดหน้า
     function draw() {
@@ -163,10 +202,154 @@
       bar.update();
       refs = { cells: {} };
       root.appendChild(h('div', { class: 'tool-row pr-tabs' },
-        C.segmented({ label: page.title, value: tab, className: 'pr-tab-seg', options: ['base', 'promo'].map(function (t) { return { value: t, label: page.tabs[t] }; }),
+        C.segmented({ label: page.title, value: tab, className: 'pr-tab-seg', options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }),
           onChange: function (v) { tab = v; store.set('ui.pricesTab', v); draw(); } }),
         h('span', { class: 'muted small pr-tab-lead' }, page.tabLead[tab])));
-      if (tab === 'base') drawBase(); else drawPromo();
+      if (tab === 'base') drawBase(); else if (tab === 'clearance') drawClearance(); else drawPromo();
+    }
+
+    // ================================================================== CR-35 แท็บ Clearance
+    function drawClearance() {
+      var X = page.clearance, Cl = X.columns;
+      var d = store.data();
+      var products = cur().products;
+      var edit = canClearance();
+      var rows = calc.clearanceRows(products, d.basePrices).filter(function (r) { return searchOk(r.product); });
+      // ข้อมูลสำหรับคำนวณ Net Sales แผน = สินค้าของแท็บนี้ (ร่างเมื่อแก้ไข)
+      var dd = {};
+      Object.keys(d).forEach(function (k) { dd[k] = d[k]; });
+      dd.products = products;
+      var search = h('input', { type: 'search', class: 'search-input pr-search', placeholder: page.search, 'aria-label': page.search, value: query });
+      search.addEventListener('change', function () { query = search.value; draw(); });
+      search.addEventListener('keydown', function (e) { if (e.key === 'Enter') { query = search.value; draw(); } });
+      root.appendChild(h('div', { class: 'tool-row pr-toolbar' }, search,
+        // CR-36: ผู้ไม่มีสิทธิ์ย่อย Clearance = ดูอย่างเดียว · แก้ไขได้โดย {บทบาท} (จากตารางสิทธิ์)
+        C.viewOnlyNote(['listing.clearance']),
+        h('span', { class: 'muted small pr-cl-note-plan' }, fill(X.planNote, { year: year })),
+        h('span', { class: 'tool-right' }, edit ? h('button', { type: 'button', class: 'btn btn-primary btn-sm pr-cl-add', onClick: addClearance }, X.add) : null)));
+      if (editing) { var b = C.editBanner(); b.update(dirty()); root.appendChild(b); }
+      var units = [];
+      SP.data.channels.filter(function (c) { return c.active !== false; }).forEach(function (ch) { calc.unitsOfChannel(d, ch.id, true).forEach(function (u) { units.push({ value: u.id, label: ch.name + ' · ' + u.name }); }); });
+      function prod(key) { return calc.findProduct(draft.products, key); }
+      function set(key, patch) { var p = prod(key); Object.keys(patch).forEach(function (k) { p.clearance[k] = patch[k]; }); draw(); }
+      function num(r) {
+        var i = h('input', { type: 'number', class: 'num pr-cl-price', min: '0', step: '0.01', value: r.clearance.price != null ? String(r.clearance.price) : '', 'aria-label': Cl.price + ' ' + r.key });
+        i.addEventListener('change', function () { set(r.key, { price: i.value === '' ? null : Math.round(Number(i.value) * 100) / 100 }); });
+        return i;
+      }
+      function stockInput(r) {
+        var i = h('input', { type: 'number', class: 'num pr-cl-stock', min: '0', step: '1', value: String(r.clearance.stockQty || 0), 'aria-label': Cl.stock + ' ' + r.key });
+        i.addEventListener('change', function () { set(r.key, { stockQty: Math.max(0, Math.round(Number(i.value) || 0)) }); });
+        return i;
+      }
+      function month(r, f, optional) {
+        var i = h('input', { type: 'month', class: 'pm-input pr-cl-' + f, value: r.clearance[f] || '', 'aria-label': Cl.range + ' ' + r.key, title: optional ? X.openEndTip : null });
+        i.addEventListener('change', function () { if (!i.value && !optional) { i.value = r.clearance[f] || ''; return; } var o = {}; o[f] = i.value || null; set(r.key, o); });
+        return i;
+      }
+      function text(r, f, type) {
+        var i = h('input', { type: type || 'text', class: 'pm-input pr-cl-' + f, value: r.clearance[f] || '', 'aria-label': Cl[f] + ' ' + r.key });
+        i.addEventListener('change', function () { var o = {}; o[f] = i.value.trim() || null; set(r.key, o); });
+        return i;
+      }
+      function unitsText(cl) { return !cl.unitIds || !cl.unitIds.length ? X.allUnits : cl.unitIds.length > 2 ? fill(X.unitsSelected, { n: cl.unitIds.length }) : cl.unitIds.map(unitName).join(', '); }
+      function stockBadge(stt) {
+        var t = stt.status === 'ok' ? X.stockStatus.ok : fill(X.stockStatus[stt.status], { n: F.units(Math.abs(stt.remaining)) });
+        return h('span', { class: 'badge pr-cl-stock-badge is-' + stt.status, title: X.stockTip }, t);
+      }
+      var COLS = ['sku', 'base', 'price', 'discount', 'range', 'units', 'expiry', 'note', 'stock', 'planned', 'remaining', 'net', 'manage'];
+      var NUMS = ['base', 'price', 'discount', 'stock', 'planned', 'net'];
+      var body = h('tbody');
+      if (!rows.length) body.appendChild(h('tr', null, h('td', { colspan: String(COLS.length), class: 'grid-empty' }, X.empty)));
+      rows.forEach(function (r) {
+        var cl = r.clearance;
+        var stt = calc.clearanceStockState(cl);
+        var net = calc.sum(calc.clearancePlanMonthly(dd, { year: year, productKey: r.key }).map(function (x) { return x.netSales; }));
+        var open = !!clOpen[r.key];
+        var toggle = h('button', { type: 'button', class: 'link-btn pr-cl-toggle', 'aria-expanded': open ? 'true' : 'false', title: open ? X.collapse : X.expand,
+          onClick: function (e) { e.stopPropagation(); clOpen[r.key] = !open; draw(); } }, open ? '▾' : '▸');
+        var head = skuHead(r.product);
+        var line = head.querySelector('.pr-sku-line') || head;
+        line.insertBefore(toggle, line.firstChild);
+        var tr = h('tr', { class: 'pr-cl-row is-clickable' + (open ? ' is-open' : ''), dataset: { key: r.key },
+          onClick: function (e) { if (e.target.closest && e.target.closest('input, button, select, label, .series-filter')) return; clOpen[r.key] = !open; draw(); } }, head,
+          h('td', { class: 'num', title: X.baseTip }, r.base != null ? priceText(r.base) : '–'),
+          h('td', { class: 'num' }, edit ? num(r) : cl.price != null ? priceText(Number(cl.price)) : '–'),
+          h('td', { class: 'num' }, r.discount != null ? F.pct(r.discount, 0) : '–'),
+          h('td', null, edit ? h('span', { class: 'pd-inline' }, month(r, 'fromMonth'), ' – ', month(r, 'toMonth', true)) : clRange(cl)),
+          h('td', { title: (cl.unitIds || []).map(unitName).join(', ') || X.allUnits }, edit ? C.multiSelect({ label: Cl.units, allLabel: X.allUnits, selected: X.unitsSelected, clear: L.series.clear, empty: L.series.empty,
+            options: units, value: cl.unitIds || [], onChange: function (v) { set(r.key, { unitIds: v.length ? v : null }); } }) : unitsText(cl)),
+          h('td', null, edit ? text(r, 'expiry', 'date') : cl.expiry ? F.date(cl.expiry) : '–'),
+          h('td', { class: 'ellipsis', title: cl.note || '' }, edit ? text(r, 'note') : cl.note || '–'),
+          h('td', { class: 'num' }, edit ? stockInput(r) : F.units(stt.stock)),
+          h('td', { class: 'num pr-cl-planned' }, F.units(stt.planned)),
+          h('td', { class: 'pr-cl-remaining' }, stockBadge(stt)),
+          h('td', { class: 'num pr-cl-net', title: fill(X.netTip, { year: year }) }, net ? F.baht(net) : '–'),
+          h('td', { class: 'manage' }, edit ? C.trashButton({ label: X.remove, confirmTitle: X.remove + ' · ' + calc.productCode(r.product), onConfirm: function () { prod(r.key).clearance = null; draw(); } }) : null));
+        body.appendChild(tr);
+        if (open) body.appendChild(h('tr', { class: 'pr-cl-detail' }, h('td', { colspan: String(COLS.length) }, planTable(r))));
+      });
+      // ตารางย่อย: หน่วยขายที่เลือก × เดือนในช่วง Clearance ของปีแผน (เดือนนอกช่วง = 0 ไม่แสดง) · แถวรวมชิ้นและ Net Sales
+      function planTable(r) {
+        var p = calc.findProduct(products, r.key);
+        var cl = p.clearance;
+        var ms = calc.clearanceMonths(cl, year);
+        var us = calc.clearanceUnitIds(p, d.listings, year);
+        if (!ms.length) return h('p', { class: 'muted small' }, fill(X.plan.noMonths, { year: year }));
+        if (!us.length) return h('p', { class: 'muted small' }, X.plan.noUnits);
+        function setQty(u, k, v) {
+          var dp = prod(r.key).clearance;
+          dp.plan = JSON.parse(JSON.stringify(dp.plan || {}));
+          dp.plan[u] = dp.plan[u] || {};
+          dp.plan[u][k] = Math.max(0, Math.round(Number(v) || 0));
+          draw();
+        }
+        var perUnit = {};
+        us.forEach(function (u) { perUnit[u] = calc.clearancePlanMonthly(dd, { year: year, productKey: r.key, unitId: u }); });
+        var tot = calc.clearancePlanMonthly(dd, { year: year, productKey: r.key });
+        function mi(k) { return Number(k.slice(5, 7)) - 1; }
+        var thead = h('thead', null, h('tr', null, h('th', { scope: 'col' }, X.plan.unit), ms.map(function (k) { return h('th', { scope: 'col', class: 'num' }, F.date(k)); }), h('th', { scope: 'col', class: 'num' }, X.plan.total)));
+        var tbody = h('tbody', null, us.map(function (u) {
+          var row = perUnit[u];
+          var sumU = calc.sum(ms.map(function (k) { return row[mi(k)].units; }));
+          return h('tr', { dataset: { unit: u } }, h('th', { scope: 'row' }, unitName(u)), ms.map(function (k) {
+            var q = calc.clearanceQty(cl, u, k);
+            return h('td', { class: 'num' }, edit ? C.numberInput({ value: q, min: 0, grouping: true, commit: true, className: 'cell pr-cl-qty', label: unitName(u) + ' ' + F.date(k), onChange: function (v) { setQty(u, k, v); } }) : F.units(q));
+          }), h('td', { class: 'num' }, F.units(sumU)));
+        }));
+        var tfoot = h('tfoot', null,
+          h('tr', { class: 'pr-cl-sum' }, h('th', { scope: 'row' }, X.plan.sumUnits), ms.map(function (k) { return h('td', { class: 'num' }, F.units(tot[mi(k)].units)); }),
+            h('td', { class: 'num' }, F.units(calc.sum(ms.map(function (k) { return tot[mi(k)].units; }))))),
+          h('tr', { class: 'pr-cl-sum' }, h('th', { scope: 'row' }, X.plan.sumNet), ms.map(function (k) { return h('td', { class: 'num' }, F.baht(tot[mi(k)].netSales)); }),
+            h('td', { class: 'num' }, F.baht(calc.sum(ms.map(function (k) { return tot[mi(k)].netSales; }))))));
+        return h('div', { class: 'pr-cl-plan' },
+          h('div', { class: 'tool-row pr-cl-plan-bar' }, h('strong', null, fill(X.plan.title, { year: year })), h('span', { class: 'muted small' }, X.plan.note),
+            edit ? h('span', { class: 'tool-right' }, h('button', { type: 'button', class: 'btn btn-secondary btn-sm pr-cl-distribute', title: X.plan.distributeTip,
+              onClick: function () { var dp = prod(r.key).clearance; dp.plan = calc.clearanceDistribute(dp, us, ms); draw(); } }, X.plan.distribute)) : null),
+          h('table', { class: 'data-grid pr-cl-plan-table' }, thead, tbody, tfoot));
+      }
+      root.appendChild(h('div', { class: 'card fit-card pr-card' }, h('div', { class: 'fit-scroll' }, h('table', { class: 'data-grid pr-cl-table' },
+        h('thead', null, h('tr', null, COLS.map(function (k) {
+          return h('th', { scope: 'col', class: NUMS.indexOf(k) >= 0 ? 'num' : null }, k === 'net' ? fill(Cl.net, { year: year }) : Cl[k]);
+        }))), body))));
+    }
+    // + เพิ่ม Clearance: SKU สถานะ Active / Discontinued · เดือนเริ่ม · ราคา (ถามยืนยันเปลี่ยน Status ตอนบันทึก)
+    function addClearance() {
+      var X = page.clearance;
+      var now2 = SP.core.clock.currentMonth();
+      var list = calc.clearanceCandidates(draft.products, now2);
+      var pick = C.select({ label: X.pickSku, value: '', className: 'pr-cl-pick', onChange: function () {},
+        options: [{ value: '', label: X.pickPlaceholder }].concat(list.map(function (p) { return { value: calc.productKey(p), label: calc.productCode(p) + ' · ' + p.name + ' (' + SP.data.content.labels.status[calc.productStatus(p, now2)] + ')' }; })) });
+      var from = h('input', { type: 'month', class: 'pm-input pr-cl-from', value: now2, 'aria-label': X.fromMonth });
+      var price = h('input', { type: 'number', class: 'num pr-cl-newprice', min: '0', step: '0.01', 'aria-label': X.columns.price });
+      function row(label, node) { return h('label', { class: 'pd-field' }, h('span', { class: 'pd-label' }, label), h('span', { class: 'pd-value' }, node)); }
+      C.dialog({ title: X.addTitle, body: h('div', { class: 'cr-body' }, row(X.pickSku, pick), row(X.fromMonth, from), row(X.columns.price, price)), confirmLabel: X.add.replace(/^\+\s*/, ''),
+        validate: function () { return !pick.value ? X.errors.sku : !from.value ? X.errors.month : null; } }).then(function (r) {
+        if (!r.ok) return;
+        var p = calc.findProduct(draft.products, pick.value);
+        p.clearance = { fromMonth: from.value, toMonth: null, stockQty: 0, price: price.value === '' ? null : Math.round(Number(price.value) * 100) / 100, unitIds: null, expiry: null, note: null };
+        draw();
+      });
     }
 
     // ================================================================== แท็บราคาหลัก
@@ -698,6 +881,23 @@
       var c0 = source === 'draft' && editing ? draft : saved;
       var st = C.exportStamp(null);
       var X = page.exportColumns;
+      if (tab === 'clearance') {
+        // CR-35: แท็บ Clearance = 1 แถวต่อ SKU × ช่วง Clearance
+        var XC = page.clearance, CC = XC.columns;
+        var rows = calc.clearanceRows(c0.products, store.data().basePrices).filter(function (r) { return searchOk(r.product); });
+        return {
+          filename: fill(page.exportFile, { tab: C.fileSafe(page.tabs.clearance), date: st.date }),
+          sheets: [{ name: XC.exportSheet, header: C.exportHeader(year, null, []),
+            columns: [{ key: 'code', label: X.code, value: function (r) { return calc.productCode(r.product); }, width: 14 }, { key: 'name', label: X.name, value: function (r) { return r.product.name; }, width: 40 },
+              { key: 'base', label: CC.base, type: 'price', value: function (r) { return r.base; } }, { key: 'price', label: CC.price, type: 'price', value: function (r) { return r.clearance.price; } },
+              { key: 'discount', label: CC.discount, type: 'pct', value: function (r) { return r.discount; } },
+              { key: 'from', label: XC.fromMonth, value: function (r) { return r.clearance.fromMonth; }, width: 10 },
+              { key: 'to', label: CC.range, value: function (r) { return r.clearance.toMonth || XC.untilSold; }, width: 12 },
+              { key: 'units', label: CC.units, value: function (r) { return (r.clearance.unitIds || []).map(unitName).join(', ') || XC.allUnits; }, width: 30 },
+              { key: 'expiry', label: CC.expiry, value: function (r) { return r.clearance.expiry || ''; }, width: 12 }, { key: 'note', label: CC.note, value: function (r) { return r.clearance.note || ''; }, width: 30 }],
+            rows: rows }]
+        };
+      }
       if (tab === 'base') {
         var month = pending || baseMonth;
         var products = store.get('master.products').filter(function (p) { return calc.inSeries(p, seriesState(store.get('master.products')).value) && searchOk(p); });

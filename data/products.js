@@ -55,22 +55,44 @@
       { word: 'lip', typeId: 'type-lip-care' }
     ],
 
-    // สินค้าใหม่ (NPD) ปี 2027 — ชื่อลงท้าย (ชื่อชั่วคราว) เพื่อไม่ให้สับสนกับสินค้าจริง
+    // CR-35: ชื่อชั่วคราวเป็นป้ายที่หน้าจอ (Status Request) ไม่เก็บในชื่อ · เดิม: สินค้าใหม่ (NPD) ปี 2027 — ชื่อลงท้าย เพื่อไม่ให้สับสนกับสินค้าจริง
     //   โครงเดียวกับรายการใน data/seed/ + tempCode (รหัสอ้างอิงในไฟล์ข้อมูล → Product Code ระบบตาม Type: 32210 · 34150 · 33480)
     //   Listing ที่ 7-Eleven และ EVEANDBOY (data/listings.js)
     //   แผนการเปิดตัวอยู่ที่ data/npd.js
     newProducts: [
-      { tempCode: 'NPD_2027Q2_01', name: 'Charmiss Blooming Heart Gloss 03 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
+      { tempCode: 'NPD_2027Q2_01', name: 'Charmiss Blooming Heart Gloss 03', series: 'Sanrio Blooming Heart',
         rsp: 199, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-15T14:00:00' },
-      { tempCode: 'NPD_2027Q2_02', name: 'Charmiss Blooming Heart Lip Serum 05 (ชื่อชั่วคราว)', series: 'Sanrio Blooming Heart',
+      { tempCode: 'NPD_2027Q2_02', name: 'Charmiss Blooming Heart Lip Serum 05', series: 'Sanrio Blooming Heart',
         rsp: 239, dealerPrice: 130, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-15T14:00:00' },
-      { tempCode: 'NPD_2027Q2_03', name: 'Charmiss Juicy Pop Tint 10 (ชื่อชั่วคราว)', series: 'Charming Lips',
+      { tempCode: 'NPD_2027Q2_03', name: 'Charmiss Juicy Pop Tint 10', series: 'Charming Lips',
         rsp: 199, dealerPrice: 90, launchDate: '2027-06-01', note: 'สินค้าใหม่ปี 2027', createdAt: '2026-09-20T10:00:00' },
       // CR-30 แผน NPD ต่อเนื่อง: ปี 2028 แบบไตรมาส (ยังไม่ Listing) และเปิดตัว ก.พ. 2028 ที่ Shopee · Lazada (units = หน่วยขายที่ Listing)
-      { tempCode: 'NPD_2028Q2_01', name: 'Charmiss Charming Glow Eyeshadow Palette 02 (ชื่อชั่วคราว)', series: 'Charming Glow',
+      { tempCode: 'NPD_2028Q2_01', name: 'Charmiss Charming Glow Eyeshadow Palette 02', series: 'Charming Glow',
         rsp: 459, dealerPrice: 250, launchDate: null, launchQuarter: '2028-Q2', units: [], note: 'สินค้าใหม่ปี 2028', createdAt: '2026-09-22T10:00:00' },
-      { tempCode: 'NPD_2028Q1_01', name: 'Charmiss Perfect Heart Blush Stick 03 (ชื่อชั่วคราว)', series: 'Perfect Heart',
-        rsp: 259, dealerPrice: 140, launchDate: '2028-02-01', units: ['shopee', 'lazada'], note: 'สินค้าใหม่ปี 2028', createdAt: '2026-09-22T10:00:00' }
+      { tempCode: 'NPD_2028Q1_01', name: 'Charmiss Perfect Heart Blush Stick 03', series: 'Perfect Heart',
+        rsp: 259, dealerPrice: 140, launchDate: '2028-02-01', units: ['shopee', 'lazada'], note: 'สินค้าใหม่ปี 2028', createdAt: '2026-09-22T10:00:00' },
+      // CR-34: คำขอ NPD จาก Sales (ยังไม่ยืนยัน · source SALES_REQUEST · request = สิ่งที่ Sales กรอก) · Listing จาก SKU Planning ที่หน่วยขายใน units
+      //   แผน NPD ที่มา SALES อยู่ที่ data/npd.js · จำนวนรายเดือนตัวอย่างที่ data/plan-seeds.js (CR-34)
+      { tempCode: 'NPD_2027Q2_04', name: 'Charmiss Juicy Pop Tint 11', series: 'Charming Lips',
+        rsp: 199, dealerPrice: 90, launchDate: '2027-06-01', units: ['watsons'], note: '', createdAt: '2026-09-18T11:00:00',
+        source: 'SALES_REQUEST', requestedBy: 'พิมพ์ลดา ใจดี', requestedAt: '2026-09-18T11:00:00',
+        request: { unitId: 'watsons', unitIds: ['watsons'], price: 199, launchDate: '2027-06-01', startMonth: '2027-06', note: '',
+          reason: 'Watsons ขอสีส้มอิฐสำหรับแคมเปญหน้าร้อน · ลูกค้าถามหาสีใกล้ Tint 05' } },
+      { tempCode: 'NPD_2027Q3_01', name: 'Charmiss Perfect Heart Blush Stick 04', series: 'Perfect Heart',
+        rsp: 259, dealerPrice: 140, launchDate: '2027-07-01', units: ['shopee'], note: '', createdAt: '2026-09-19T15:00:00',
+        source: 'SALES_REQUEST', requestedBy: 'มิลิน แก้วใส', requestedAt: '2026-09-19T15:00:00',
+        request: { unitId: 'shopee', unitIds: ['shopee'], price: 259, launchDate: '2027-07-01', startMonth: '2027-07', note: '',
+          reason: 'สีชมพูพีชสำหรับ Live ขายบน Shopee (ขนาดพกพา)' } },
+      // CR-35: ตัวอย่าง Status Delete (เลิกขายแล้ว ไม่ผลิต ไม่ขาย · ไม่มี Listing และไม่อยู่ในแผน)
+      { tempCode: 'SAMPLE_DEL_01', name: 'Charmiss Juicy Pop Tint Mini 01', series: 'Charming Lips',
+        rsp: 99, dealerPrice: 50, launchDate: '2023-03-01', discontinueMonth: '2025-06', deletedFrom: '2025-12', units: [], isSample: true,
+        note: 'ตัวอย่างสินค้าที่เลิกขายแล้ว', createdAt: '2023-02-01T09:00:00' }
+    ],
+    // CR-36: ตัวอย่างแผน Clearance (Supply Chain) · Glitter Lip Gloss ITP 04 (Discontinued ตั้งแต่ เม.ย. 2026) → Clearance ม.ค.–เม.ย. 2027 ราคา 79 บาท
+    //   Watsons + TT เขต 1 · สต็อก 1,200 ชิ้น · แผนระบาย 1,000 ชิ้น (125 ชิ้น / หน่วย / เดือน · สถานะ ยังระบายไม่หมด) · สินค้านี้ไม่มี Listing และไม่อยู่ในแผน SKU ใด (ไม่ต้องล้างยอดเดิม)
+    samplePatches: [
+      { trCode: '32090', patch: { isSample: true, clearance: { fromMonth: '2027-01', toMonth: '2027-04', stockQty: 1200, price: 79, unitIds: ['watsons', 'TT-01'], expiry: '2027-06-30', note: 'ตัวอย่างแผน Clearance',
+        plan: { watsons: { '2027-01': 125, '2027-02': 125, '2027-03': 125, '2027-04': 125 }, 'TT-01': { '2027-01': 125, '2027-02': 125, '2027-03': 125, '2027-04': 125 } } } } }
     ]
   };
 

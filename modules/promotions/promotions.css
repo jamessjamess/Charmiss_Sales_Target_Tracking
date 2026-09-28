@@ -1,4 +1,31 @@
 /* modules/promotions/promotions.css — ราคาและ Promotion (CR-30): แท็บ ราคาหลัก | Promotion Price · ตาราง SKU ติดซ้าย หัวติดบน เลื่อนภายในการ์ด */
+/* CR-35: แท็บ Clearance · ป้าย Clearance ในแท็บราคาหลักและ Promotion */
+.pr-cl-tag { display: block; font-size: var(--fs-xs); color: var(--c-text-muted); white-space: normal; line-height: 1.35; }
+.pr-cl-range { white-space: nowrap; }
+.pr-cl-tag .badge { font-size: var(--fs-xs); padding: 0 6px; }
+.pr-cl-table input.num { width: 7em; }
+.pr-cl-table .pm-input { max-width: 11em; }
+.pr-cl-table td { vertical-align: middle; }
+.pr-cl-table .pr-cl-tag { display: none; }
+/* CR-36: แผน Clearance · แถวขยาย · คงเหลือสต็อก (ครบ = เขียว · ยังระบายไม่หมด = เหลือง · เกินสต็อก = แดง) */
+.pr-cl-toggle { margin-right: 4px; color: var(--c-text-muted); text-decoration: none; width: 1em; display: inline-block; }
+.pr-cl-row.is-open > * { background: var(--c-surface-2); }
+.pr-cl-table input.pr-cl-stock { width: 6em; }
+.pr-cl-stock-badge.is-ok { background: var(--status-complete-bg); color: var(--status-complete-fg); }
+.pr-cl-stock-badge.is-left { background: var(--status-over-bg); color: var(--status-over-fg); }
+.pr-cl-stock-badge.is-over { background: var(--status-short-bg); color: var(--status-short-fg); }
+.pr-cl-detail > td { background: var(--c-surface-2); padding: var(--sp-2) var(--sp-3) var(--sp-3); }
+.pr-cl-plan { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); padding: var(--sp-2); }
+.pr-cl-plan-bar { gap: var(--sp-2); margin-bottom: var(--sp-1); }
+.pr-cl-plan-table { width: auto; min-width: 50%; }
+.pr-cl-plan-table input.cell { width: 6em; }
+.pr-cl-plan-table tfoot th, .pr-cl-plan-table tfoot td { font-weight: var(--fw-bold); border-top: 1px solid var(--c-border-strong); }
+.pr-cl-note-plan { flex: 1 1 auto; }
+.pr-cl-table > thead th { white-space: normal; line-height: 1.2; vertical-align: bottom; }
+.pr-cl-table .pm-input { max-width: 9.5em; }
+.pr-cl-table input.pr-cl-note { max-width: 8em; }
+.pr-cl-table input.pr-cl-price { width: 5.5em; }
+.pr-cl-table input.pr-cl-stock { width: 5em; }
 .page-promotionPrice .module-body > * + * { margin-top: var(--sp-2); }
 
 .pr-tabs { gap: var(--sp-3); align-items: center; }

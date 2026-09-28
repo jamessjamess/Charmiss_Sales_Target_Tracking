@@ -2,7 +2,7 @@
 
 | หน้า | Module · id | จัดการ | Spec |
 |---|---|---|---|
-| `A` Sales Unit & Customer | `modules/sales-units` · `salesUnits` | หน่วยขาย (Account · Platform · เขต) · คู่ค้า (รหัสคู่ค้า) ตามช่วงเดือน · CR-33 แก้ไขรายรายการ · GP / Platform Fee · Channel Master | [sales-units.md](sales-units.md) |
+| `A` Partner List (CR-36 · เดิม Account Master / Sales Unit & Customer) | `modules/sales-units` · `salesUnits` | หน่วยขาย (Account · Platform · เขต) · คู่ค้า (รหัสคู่ค้า) ตามช่วงเดือน · CR-33 แก้ไขรายรายการ · GP / Platform Fee · Channel Master | [sales-units.md](sales-units.md) |
 | `S` Sales Person Management | `modules/people` · `people` | บุคลากร / ทีม · สมาชิกทีมขาย · บัญชีผู้ใช้ · ผู้รับผิดชอบรายเดือน | [people.md](people.md) |
 
 - หน้าที่ซ่อนแล้ว (ไม่ลบไฟล์ · เปิดลิงก์เดิมแล้วพาไปหน้าใหม่):
@@ -21,13 +21,13 @@
     ท้าย `เกณฑ์ที่ตรวจ:` รายชื่อเกณฑ์ทั้งหมดของหน้า (แสดงแม้ n = 0)
 - คลิกแถว → Drawer ขวา แท็บ `ข้อมูล` · `ประวัติการเปลี่ยนแปลง` (`components.historyList` จาก `master.audit`)
 - โหมดแก้ไข (`workflowBar` แบบง่าย) → draft → `บันทึก` เขียน store + `master.audit` / `ยกเลิก` = ทิ้งทั้งหมด · เปิดมาเป็นโหมดดู · บทบาทที่ดูได้อย่างเดียวเห็นข้อความอ่านอย่างเดียว
-  - CR-33 ข้อยกเว้น: Sales Unit & Customer ไม่มีโหมดแก้ไขทั้งหน้า · แก้ไขรายรายการใน Drawer / Dialog แล้วบันทึกทันที (ตรวจสิทธิ์ใน `units.command*`) · Sales Person Management ยังใช้โหมดแก้ไข
+  - CR-33 ข้อยกเว้น: Account Master ไม่มีโหมดแก้ไขทั้งหน้า · แก้ไขรายรายการใน Drawer / Dialog แล้วบันทึกทันที (ตรวจสิทธิ์ใน `units.command*`) · Sales Person Management ยังใช้โหมดแก้ไข
 - ไม่ลบรายการที่ถูกอ้างอิง ใช้ปิดใช้งานพร้อมเดือนที่มีผล · ค่าที่เปลี่ยนตามเวลาเก็บเป็นช่วง `มีผลตั้งแต่ – ถึง` · เดือนที่ผ่านไปแล้วแก้ไม่ได้
 - ชื่อผู้รับผิดชอบ = ลิงก์ไปหน้า Sales Person Management (`components.personLink` → Drawer ของคน · แผงหน่วยขาย → แท็บผู้รับผิดชอบรายเดือน)
 - ทั้ง 2 หน้าและทุกแท็บไม่เลื่อนที่ 1920×1080 (ตารางเลื่อนภายในการ์ด) · ไม่มี Emoji
 
 ## ตารางเทียบฟีเจอร์
 
-- Account & Platform · เขตและร้านค้า (TT) → Sales Unit & Customer: ดู [sales-units.md](sales-units.md#ตารางเทียบฟีเจอร์-cr-32-ส่วน-6--ไม่มีอะไรหาย)
+- Account & Platform · เขตและร้านค้า (TT) → Account Master: ดู [sales-units.md](sales-units.md#ตารางเทียบฟีเจอร์-cr-32-ส่วน-6--ไม่มีอะไรหาย)
 - บุคลากรและทีม → Sales Person Management: ดู [people.md](people.md#ตารางเทียบฟีเจอร์-cr-32)
 - CR-29 (หน้าเดิมก่อนหน้านั้น): ผลงานรายบุคคลอยู่ที่ Plan Summary · ตัวเลือกเดือนปัจจุบันจำลองตัดออก (`SP.core.clock`) · คอลัมน์ `แผนปี 2027` ของ Account ตัดออก

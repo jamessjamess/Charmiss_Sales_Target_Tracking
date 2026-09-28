@@ -593,10 +593,13 @@
 
   // ราคาของ SKU ในหน่วยขาย (unitId null = ระดับทั้ง Channel) เดือน month จากชุดราคา pricing = { basePrices, promoPrices }
   //   → { price (null = ไม่มีราคา), source: 'promoUnit' | 'promoChannel' | 'base', base (ราคาหลักของ Channel), rsp, priceType, entry }
+  // CR-35: ราคา Clearance ลำดับแรก (เดือนในช่วง Clearance ของหน่วยขายนั้น · pricing.clearance = { <productKey>: product.clearance }) → Promotion Price → ราคาหลัก
   function resolveWith(pricing, key, channelId, unitId, priceType, month) {
     var type = priceType || 'RSP';
     var base = basePriceAt(pricing.basePrices, key, type, month);
     var rsp = type === 'RSP' ? base : basePriceAt(pricing.basePrices, key, 'RSP', month);
+    var cl = pricing.clearance ? pricing.clearance[key] : null;
+    if (cl && Number(cl.price) > 0 && clearanceActive(cl, month) && clearanceForUnit(cl, unitId)) return { price: Number(cl.price), source: 'clearance', base: base, rsp: rsp, priceType: type, entry: cl };
     var u = unitId ? promoEntry(pricing.promoPrices, key, channelId, unitId, month) : null;
     if (u) return { price: Number(u.price), source: 'promoUnit', base: base, rsp: rsp, priceType: type, entry: u };
     var c = promoEntry(pricing.promoPrices, key, channelId, null, month);
@@ -611,7 +614,7 @@
     var info = unitInfo(data, unitId);
     var ch = info ? info.channel : findById(data.channels, unitId);
     if (!ch) return { price: null, source: 'base', base: null, rsp: null, priceType: 'RSP', entry: null };
-    return resolveWith({ basePrices: data.basePrices, promoPrices: data.promoPrices }, key, ch.id, info ? unitId : null, channelPriceType(ch), month);
+    return resolveWith({ basePrices: data.basePrices, promoPrices: data.promoPrices, clearance: clearanceMap(data.products) }, key, ch.id, info ? unitId : null, channelPriceType(ch), month);
   }
 
   // ตรวจ Promotion Price (เตือนเท่านั้น ไม่บล็อก) → { ok, error: 'price' | null, warnings: ['aboveBase' | 'belowBase'], diff (สัดส่วนเทียบราคาหลัก) }
@@ -630,8 +633,223 @@
   // ข้อมูลราคาที่ใช้คำนวณ: ปัจจุบัน (data.basePrices · data.promoPrices · GP ของหน่วย) หรือ Snapshot ตอนล็อก Baseline [Phase 2]
   //   snapshot = { basePrices, promoPrices, gp: { <unitId>: GP } } (ราคาที่แก้หลังล็อกไม่เปลี่ยน Baseline)
   function pricingOf(data, snapshot) {
-    if (snapshot && snapshot.basePrices) return { basePrices: snapshot.basePrices, promoPrices: snapshot.promoPrices || [], gp: snapshot.gp || {} };
-    return { basePrices: data.basePrices || [], promoPrices: data.promoPrices || [], gp: null };
+    if (snapshot && snapshot.basePrices) return { basePrices: snapshot.basePrices, promoPrices: snapshot.promoPrices || [], gp: snapshot.gp || {}, clearance: snapshot.clearance || null };
+    return { basePrices: data.basePrices || [], promoPrices: data.promoPrices || [], gp: null, clearance: clearanceMap(data.products) };
+  }
+  // CR-35: ช่วง Clearance ของสินค้า = product.clearance { fromMonth, toMonth (ว่าง = จนสินค้าหมด), stockQty, price (บาท รวม VAT), unitIds (ว่าง = ทุกหน่วยขาย), expiry, note }
+  function clearanceMap(products) {
+    var out = null;
+    (products || []).forEach(function (p) { if (p.clearance && p.clearance.fromMonth) { out = out || {}; out[productKey(p)] = p.clearance; } });
+    return out;
+  }
+  function clearanceActive(cl, month) { var k = String(month).slice(0, 7); return !!(cl && cl.fromMonth && cl.fromMonth <= k && (!cl.toMonth || k <= cl.toMonth)); }
+  function clearanceForUnit(cl, unitId) { return !cl.unitIds || !cl.unitIds.length || (!!unitId && cl.unitIds.indexOf(unitId) >= 0); }
+  // ส่วนลดของราคา Clearance จากราคาหลัก (RSP ของเดือนเริ่ม) → สัดส่วน | null
+  function clearanceDiscount(base, price) { return base > 0 && price > 0 ? 1 - price / base : null; }
+  // แถวของแท็บ Clearance: สินค้าที่มีช่วง Clearance → [{ key, product, clearance, base (RSP เดือนเริ่ม), discount }] เรียงเดือนเริ่ม
+  function clearanceRows(products, basePrices) {
+    return (products || []).filter(function (p) { return p.clearance && p.clearance.fromMonth; }).map(function (p) {
+      var key = productKey(p);
+      var base = rspAt(basePrices, key, p.clearance.fromMonth);
+      return { key: key, product: p, clearance: p.clearance, base: base, discount: clearanceDiscount(base, Number(p.clearance.price)) };
+    }).sort(function (a, b) { return a.clearance.fromMonth < b.clearance.fromMonth ? -1 : a.clearance.fromMonth > b.clearance.fromMonth ? 1 : 0; });
+  }
+  // ---------------------------------------------------------------------
+  // CR-36 Product List: ตัวเลือกหมวดสินค้าแบบลำดับชั้น · Product Year · จัดกลุ่มซ้อนหลายชั้น
+  // ---------------------------------------------------------------------
+  // ตัวเลือกหมวดสินค้า: Category (ไม่มีคำนำหน้า) · Sub Category นำหน้า '- ' · Type นำหน้า '-- ' → [{ value, name, depth, level, text }]
+  var TREE_PREFIX = ['', '- ', '-- '];
+  function categoryOptions(tax) {
+    var out = [];
+    SP.core.taxonomy.buildTree(tax, 'category').forEach(function walk(t) {
+      out.push({ value: t.node.id, name: t.node.name, depth: t.depth, level: t.node.level, text: (TREE_PREFIX[t.depth] || '') + t.node.name });
+      t.children.forEach(walk);
+    });
+    return out;
+  }
+  // Product Year = ปีของเดือนเริ่มที่เร็วที่สุดของ Listing ทุกหน่วยขาย (ไม่นับเสนอขาย) → ไม่มี Listing = ปีของเดือนแรกที่มียอดขายในข้อมูลย้อนหลัง → ไม่มีทั้งสอง = null
+  function productYear(product, listings, history) {
+    if (!product) return null;
+    var key = productKey(product);
+    var launch = product.launchDate ? String(product.launchDate).slice(0, 7) : null;
+    var first = null;
+    (listings || []).forEach(function (l) {
+      if (l.productKey !== key || l.status === 'offered') return;
+      var f = l.fromMonth || launch;
+      if (f && (!first || f < first)) first = f;
+    });
+    if (first) return Number(first.slice(0, 4));
+    var years = history && history.years ? Object.keys(history.years).map(Number).sort(function (a, b) { return a - b; }) : [];
+    for (var i = 0; i < years.length; i++) {
+      var sq = history.years[years[i]].skuQty || {};
+      var sold = Object.keys(sq).some(function (u) { var arr = sq[u] && sq[u][key]; return !!arr && arr.some(function (q) { return q > 0; }); });
+      if (sold) return years[i];
+    }
+    return null;
+  }
+  // จัดกลุ่มซ้อน: levels = [{ key(item) → id, name(id) → ชื่อ, order(id) → ลำดับ }] → [{ id, name, count, depth, groups | items }] (id ว่าง = ท้ายสุด)
+  function groupItems(items, levels, depth) {
+    depth = depth || 0;
+    if (!levels || !levels.length) return null;
+    var lv = levels[0], map = {}, ids = [];
+    (items || []).forEach(function (it) {
+      var id = lv.key(it);
+      id = id == null ? '' : String(id);
+      if (!map[id]) { map[id] = []; ids.push(id); }
+      map[id].push(it);
+    });
+    var out = ids.map(function (id) {
+      var g = { id: id, name: lv.name(id), count: map[id].length, depth: depth };
+      if (levels.length > 1) g.groups = groupItems(map[id], levels.slice(1), depth + 1); else g.items = map[id];
+      return g;
+    });
+    out.sort(function (a, b) {
+      return ((a.id === '') - (b.id === '')) || ((lv.order ? lv.order(a.id) : 0) - (lv.order ? lv.order(b.id) : 0)) || String(a.name).localeCompare(String(b.name));
+    });
+    return out;
+  }
+  // ชั้นของการจัดกลุ่มสินค้า by = 'none' | 'category' | 'subCategory' | 'type' | 'series' | 'level' (Category › Sub Category › Type) | 'status' | 'year' | 'launchMonth'
+  //   ctx = { tax, product(item) → สินค้า (ค่าตั้งต้น = item), statusOf(item), yearOf(item), launchOf(item) → 'YYYY-MM' | null,
+  //           labels: { none, noYear, noLaunch, status: { <status>: ป้าย }, month('YYYY-MM') → ข้อความ } } → [ชั้น] | null (ไม่จัดกลุ่ม)
+  var GROUP_BY = ['category', 'subCategory', 'type', 'series', 'level', 'status', 'year', 'launchMonth'];
+  function productGroupLevels(by, ctx) {
+    if (!by || by === 'none' || GROUP_BY.indexOf(by) < 0) return null;
+    var prod = ctx.product || function (x) { return x; };
+    var Lb = ctx.labels || {};
+    function orderOf(kind) {
+      var idx = {}, i = 0;
+      SP.core.taxonomy.buildTree(ctx.tax, kind).forEach(function walk(t) { idx[t.node.id] = i++; t.children.forEach(walk); });
+      return function (id) { return idx[id] != null ? idx[id] : 9999; };
+    }
+    function taxLevel(field, kind) {
+      return { key: function (it) { var p = prod(it); return p ? p[field] || '' : ''; }, name: function (id) { return id ? taxonomyName(ctx.tax, kind, id) || id : Lb.none; }, order: orderOf(kind) };
+    }
+    if (by === 'category') return [taxLevel('categoryId', 'category')];
+    if (by === 'subCategory') return [taxLevel('subCategoryId', 'category')];
+    if (by === 'type') return [taxLevel('typeId', 'category')];
+    if (by === 'series') return [taxLevel('seriesId', 'series')];
+    if (by === 'level') return [taxLevel('categoryId', 'category'), taxLevel('subCategoryId', 'category'), taxLevel('typeId', 'category')];
+    if (by === 'status') return [{ key: ctx.statusOf, name: function (id) { return (Lb.status && Lb.status[id]) || id; }, order: function (id) { var i = PRODUCT_STATUSES.indexOf(id); return i < 0 ? 99 : i; } }];
+    if (by === 'year') return [{ key: function (it) { var y = ctx.yearOf(it); return y == null ? '' : y; }, name: function (id) { return id ? id : Lb.noYear; }, order: function (id) { return Number(id) || 0; } }];
+    return [{ key: function (it) { return ctx.launchOf(it) || ''; }, name: function (id) { return id ? (Lb.month ? Lb.month(id) : id) : Lb.noLaunch; }, order: function (id) { return absMonth(id + '') || 0; } }];
+  }
+  // จำนวนรายการรวมของกลุ่ม (ทุกชั้น) = ผลรวม count ของชั้นบนสุด
+  function groupTotal(groups) { return sum((groups || []).map(function (g) { return g.count; })); }
+
+  // ---------------------------------------------------------------------
+  // CR-36 แผน Clearance (Supply Chain · แท็บ Clearance ของ Price & Promotion) — ไม่นับใน รวมแผน · คงเหลือ · สถานะ ขาด/เกิน/ครบ ของ Sales Planning ทุกขั้น
+  //   product.clearance.plan = { <unitId>: { 'YYYY-MM': ชิ้น } } · เดือนนอกช่วง Clearance / หน่วยขายที่ไม่ได้เลือก = 0
+  // ---------------------------------------------------------------------
+  // เดือนในช่วง Clearance ที่อยู่ในปี → ['YYYY-MM']
+  function clearanceMonths(cl, year) {
+    var out = [];
+    if (!cl || !cl.fromMonth) return out;
+    for (var m = 0; m < 12; m++) { var k = monthKey(year, m); if (clearanceActive(cl, k)) out.push(k); }
+    return out;
+  }
+  // หน่วยขายของแผน: unitIds ที่เลือก → ไม่ระบุ (ทุกหน่วยขาย) = หน่วยขายที่ Listing สินค้านี้ในปี + หน่วยขายที่มีแผนอยู่แล้ว
+  function clearanceUnitIds(product, listings, year) {
+    var cl = product && product.clearance;
+    if (!cl) return [];
+    if (cl.unitIds && cl.unitIds.length) return cl.unitIds.slice();
+    var key = productKey(product), out = [];
+    (listings || []).forEach(function (l) { if (l.productKey === key && out.indexOf(l.accountId) < 0 && listedInYear(listings, key, l.accountId, year)) out.push(l.accountId); });
+    Object.keys(cl.plan || {}).forEach(function (u) { if (out.indexOf(u) < 0) out.push(u); });
+    return out;
+  }
+  function clearanceQty(cl, unitId, month) {
+    if (!cl || !clearanceActive(cl, month) || !clearanceForUnit(cl, unitId)) return 0;
+    var u = cl.plan && cl.plan[unitId];
+    return Math.max(0, Number(u && u[month]) || 0);
+  }
+  // แผนระบายรวม = ผลรวมชิ้นทุกหน่วยขายทุกเดือนในช่วง Clearance
+  function clearancePlanned(cl) {
+    var n = 0;
+    Object.keys((cl && cl.plan) || {}).forEach(function (u) { Object.keys(cl.plan[u] || {}).forEach(function (k) { n += clearanceQty(cl, u, k); }); });
+    return n;
+  }
+  // คงเหลือสต็อก = สต็อกที่ต้องระบาย − แผนระบาย → { stock, planned, remaining, status: 'ok' (= 0 ครบ) | 'left' (> 0 ยังระบายไม่หมด) | 'over' (< 0 เกินสต็อก) }
+  function clearanceStockState(cl) {
+    var stock = Math.max(0, Number(cl && cl.stockQty) || 0), planned = clearancePlanned(cl), rem = stock - planned;
+    return { stock: stock, planned: planned, remaining: rem, status: rem === 0 ? 'ok' : rem > 0 ? 'left' : 'over' };
+  }
+  // กระจายเท่ากันทุกเดือน: คงเหลือสต็อกแบ่งเท่ากันให้หน่วยขาย × เดือน (ปัดลง · เศษไปเดือนสุดท้าย) บวกจากแผนเดิม → plan ใหม่ (คงเหลือ ≤ 0 = เท่าเดิม)
+  function clearanceDistribute(cl, unitIds, months) {
+    var plan = JSON.parse(JSON.stringify((cl && cl.plan) || {}));
+    var rem = clearanceStockState(cl).remaining;
+    var cells = [];
+    (unitIds || []).forEach(function (u) { (months || []).forEach(function (k) { if (clearanceActive(cl, k) && clearanceForUnit(cl, u)) cells.push([u, k]); }); });
+    if (!(rem > 0) || !cells.length) return plan;
+    var each = Math.floor(rem / cells.length), extra = rem - each * cells.length;
+    cells.forEach(function (c, i) {
+      plan[c[0]] = plan[c[0]] || {};
+      plan[c[0]][c[1]] = (Number(plan[c[0]][c[1]]) || 0) + each + (i === cells.length - 1 ? extra : 0);
+    });
+    return plan;
+  }
+  // แผน Clearance รายเดือนของปี → [12 × { month, units, netSales }] · scope = { year, productKey, unitId, unitIds, channelId } (ไม่ระบุ = รวมทั้งหมด)
+  //   Net Sales = จำนวน × ราคาของเดือน (ราคา Clearance ลำดับแรก) ด้วยสูตร netSales ของ Channel (GP / Platform Fee ของหน่วยขาย)
+  function clearancePlanMonthly(data, scope) {
+    scope = scope || {};
+    var year = scope.year || settings().DEFAULT_PLAN_YEAR;
+    var includesVat = settings().PRICE_INCLUDES_VAT;
+    var pricing = pricingOf(data, null);
+    var out = [];
+    for (var i = 0; i < 12; i++) out.push({ month: monthKey(year, i), units: 0, netSales: 0 });
+    var ctxs = {};
+    (data.products || []).forEach(function (p) {
+      var cl = p.clearance;
+      if (!cl || !cl.plan) return;
+      var key = productKey(p);
+      if (scope.productKey && scope.productKey !== key) return;
+      Object.keys(cl.plan).forEach(function (u) {
+        if (scope.unitId && u !== scope.unitId) return;
+        if (scope.unitIds && scope.unitIds.indexOf(u) < 0) return;
+        if (scope.channelId) { var info = unitInfo(data, u); if (!info || !info.channel || info.channel.id !== scope.channelId) return; }
+        var ctx = ctxs[u] || (ctxs[u] = unitPricing(data, pricing, u));
+        for (var m = 0; m < 12; m++) {
+          var q = clearanceQty(cl, u, monthKey(year, m));
+          if (!q) continue;
+          var mp = monthPricing(pricing, key, u, ctx, year, m);
+          out[m].units += q;
+          out[m].netSales += netSales(q, mp.price, { hasGP: ctx.hasGP }, { gp: mp.gp }, { includesVat: includesVat }) || 0;
+        }
+      });
+    });
+    return out;
+  }
+  // แถวของแผน SKU ที่ยังมีจำนวนในเดือน Clearance ที่ล็อก (ค่าเดิมก่อน CR-36 · ข้อมูลที่ต้องตรวจ มีแผนสินค้า Clearance) → [row]
+  function clearanceLockedRows(grid) {
+    return ((grid && grid.rows) || []).filter(function (r) { return r.cells.some(function (c) { return c.state.reason === 'clearance' && c.units > 0; }); });
+  }
+  // ล้างค่าในเดือน Clearance ที่ล็อก (keys ไม่ระบุ = ทุกแถว) → แผนใหม่
+  function clearClearanceCells(plan, grid, keys) {
+    var out = copy(plan);
+    ((grid && grid.rows) || []).forEach(function (r) {
+      if (keys && keys.indexOf(r.key) < 0) return;
+      var item = out.items && out.items[r.key];
+      if (!item) return;
+      r.cells.forEach(function (c, m) { if (c.state.reason === 'clearance') { item.qty[m] = 0; if (item.overrides) item.overrides[m] = false; } });
+    });
+    return out;
+  }
+  // CR-36 หน่วยขายที่มี Listing ของสินค้าในปีแผน แต่แผน SKU ของหน่วยขายนั้นไม่มีแถวของสินค้านี้ (ใช้ร่วม Launch & Listing และข้อความแจ้งใน SKU Planning)
+  //   skuPlans = { <unitId>: plan } → [unitId]
+  function listedNotPlanned(master, skuPlans, key, year) {
+    var out = [];
+    ((master && master.listings) || []).forEach(function (l) {
+      if (l.productKey !== key || out.indexOf(l.accountId) >= 0) return;
+      if (!listedInYear(master.listings, key, l.accountId, year)) return;
+      var plan = skuPlans && skuPlans[l.accountId];
+      var it = plan && plan.items && plan.items[key];
+      if (!it || it.stopped) out.push(l.accountId);
+    });
+    return out;
+  }
+
+  // สินค้าที่เริ่ม Clearance ได้ ณ เดือน = Status Active หรือ Discontinued (ยังไม่มีช่วง Clearance)
+  function clearanceCandidates(products, month) {
+    return (products || []).filter(function (p) { var st = productStatus(p, month); return !p.clearance && (st === 'active' || st === 'discontinued'); });
   }
 
   // Channel, GP ปกติ และประเภทราคาหลักของหน่วยขาย (Channel ที่ hasGP = false → GP = 0 ทุกกรณี)
@@ -773,20 +991,60 @@
   // =====================================================================
 
   // productKey = Product Code (trCode · CR-30 ระบบสร้างเสมอ ไม่มีรหัสชั่วคราวแล้ว) — ใช้อ้างสินค้าทุกที่ (Listing, ราคา, แผน SKU, Actual, Run-rate)
-  function productKey(product) { return product ? (product.trCode || product.tempCode || '') : ''; }
+  // CR-35: ID ภายใน (id) ใช้อ้างอิงทุกความสัมพันธ์ (แผน SKU · Listing · ราคา · แผน NPD) — สินค้าเดิมไม่มี id = Product Code เดิม (ไม่ต้องย้ายข้อมูล) ·
+  //   คำขอ NPD ได้ id คงที่ (REQ-nnn) ตั้งแต่สร้าง จึงเปลี่ยนรหัสที่แสดง (รหัสชั่วคราว → Product Code 5 หลัก) ได้โดยไม่ย้ายการอ้างอิง
+  function productKey(product) { return product ? (product.id || product.trCode || product.tempCode || '') : ''; }
+  // CR-35: คำขอ NPD จาก Sales ที่ทีม Product ยังไม่ยืนยัน = ยังไม่มี Product Code 5 หลัก (Status Request)
+  function isRequestProduct(product) { return !!product && product.source === SALES_REQUEST && !product.trCode; }
+  // รหัสชั่วคราวของคำขอ NPD-YYMM-NNN: YYMM = เดือนเริ่มขายที่ขอ (ตามเดือนเปิดตัวปัจจุบัน · เปลี่ยนตาม Listing ที่เริ่มเร็วสุด) · NNN = requestSeq (ลำดับรวม ไม่ใช้ซ้ำ ไม่เปลี่ยน)
+  function requestCodeOf(product) {
+    var r = product.request || {};
+    var k = String(product.launchDate || r.launchDate || r.startMonth || '').slice(0, 7);
+    var seq = String(product.requestSeq || 0);
+    while (seq.length < 3) seq = '0' + seq;
+    return 'NPD-' + (k ? k.slice(2, 4) + k.slice(5, 7) : '0000') + '-' + seq;
+  }
+  // รหัสที่แสดงและค้นหา = Product Code 5 หลัก · คำขอ = รหัสชั่วคราว · อื่นๆ = รหัสเดิม
+  function productCode(product) {
+    if (!product) return '';
+    if (product.trCode) return product.trCode;
+    if (isRequestProduct(product)) return requestCodeOf(product);
+    return product.tempCode || product.id || '';
+  }
+  // รหัสที่แสดงของ key (ไม่พบสินค้า = key)
+  function codeOf(products, key) { var p = findProduct(products, key); return p ? productCode(p) : key; }
 
   function findProduct(products, key) {
     return (products || []).filter(function (p) { return productKey(p) === key; })[0] || null;
   }
 
-  // Status ของสินค้า ณ เดือนที่พิจารณา (month = 'YYYY-MM') คำนวณจากวันที่เท่านั้น (ห้ามให้เลือกเอง)
+  // CR-35 วงจรสถานะ 7 แบบ (ลำดับของตัวกรองทุกหน้า): request · planned · new (NPD) · active · discontinued · clearance · delete
+  //   productStatus = Status ที่แสดง: delete (ตั้งแต่ deletedFrom) → request (คำขอที่ยังไม่ยืนยัน) → Status จากวันที่ (dateStatus)
+  //   การล็อกช่องของแผน SKU ยังใช้ Status จากวันที่ (dateStatus) · Delete = แถวอ่านอย่างเดียวคงค่า (skuPlanGrid)
+  var PRODUCT_STATUSES = ['request', 'planned', 'new', 'active', 'discontinued', 'clearance', 'delete'];
+  function isDeletedAt(product, month) { return !!(product && product.deletedFrom && String(month).slice(0, 7) >= product.deletedFrom); }
+  function deletedInYear(product, year) { return !!(product && product.deletedFrom && product.deletedFrom <= monthKey(year, 11)); }
+  function productStatus(product, month, npdMonths) {
+    if (isDeletedAt(product, month)) return 'delete';
+    if (isRequestProduct(product)) return 'request';
+    return dateStatus(product, month, npdMonths);
+  }
+  // ประเภทรายได้ของ Status (เตรียมใช้ติดตามรายได้ Phase 2) → 'npd' | 'existing' | 'clearance' | null
+  function revenueTypeOf(status) {
+    if (status === 'request' || status === 'planned' || status === 'new') return 'npd';
+    if (status === 'active' || status === 'discontinued') return 'existing';
+    if (status === 'clearance') return 'clearance';
+    return null;
+  }
+
+  // Status จากวันที่ ณ เดือนที่พิจารณา (month = 'YYYY-MM') (ห้ามให้เลือกเอง)
   // → 'planned' ก่อน launchDate | 'new' NPD_MONTHS เดือนแรก (เดือนที่เริ่มขาย = เดือนที่ 1) | 'active' พ้นช่วง New
   //   | 'clearance' อยู่ในช่วง Clearance (มาก่อน Status อื่นเสมอ) | 'discontinued' หลัง discontinueMonth
-  function productStatus(product, month, npdMonths) {
+  function dateStatus(product, month, npdMonths) {
     if (npdMonths == null) npdMonths = settings().NPD_MONTHS;
     var a = absMonth(month);
     var cl = product.clearance;
-    if (cl && cl.fromMonth && cl.toMonth && a >= absMonth(cl.fromMonth) && a <= absMonth(cl.toMonth)) return 'clearance';
+    if (cl && cl.fromMonth && a >= absMonth(cl.fromMonth) && (!cl.toMonth || a <= absMonth(cl.toMonth))) return 'clearance';   // CR-35 สิ้นสุดว่าง = จนสินค้าหมด
     if (product.discontinueMonth && a > absMonth(product.discontinueMonth)) return 'discontinued';
     // CR-30: NPD ที่ระบุเป็นไตรมาส (launchQuarter 'YYYY-Qn') ใช้เดือนแรกของไตรมาสเป็นเดือนเปิดตัวชั่วคราว (เดือนเปิดตัวยังไม่ยืนยัน)
     var launch = product.launchDate || quarterStart(product.launchQuarter);
@@ -797,8 +1055,9 @@
     return 'active';
   }
 
-  // Status ของเดือน m (0–11) ในปีแผน year
+  // Status ของเดือน m (0–11) ในปีแผน year (ที่แสดง) · dateStatusAt = จากวันที่ (การล็อกช่อง)
   function statusAt(product, year, m, npdMonths) { return productStatus(product, monthKey(year, m), npdMonths); }
+  function dateStatusAt(product, year, m, npdMonths) { return dateStatus(product, monthKey(year, m), npdMonths); }
 
   // ช่วงต่อเนื่องของ Status ทั้งปี → [{ status, from, to }] (Tooltip การเปลี่ยน Status และเส้นเวลา 12 ช่อง)
   function statusSegments(product, year, npdMonths) {
@@ -815,10 +1074,11 @@
   // Status ในบริบทปีแผน = Status ณ เดือนแรกของปีแผน
   function planYearStatus(product, year, npdMonths) { return statusAt(product, year, 0, npdMonths); }
 
-  // ขายอยู่ในปีแผน = มีอย่างน้อย 1 เดือนที่เป็น New / Active / Clearance
+  // ขายอยู่ในปีแผน = มีอย่างน้อย 1 เดือนที่เป็น New / Active / Clearance ตามวันที่ (CR-35 ไม่นับเดือนที่ Delete)
   function soldInYear(product, year, npdMonths) {
     for (var m = 0; m < 12; m++) {
-      var st = statusAt(product, year, m, npdMonths);
+      if (isDeletedAt(product, monthKey(year, m))) continue;
+      var st = dateStatusAt(product, year, m, npdMonths);
       if (st === 'new' || st === 'active' || st === 'clearance') return true;
     }
     return false;
@@ -944,21 +1204,22 @@
   // ก่อนเดือนเริ่มขายในหน่วย → ล็อก / Clearance → Clearance / Planned หรือ Discontinued → ล็อก
   // hasSystem = วิธีเติมยอดของหน่วยมีค่าให้ SKU นี้ (calc.defaultPlanQty ไม่เป็น null: มียอดปีก่อน หรือมี Run-rate)
   //   ไม่มี (เช่น SKU ใหม่ในหน่วยนั้น) → กรอกเอง / มี → ระบบเติม
-  function cellSource(product, m, year, hasSystem, startMonth, npdMonths) {
+  //   CR-35: Status จากวันที่ (คำขอ NPD ล็อกก่อนเดือนเปิดตัวเหมือน Planned) · Discontinued = ขายจนหมด → แก้ได้เฉพาะหน่วยขายที่เคยขาย (soldHere)
+  function cellSource(product, m, year, hasSystem, startMonth, npdMonths, soldHere) {
     if (startMonth != null && m < startMonth) return 'locked';
-    var st = statusAt(product, year, m, npdMonths);
+    var st = dateStatusAt(product, year, m, npdMonths);
     if (st === 'clearance') return 'clearance';
-    if (st === 'planned' || st === 'discontinued') return 'locked';
+    if (st === 'planned' || (st === 'discontinued' && !soldHere)) return 'locked';
     return hasSystem ? 'system' : 'manual';
   }
 
   // เหตุผลของช่องล็อก 0 (null = ไม่ได้ล็อก): 'notListed' | 'planned' ก่อนวันเริ่มขาย | 'discontinued' เลิกขายแล้ว
   //   | 'beforeStart' สินค้าวางขายแล้วแต่ยังไม่ถึงเดือนเริ่มขายในหน่วยนี้
-  function lockReason(product, m, year, startMonth, listed, npdMonths) {
+  function lockReason(product, m, year, startMonth, listed, npdMonths, soldHere) {
     if (listed === false) return 'notListed';
-    var st = statusAt(product, year, m, npdMonths);
+    var st = dateStatusAt(product, year, m, npdMonths);
     if (st === 'planned') return 'planned';
-    if (st === 'discontinued') return 'discontinued';
+    if (st === 'discontinued' && !soldHere) return 'discontinued';
     if (startMonth != null && m < startMonth) return 'beforeStart';
     return null;
   }
@@ -1054,10 +1315,13 @@
   //   = ขายในปีแผน (ไม่เลิกขายก่อนปีแผน และเปิดตัวไม่เกินปีแผน) · ยังไม่อยู่ในแผน
   //   → [{ product, key, listed (Listing แล้วในหน่วยนี้), status, npd, fromSales, blocked: null | 'incomplete', missing, startMonth }]
   //   เรียง Listing แล้วก่อน / blocked = แสดงแต่เลือกไม่ได้ (สินค้าจาก Sales ไม่ติด)
-  function addableSkus(master, unitId, plan, year) {
+  //   CR-35: history (ไม่บังคับ) = Discontinued ที่เคยขายในหน่วยขายนี้เพิ่มได้ · สินค้าที่เป็น Delete ในปีแผนไม่แสดง
+  function addableSkus(master, unitId, plan, year, history) {
     var items = (plan && plan.items) || {};
     return master.products.filter(function (p) {
-      return !items[productKey(p)] && soldInYear(planProduct(p), year);
+      if (items[productKey(p)] || deletedInYear(p, year)) return false;
+      var pp = planProduct(p);
+      return soldInYear(pp, year) || (!!history && hasStatusInYear(pp, year, ['discontinued']) && soldInUnit(history, unitId, productKey(p)));
     }).map(function (p) {
       var key = productKey(p);
       var c = productCompleteness(p, master.basePrices);
@@ -1077,7 +1341,7 @@
     keys.forEach(function (k) {
       unitIds.forEach(function (u) {
         if (isListed(out, k, u)) return;
-        out.push({ productKey: k, accountId: u, status: 'listed', fromMonth: meta.fromMonth || null, toMonth: null, addedBy: 'SALES', addedAt: meta.at || null, addedByName: meta.by || null });
+        out.push({ productKey: k, accountId: u, status: 'listed', fromMonth: meta.fromMonth || null, toMonth: null, addedBy: 'SALES', source: 'skuPlanning', addedAt: meta.at || null, addedByName: meta.by || null });
       });
     });
     return out;
@@ -1098,18 +1362,18 @@
     if (!name) errors.push('name');
     if (input.seriesId === undefined || input.seriesId === '') errors.push('series');
     if (!(Number(input.price) > 0)) errors.push('price');
-    var coded = SP.core.catalog.nextCode(master.products, master.taxonomy, input.typeId, master.codeCounters);
-    if (!coded.ok) errors.push(coded.error === 'type' ? 'type' : 'prefix');
+    // CR-35: คำขอได้ ID ภายใน (REQ-nnn) + ลำดับคำขอรวมทั้งระบบ (requestSeq · รหัสชั่วคราว NPD-YYMM-NNN) · Product Code 5 หลักออกตอนทีม Product ยืนยัน
+    var seq = SP.core.catalog.nextRequestSeq(master.products, master.codeCounters);
     var m = Number(input.startMonth);
     if (input.startMonth === '' || input.startMonth == null || isNaN(m) || m < 0 || m > 11) errors.push('month');
     if (errors.length) return { ok: false, errors: errors, key: null, product: null, master: master };
     var year = input.year;
     var launch = dateKey(year, m, 1);
-    var code = coded.code;
+    var code = SP.core.catalog.requestId(seq);
     var units = [input.unitId].concat((input.unitIds || []).filter(function (u) { return u && u !== input.unitId; }));
     var price = Math.round(Number(input.price) * 100) / 100;
     var product = {
-      trCode: code, barcode: '', name: name, nameEn: '', shortName: '', inferred: false,
+      id: code, requestSeq: seq, trCode: '', barcode: '', name: name, nameEn: '', shortName: '', inferred: false,
       categoryId: input.categoryId || null, subCategoryId: input.subCategoryId || null, typeId: input.typeId || null,
       seriesId: input.seriesId || null, subSeriesId: null, packSize: null, uom: null, image: null,
       launchDate: launch, discontinueMonth: null, clearance: null, note: '', inTrcloud: false,
@@ -1122,9 +1386,9 @@
       products: (master.products || []).concat([product]),
       basePrices: setBasePrice(master.basePrices || [], { productKey: code, priceType: 'RSP', effectiveMonth: start, price: price, by: meta.by || '', at: meta.at || '' }).list,
       listings: addSalesListings(master.listings, [code], units, { at: meta.at, by: meta.by, fromMonth: start }),
-      codeCounters: SP.core.catalog.takeCode(master.codeCounters, code),
+      codeCounters: SP.core.catalog.takeRequestSeq(master.codeCounters, seq),
       npdPlans: (master.npdPlans || []).concat([{
-        id: 'npd-' + code, productKey: code, seriesId: product.seriesId, stage: 'plan', plannedLaunchDate: launch, launchQuarter: null, stageTargets: {},
+        id: 'npd-' + code.toLowerCase(), productKey: code, seriesId: product.seriesId, stage: 'plan', plannedLaunchDate: launch, launchQuarter: null, stageTargets: {},
         plannedAccounts: units.map(function (u) { return { accountId: u, plannedStartMonth: start }; }), expectedRsp: price, owner: '', source: 'SALES',
         note: product.request.note, workflow: { status: 'approved', history: [{ action: 'apply', by: meta.by || '', at: meta.at || '' }] }
       }])
@@ -1202,21 +1466,24 @@
       var ly = ref ? ref.monthly : null;
       var rr = runRateOf(data.history, key, unitId);
       var sys = listed ? defaultPlanQty(method, { monthly: ly, runRate: rr }, opts.target, unitLY, si) : null;
-      var clFrom = p.clearance ? monthIndex(p.clearance.fromMonth, year) : 0;
-      var clSplit = p.clearance
-        ? clearanceSplit(clearanceStockFor(p, master.listings, unitId), monthIndex(p.clearance.toMonth, year) - clFrom + 1)
-        : [];
+      var soldHere = soldInUnit(data.history, unitId, key);   // CR-35: Discontinued แก้ได้เฉพาะหน่วยขายที่เคยขาย
       var lyTotal = ly ? { units: 0, sellOut: 0, net: 0 } : null;
       var cells = [];
       for (var m = 0; m < 12; m++) {
         // CR-30: เดือนนอกช่วง Listing ของหน่วยนี้ (ก่อนเริ่มวางขาย / หลังถอด) = ล็อก 0
         var outside = listed ? listingOutside(lrec, year, m) : null;
-        var source = listed && !outside ? cellSource(p, m, year, sys != null, item.startMonth, st.NPD_MONTHS) : 'locked';
-        var lock = source === 'locked' ? lockReason(p, m, year, item.startMonth, listed, st.NPD_MONTHS) || outside : null;
+        var source = listed && !outside ? cellSource(p, m, year, sys != null, item.startMonth, st.NPD_MONTHS, soldHere) : 'locked';
+        var lock = source === 'locked' ? lockReason(p, m, year, item.startMonth, listed, st.NPD_MONTHS, soldHere) || outside : null;
         var state = cellState(mode, m, current, source, st.FROZEN_MONTHS);
-        var systemUnits = source === 'system' ? sys[m] : source === 'clearance' ? (clSplit[m - clFrom] || 0) : null;
-        var override = !!(item.overrides && item.overrides[m]) && systemUnits != null;
-        var planned = source === 'locked' ? 0 : (source === 'manual' || override) ? Number(item.qty[m] || 0) : systemUnits;
+        // CR-35: เดือนที่สินค้าเป็น Delete = อ่านอย่างเดียว คงค่าเดิม (ไม่ล้างให้อัตโนมัติ · ข้อมูลที่ต้องตรวจ มีแผนสินค้า Delete)
+        if (source !== 'locked' && isDeletedAt(p0, monthKey(year, m))) state = { editable: false, reason: 'deleted' };
+        // CR-36: เดือน Clearance = อ่านอย่างเดียว วางแผนจำนวนที่ Price & Promotion › Clearance (แผน Clearance ไม่นับในแผนนี้) · ค่าที่มีอยู่ก่อน (Override) คงไว้
+        //   แทนการแบ่ง Stock อัตโนมัติของ CR-30 (clearanceSplit / clearanceStockFor ยังอยู่ใน calc)
+        var clLock = source === 'clearance' && state.editable;
+        if (clLock) { state = { editable: false, reason: 'clearance' }; lock = 'clearance'; }
+        var systemUnits = source === 'system' ? sys[m] : null;
+        var override = source === 'clearance' ? !!(item.overrides && item.overrides[m]) : !!(item.overrides && item.overrides[m]) && systemUnits != null;
+        var planned = source === 'locked' ? 0 : (source === 'manual' || override) ? Number(item.qty[m] || 0) : source === 'clearance' ? 0 : systemUnits;
         var units = state.reason === 'actual' ? actualUnits(data.actuals, year, unitId, key, m) : planned;
         var pm = monthPricing(pricing, key, unitId, ctx, year, m);
         var c = chain({ units: units, price: pm.price, gp: pm.gp, hasGP: ctx.hasGP, includesVat: includesVat });
@@ -1256,6 +1523,7 @@
         status: planYearStatus(p, year, st.NPD_MONTHS),
         primary: primaryStatus(p, year, st.NPD_MONTHS),
         group: launchesIn(p, year) ? 'npd' : 'selling',
+        planType: planTypeOf(data, master, key, unitId, year),   // CR-34: ประเภทสินค้าในแผน (existing · newListing · npdConfirmed · npdRequest · clearance)
         runRate: rr,
         fill: sys != null ? method : null,
         segments: statusSegments(p, year, st.NPD_MONTHS),
@@ -1751,9 +2019,13 @@
 
   // ความครบถ้วน (ฟิลด์จำเป็นและที่ควรมีอยู่ใน settings) → { pct, missingRequired, missingRecommended, complete, level }
   //   level = 'ok' ครบ | 'required' ขาดข้อมูลจำเป็น | 'recommended' ขาดข้อมูลที่ควรมี
+  //   CR-35: คำขอ NPD (Request) ไม่นับรหัส TRCLOUD / Barcode · ฟิลด์จำเป็นของคำขอ = ชื่อ · Series · หมวด · Type · RSP · เดือนเริ่มขาย
+  var REQUEST_REQUIRED = ['name', 'seriesId', 'categoryId', 'typeId', 'rsp', 'launchDate'];
+  var REQUEST_RECOMMENDED = ['image'];
   function productCompleteness(product, basePrices) {
     var S = settings();
-    var req = S.PRODUCT_REQUIRED || [], rec = S.PRODUCT_RECOMMENDED || [];
+    var request = isRequestProduct(product);
+    var req = request ? REQUEST_REQUIRED : S.PRODUCT_REQUIRED || [], rec = request ? REQUEST_RECOMMENDED : S.PRODUCT_RECOMMENDED || [];
     var missingRequired = req.filter(function (f) { return !hasProductField(product, f, basePrices); });
     var missingRecommended = rec.filter(function (f) { return !hasProductField(product, f, basePrices); });
     var total = req.length + rec.length;
@@ -2600,7 +2872,7 @@
       var p = r.product || {};
       return {
         key: r.key, name: displayName(p) || r.key, unitId: unitId, channelId: channelId,
-        seriesId: p.seriesId || '', categoryId: p.categoryId || '', subCategoryId: p.subCategoryId || '', status: r.status || '',
+        seriesId: p.seriesId || '', categoryId: p.categoryId || '', subCategoryId: p.subCategoryId || '', status: r.status || '', planType: r.planType || 'existing',
         units: r.cells.map(function (c) { return c.units || 0; }),
         sale: r.cells.map(function (c) { return c.sellOut || 0; }),
         net: r.cells.map(function (c) { return c.net || 0; })
@@ -2720,6 +2992,12 @@
   //   · 'none' (กลุ่มเดียว) → [{ key, kind, rows }] / tax = taxonomy (ใช้ลำดับ Series)
   function groupPlanRows(rows, by, tax) {
     if (by === 'none') return [{ key: 'all', kind: 'none', rows: rows }];
+    // CR-34: 'type' = ประเภทสินค้าในแผน ตามลำดับ PLAN_TYPES · แสดงเฉพาะกลุ่มที่มีรายการ
+    if (by === 'type') {
+      var byType = {};
+      rows.forEach(function (r) { var t = r.planType || 'existing'; (byType[t] = byType[t] || []).push(r); });
+      return PLAN_TYPES.filter(function (t) { return byType[t]; }).map(function (t) { return { key: t, kind: 'type', rows: byType[t] }; });
+    }
     var order = by === 'series'
       ? taxonomyChildren(tax, 'series', null).map(function (n) { return n.id; }).concat([''])
       : ['active', 'clearance', 'discontinued', 'new'];
@@ -2730,6 +3008,233 @@
     });
     Object.keys(map).forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
     return order.filter(function (k) { return map[k] || (by === 'status' && k === 'new'); }).map(function (k) { return { key: k, kind: by, rows: map[k] || [] }; });
+  }
+
+  // =====================================================================
+  // CR-34: ประเภทสินค้าในแผน (ต่อ SKU × หน่วยขาย · ปีแผน) — Status ยังคำนวณจากวันที่เท่านั้น (productStatus)
+  //   existing (สินค้าเดิม: เคยมียอดขายจริงในหน่วยขายนี้) · newListing (Listing ใหม่: ขายอยู่แต่ไม่เคยมียอดในหน่วยนี้) ·
+  //   npdConfirmed (NPD ยืนยันแล้ว: เปิดตัวหรืออยู่ในช่วง NPD ภายในปีแผน) · npdRequest (ขอ NPD: คำขอจาก Sales ที่ทีม Product ยังไม่ยืนยัน) ·
+  //   clearance (ช่วง Clearance ทับปีแผน · ไม่ควรอยู่ในแผน)
+  // =====================================================================
+  var PLAN_TYPES = ['existing', 'newListing', 'npdConfirmed', 'npdRequest', 'clearance'];
+  function npdPlanOf(npdPlans, key) { return (npdPlans || []).filter(function (n) { return n.productKey === key; })[0] || null; }
+  // คำขอ NPD จาก Sales ที่ยังไม่ยืนยัน = สินค้า SALES_REQUEST หรือแผน NPD ที่มา SALES · ยืนยันแล้ว = แผน NPD มี confirmedAt (ทีม Product ติ๊กที่หน้าแผน NPD)
+  //   CR-35: คำขอ = Status Request (isRequestProduct · ยังไม่มี Product Code 5 หลัก) · ยืนยันที่ Launch & Listing / Product List (catalog.confirmRequest)
+  function isNpdRequest(product) { return isRequestProduct(product); }
+  // เคยมียอดขายจริงในหน่วยขายนี้ (ทุกปีใน history.years ถึงเดือนที่ปิดแล้วของปีนั้น · ไม่นับเดือนเริ่มขายโดยประมาณ skuStart)
+  function soldInUnit(history, unitId, key) {
+    var years = (history && history.years) || {};
+    return Object.keys(years).some(function (y) {
+      var a = skuHistory(history, y, unitId, key);
+      if (!a) return false;
+      var n = years[y].actualMonths == null ? 12 : years[y].actualMonths;
+      for (var m = 0; m < Math.min(12, n); m++) if (a[m] > 0) return true;
+      return false;
+    });
+  }
+  function hasStatusInYear(product, year, list) {
+    for (var m = 0; m < 12; m++) if (list.indexOf(dateStatusAt(product, year, m)) >= 0) return true;
+    return false;
+  }
+  // ประเภทสินค้าในแผน · data = store.data() (history) · master = { products, npdPlans } (ไม่มี = ใช้ data)
+  function planTypeOf(data, master, key, unitId, year) {
+    var m0 = master || data || {};
+    var p = findProduct(m0.products, key);
+    if (!p) return 'existing';
+    var pp = planProduct(p);
+    if (hasStatusInYear(pp, year, ['clearance'])) return 'clearance';
+    if (isNpdRequest(p)) return 'npdRequest';
+    if (hasStatusInYear(pp, year, ['planned', 'new'])) return 'npdConfirmed';
+    // CR-35: Active / Discontinued ที่เคยขายในหน่วยขายนี้ = สินค้าเดิม · Active ที่ไม่เคยขาย = Listing ใหม่ · Discontinued ที่ไม่เคยขาย = ไม่มีประเภท (เพิ่มในแผนไม่ได้)
+    var sold = soldInUnit(data && data.history, unitId, key);
+    if (sold) return 'existing';
+    return hasStatusInYear(pp, year, ['new', 'active']) ? 'newListing' : null;
+  }
+  function isNewPlanType(t) { return t === 'newListing' || t === 'npdConfirmed' || t === 'npdRequest'; }
+  // Listing ที่สร้างจาก SKU Planning (Sales แก้เดือนเริ่ม / ลบได้เฉพาะรายการนี้) · addedBy SALES เดิม (CR-20) นับเป็นที่มาเดียวกัน
+  function isPlanListing(l) { return !!l && (l.source === 'skuPlanning' || l.addedBy === 'SALES'); }
+
+  // เดือนเริ่มที่เลือกได้ในคอลัมน์ช่วงเวลาขาย (โหมดแก้ไข · สินค้าใหม่ 3 ประเภท): เดือนแรกของปีแผน ถึงเดือนสุดแผน (ไม่เกิน ธ.ค. ของปีแผน)
+  //   NPD ยืนยันแล้ว = ไม่ก่อนเดือนเปิดตัว · Listing ที่ทีม Product สร้าง = ไม่ก่อนเดือนเริ่มวางขายของ Listing นั้น
+  //   → [{ m, key: 'YYYY-MM', ok, reason: null | 'beforeLaunch' | 'beforeListing' }] · launch = เดือนเปิดตัว 'YYYY-MM' | null
+  function startMonthOptions(product, type, listing, year, horizonEnd) {
+    var p = planProduct(product);
+    var launch = p ? (p.launchDate || quarterStart(p.launchQuarter)) : null;
+    launch = launch ? String(launch).slice(0, 7) : null;
+    var end = horizonEnd && horizonEnd < monthKey(year, 11) ? horizonEnd : monthKey(year, 11);
+    var lockedListing = listing && !isPlanListing(listing) && listing.fromMonth ? listing.fromMonth : null;
+    var out = [];
+    for (var m = 0; m < 12; m++) {
+      var k = monthKey(year, m);
+      if (k > end && m > 0) break;
+      var reason = type === 'npdConfirmed' && launch && k < launch ? 'beforeLaunch' : lockedListing && k < lockedListing ? 'beforeListing' : null;
+      out.push({ m: m, key: k, ok: !reason, reason: reason });
+    }
+    return { months: out, launch: launch };
+  }
+  // เดือนก่อนเดือนเริ่มใหม่ที่มีจำนวนแล้ว (เลื่อนเดือนเริ่มให้ช้าลง = ค่าเหล่านี้จะถูกล้างเป็น 0) → [index]
+  function startClearedMonths(item, m) {
+    var out = [];
+    for (var i = 0; i < Math.min(12, m); i++) if (item && ((item.qty && item.qty[i] > 0) || (item.overrides && item.overrides[i] && item.qty[i]))) out.push(i);
+    return out;
+  }
+  // ตั้งเดือนเริ่มขายของแถว → แผนใหม่ (เดือนก่อนเดือนเริ่ม: ค่าและ Override ล้าง = ล็อก 0 ตามกติกา Listing)
+  function setPlanStart(plan, key, m) {
+    var out = copy(plan);
+    var it = out.items && out.items[key];
+    if (!it) return out;
+    it.startMonth = m;
+    for (var i = 0; i < Math.min(12, m); i++) { it.qty[i] = 0; it.overrides[i] = false; }
+    return out;
+  }
+  // เดือนเปิดตัวของคำขอ NPD = เดือนเริ่มที่เร็วที่สุดของ Listing ทุกหน่วยขายของสินค้านั้น (ไม่นับที่ถอดแล้ว) → 'YYYY-MM' | null
+  function requestLaunchMonth(listings, key) {
+    var ms = (listings || []).filter(function (l) { return l.productKey === key && listingStatus(l) !== 'delisted' && l.fromMonth; }).map(function (l) { return l.fromMonth; }).sort();
+    return ms[0] || null;
+  }
+  // คำขอ NPD (ยังไม่ยืนยัน): ตั้งเดือนเปิดตัวของสินค้า (launchDate · request.launchDate) และแผน NPD ตาม Listing → { products, npdPlans }
+  function syncRequestLaunch(master, key) {
+    var p = findProduct(master.products, key);
+    var out = { products: master.products, npdPlans: master.npdPlans };
+    if (!p || !isNpdRequest(p, master.npdPlans)) return out;
+    var first = requestLaunchMonth(master.listings, key);
+    if (!first) return out;
+    var date = first + '-01';
+    out.products = (master.products || []).map(function (x) {
+      if (productKey(x) !== key || x.launchDate === date) return x;
+      var o = copy(x);
+      o.launchDate = date;
+      delete o.launchQuarter;
+      if (o.request) o.request.launchDate = date;
+      return o;
+    });
+    out.npdPlans = (master.npdPlans || []).map(function (n) {
+      if (n.productKey !== key) return n;
+      var o = copy(n);
+      o.plannedLaunchDate = date;
+      o.launchQuarter = null;
+      o.plannedAccounts = (master.listings || []).filter(function (l) { return l.productKey === key && listingStatus(l) !== 'delisted'; })
+        .map(function (l) { return { accountId: l.accountId, plannedStartMonth: l.fromMonth || null }; });
+      return o;
+    });
+    return out;
+  }
+  // Master ที่รวมการแก้ของแผน SKU ที่ยังไม่บันทึก (ใช้ทั้งตอนแสดงผลและตอนบันทึก) · pending บนแผน:
+  //   newListings { key: 'YYYY-MM' } = Listing ใหม่ที่สร้างจาก SKU Planning · listingStarts { key: 'YYYY-MM' } = เดือนเริ่มใหม่ของ Listing จาก SKU Planning ·
+  //   dropListings { key: true } = ลบ Listing จาก SKU Planning ของหน่วยนี้ (นำออกจากแผน) · meta = { at, by } → { products, listings, npdPlans, changed: [key] }
+  function planMasterPreview(master, plan, unitId, meta) {
+    meta = meta || {};
+    var p = plan || {};
+    var listings = master.listings || [];
+    var changed = [];
+    Object.keys(p.dropListings || {}).forEach(function (k) {
+      var l = listingOf(listings, k, unitId);
+      if (!isPlanListing(l)) return;
+      listings = listings.filter(function (x) { return !(x.productKey === k && x.accountId === unitId); });
+      changed.push(k);
+    });
+    Object.keys(p.newListings || {}).forEach(function (k) {
+      if (!(p.items || {})[k]) return;
+      listings = addSalesListings(listings, [k], [unitId], { at: meta.at, by: meta.by, fromMonth: p.newListings[k] });
+      if (changed.indexOf(k) < 0) changed.push(k);
+    });
+    Object.keys(p.listingStarts || {}).forEach(function (k) {
+      var l = listingOf(listings, k, unitId);
+      if (!isPlanListing(l) || l.fromMonth === p.listingStarts[k]) return;
+      listings = listings.map(function (x) { if (x.productKey !== k || x.accountId !== unitId) return x; var o = copy(x); o.fromMonth = p.listingStarts[k]; return o; });
+      if (changed.indexOf(k) < 0) changed.push(k);
+    });
+    var out = { products: master.products, listings: listings, npdPlans: master.npdPlans, changed: changed };
+    changed.forEach(function (k) {
+      var r = syncRequestLaunch({ products: out.products, listings: out.listings, npdPlans: out.npdPlans }, k);
+      out.products = r.products;
+      out.npdPlans = r.npdPlans;
+    });
+    return out;
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-34 ส่วน 3–5: Plan Summary ตามประเภทสินค้าในแผน (ข้อมูล = report.skuItems · calc.skuPlanItems ที่มี planType)
+  // ---------------------------------------------------------------------
+  function typeOfItem(it) { return PLAN_TYPES.indexOf(it.planType) >= 0 ? it.planType : 'existing'; }
+  function itemsIn(items, unitIds) {
+    if (!unitIds) return items || [];
+    var ids = {};
+    unitIds.forEach(function (u) { ids[u] = true; });
+    return (items || []).filter(function (it) { return ids[it.unitId]; });
+  }
+  // แผนรายเดือนแยกประเภท · scope = { units: [{ id, targetM, priorM, planM }], items: report.skuItems }
+  //   → [12 × { month, target, reference (ยอดขายอ้างอิงรายเดือน · calc.priorMonthly), plan, existing, newListing, npdConfirmed, npdRequest, clearance }]
+  //   ไม่มี items (Snapshot ก่อน CR-34) = แผนทั้งหมดเป็นสินค้าเดิม (planM) · plan = ผลรวมทุกประเภท = รวมแผน Net Sales ของหน้า SKU Planning
+  function planByTypeMonthly(scope) {
+    var units = (scope && scope.units) || [];
+    var out = [];
+    for (var m = 0; m < 12; m++) {
+      var o = { month: m, target: 0, reference: 0, plan: 0 };
+      PLAN_TYPES.forEach(function (t) { o[t] = 0; });
+      units.forEach(function (u) { o.target += (u.targetM && u.targetM[m]) || 0; o.reference += (u.priorM && u.priorM[m]) || 0; });
+      out.push(o);
+    }
+    if (scope && scope.items) {
+      itemsIn(scope.items, units.map(function (u) { return u.id; })).forEach(function (it) {
+        var t = typeOfItem(it);
+        for (var i = 0; i < 12; i++) out[i][t] += (it.net && it.net[i]) || 0;
+      });
+    } else {
+      units.forEach(function (u) { for (var i = 0; i < 12; i++) out[i].existing += (u.planM && u.planM[i]) || 0; });
+    }
+    out.forEach(function (o) { o.plan = sum(PLAN_TYPES.map(function (t) { return o[t]; })); });
+    return out;
+  }
+  // ส่วนต่างรายเดือนใต้กราฟ = แผน − เป้าหมาย → { diff, status } · ครบ = |ส่วนต่าง| < PLAN_DIFF_OK_BAHT (ครึ่งหนึ่งของหลักที่แสดง 0.1 ล้าน)
+  //   ไม่มีเป้าหมาย = 'empty' · ขาด = 'short' · เกิน = 'over' (สีตามแถวคงเหลือ)
+  var PLAN_DIFF_OK_BAHT = 50000;
+  function planDiff(target, plan) {
+    var d = (plan || 0) - (target || 0);
+    return { diff: d, status: !target ? 'empty' : Math.abs(d) < PLAN_DIFF_OK_BAHT ? 'ok' : d < 0 ? 'short' : 'over' };
+  }
+  function itemTotal(it, f) { return sum((it[f] || []).map(function (v) { return v || 0; })); }
+  // สัดส่วนแผนตามประเภท (ซ้าย) → { total, rows: [{ type, value, skus }] (สินค้าเดิมรวม Listing ใหม่ · Clearance เฉพาะเมื่อมีแผน),
+  //   listing: { value, skus } (Listing ใหม่ที่รวมในสินค้าเดิม), newTotal (Listing ใหม่ + NPD ยืนยันแล้ว + ขอ NPD), newPct (ของแผนรวม),
+  //   gap (เป้าหมาย − สินค้าเดิมไม่รวม Listing ใหม่ · ไม่ติดลบ) } · SKU = รหัสที่มีจำนวนในแผน > 0 (ไม่นับซ้ำข้ามหน่วยขาย)
+  function planTypeMix(items, unitIds, target) {
+    var val = {}, keys = {};
+    PLAN_TYPES.forEach(function (t) { val[t] = 0; keys[t] = {}; });
+    itemsIn(items, unitIds).forEach(function (it) {
+      var t = typeOfItem(it);
+      val[t] += itemTotal(it, 'net');
+      if (itemTotal(it, 'units') > 0) keys[t][it.key] = true;
+    });
+    function n(list) { var k = {}; list.forEach(function (t) { Object.keys(keys[t]).forEach(function (x) { k[x] = true; }); }); return Object.keys(k).length; }
+    var total = sum(PLAN_TYPES.map(function (t) { return val[t]; }));
+    var rows = [
+      { type: 'existing', value: val.existing + val.newListing, skus: n(['existing', 'newListing']) },
+      { type: 'npdConfirmed', value: val.npdConfirmed, skus: n(['npdConfirmed']) },
+      { type: 'npdRequest', value: val.npdRequest, skus: n(['npdRequest']) }
+    ];
+    if (val.clearance > 0.5 || n(['clearance'])) rows.push({ type: 'clearance', value: val.clearance, skus: n(['clearance']) });
+    var newTotal = val.newListing + val.npdConfirmed + val.npdRequest;
+    return { total: total, rows: rows, listing: { value: val.newListing, skus: n(['newListing']) }, newTotal: newTotal, newPct: total ? newTotal / total : 0,
+      gap: Math.max(0, (target || 0) - val.existing) };
+  }
+  // ตามกลุ่มสินค้าซ้อนตามประเภท (ขวา) kind = 'series' | 'category' → [{ key ('' = ไม่ระบุ), total, parts: { existing (รวม Listing ใหม่), npdConfirmed, npdRequest, clearance }, listing }]
+  //   เรียงมากไปน้อย · ไม่ระบุไว้ท้ายสุด · กลุ่มที่ไม่มีแผน (≤ 0.5 บาท) ไม่แสดง
+  function planGroupByType(items, unitIds, kind) {
+    var map = {};
+    itemsIn(items, unitIds).forEach(function (it) {
+      var k = (kind === 'category' ? it.categoryId : it.seriesId) || '';
+      var g = map[k] || (map[k] = { key: k, total: 0, parts: { existing: 0, npdConfirmed: 0, npdRequest: 0, clearance: 0 }, listing: 0 });
+      var t = typeOfItem(it), v = itemTotal(it, 'net');
+      g.total += v;
+      if (t === 'newListing') { g.parts.existing += v; g.listing += v; } else g.parts[t] += v;
+    });
+    return Object.keys(map).map(function (k) { return map[k]; }).filter(function (g) { return g.total > 0.5; })
+      .sort(function (a, b) { return (a.key === '' ? 1 : 0) - (b.key === '' ? 1 : 0) || b.total - a.total; });
+  }
+  // ข้อมูลที่ต้องตรวจ: แผนสินค้า Clearance = SKU × หน่วยขายที่มีจำนวนในแผน > 0 → [{ key, name, unitId, channelId, units }]
+  function planClearanceItems(items, unitIds) {
+    return itemsIn(items, unitIds).filter(function (it) { return it.planType === 'clearance' && itemTotal(it, 'units') > 0; })
+      .map(function (it) { return { key: it.key, name: it.name, unitId: it.unitId, channelId: it.channelId, units: itemTotal(it, 'units') }; });
   }
 
   // =====================================================================
@@ -2902,7 +3407,7 @@
   }
 
   // CR-32: เดือนที่หน่วยขายไม่มีผู้รับผิดชอบ (ownerOf = null) ระหว่าง fromKey – toKey (รวมทั้งสองเดือน) ฟังก์ชันเดียวของทุกหน้า
-  //   (Sales Unit & Customer ณ เดือนที่เลือก · Sales Person Management เดือนปัจจุบัน – สุดแผน) ตัวเลขจึงไม่ขัดกัน
+  //   (Account Master ณ เดือนที่เลือก · Sales Person Management เดือนปัจจุบัน – สุดแผน) ตัวเลขจึงไม่ขัดกัน
   //   → [{ unitId, runs: [{ from, to, after }] }] เฉพาะหน่วยที่มีช่วงว่าง · after = ผู้รับผิดชอบเดือนก่อนช่วงว่าง
   //   (สิ้นสุดแล้วไม่มีคนรับช่วง) | null = ว่างโดยไม่มีคนก่อนหน้า
   function ownerGaps(assignments, salespeople, unitIds, fromKey, toKey) {
@@ -2926,7 +3431,10 @@
   //        vacant: { months: [12], total, units: [...] } }] }
   //   ผู้รับผิดชอบของเดือน = ownerOf (ทีมนับเป็นผู้รับผิดชอบ) · Σ แถวบุคคล + ไม่มีผู้รับผิดชอบ = ยอดรวม Channel ทุกเดือน
   //   แถวลูก = หน่วยขายที่คนนั้นรับผิดชอบในปีนั้น (ค่าเฉพาะเดือนที่รับผิดชอบ) · เดือนที่หน่วยไม่มีค่า (null) ไม่นับ
-  function personMonthlyLoad(data, year, values) {
+  // CR-35: opts.allOwners = แสดงผู้รับผิดชอบของหน่วยขายที่ไม่มีค่าในปีนั้นด้วย (แถวยอด 0 · เช่น ทีม KAM กลาง ในกลุ่ม MT เมื่อหน่วยขายไม่อยู่ในแผน) ·
+  //   ไม่ส่ง = ผลเดิม · กลุ่ม = Channel ของหน่วยขายที่รับผิดชอบ (คนที่ดูแลหลาย Channel อยู่ทุกกลุ่มที่เกี่ยวข้อง)
+  function personMonthlyLoad(data, year, values, opts) {
+    var allOwners = !!(opts && opts.allOwners);
     var chs = (data.channels || []).filter(function (c) { return c.active !== false; }).slice().sort(function (a, b) { return (a.order || 0) - (b.order || 0); });
     function blank() { return [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; }
     function nulls() { return [null, null, null, null, null, null, null, null, null, null, null, null]; }
@@ -2939,7 +3447,13 @@
       unitsOfChannel(data, ch.id, true).forEach(function (u) {
         var v = values[u.id] || nulls();
         for (var m = 0; m < 12; m++) {
-          if (v[m] == null) continue;
+          if (v[m] == null) {
+            if (allOwners) {
+              var owner = ownerOf(data.assignments, data.salespeople, u.id, monthKey(year, m));
+              if (owner && !people[owner]) { people[owner] = { personId: owner, months: blank(), total: 0, units: [], byUnit: {} }; order.push(owner); }
+            }
+            continue;
+          }
           total[m] += v[m];
           var pid = ownerOf(data.assignments, data.salespeople, u.id, monthKey(year, m));
           var row;
@@ -2960,6 +3474,18 @@
     });
     return { year: year, channels: out };
   }
+
+  // CR-35: ช่วงปีของตัวเลือกปี (ผู้รับผิดชอบรายเดือน) = ปีที่เก่าที่สุดที่มีข้อมูลผู้รับผิดชอบ ถึงปีของเดือนสุดแผน (settings.PLAN_HORIZON_END ผ่าน clock) → [ปี]
+  function ownerYears(assignments, horizonEnd) {
+    var end = Number(String(horizonEnd || SP.core.clock.horizonEnd()).slice(0, 4));
+    var first = end;
+    (assignments || []).forEach(function (a) { var y = Number(String(a.fromMonth || '').slice(0, 4)); if (y && y < first) first = y; });
+    var out = [];
+    for (var y = first; y <= end; y++) out.push(y);
+    return out;
+  }
+  // ป้ายของปีในตัวเลือกปี: ไม่เกินปีของเดือนปัจจุบันกลาง = ข้อมูลจริง ('actual') · หลังจากนั้น = ปีแผน ('plan')
+  function yearKind(year) { return year <= Number(SP.core.clock.currentMonth().slice(0, 4)) ? 'actual' : 'plan'; }
 
   // CR-32: เปลี่ยนผู้รับผิดชอบหน่วย unitId เป็น personId ช่วง start – end (ส่วนที่ 4.4) → { ask, current, replaceEnd, after: { from, to } }
   //   ask = ช่วงที่เลือกมีช่วงเดิมของคนอื่น (Q) และช่วงของ Q ยังต่อไปหลัง end (ครบ 2 ข้อ · Q จบภายใน end = เขียนทับได้เลย ไม่ถาม)
@@ -3003,6 +3529,58 @@
     AGE_GROUPS: AGE_GROUPS,
     monthsDiff: monthsDiff,
     skuPlanItems: skuPlanItems,
+    PLAN_TYPES: PLAN_TYPES,
+    PRODUCT_STATUSES: PRODUCT_STATUSES,
+    isRequestProduct: isRequestProduct,
+    requestCodeOf: requestCodeOf,
+    productCode: productCode,
+    codeOf: codeOf,
+    isDeletedAt: isDeletedAt,
+    deletedInYear: deletedInYear,
+    revenueTypeOf: revenueTypeOf,
+    dateStatus: dateStatus,
+    dateStatusAt: dateStatusAt,
+    npdPlanOf: npdPlanOf,
+    isNpdRequest: isNpdRequest,
+    soldInUnit: soldInUnit,
+    planTypeOf: planTypeOf,
+    isNewPlanType: isNewPlanType,
+    isPlanListing: isPlanListing,
+    startMonthOptions: startMonthOptions,
+    startClearedMonths: startClearedMonths,
+    setPlanStart: setPlanStart,
+    requestLaunchMonth: requestLaunchMonth,
+    syncRequestLaunch: syncRequestLaunch,
+    planMasterPreview: planMasterPreview,
+    clearanceMap: clearanceMap,
+    clearanceActive: clearanceActive,
+    clearanceForUnit: clearanceForUnit,
+    clearanceDiscount: clearanceDiscount,
+    clearanceRows: clearanceRows,
+    clearanceCandidates: clearanceCandidates,
+    categoryOptions: categoryOptions,
+    clearanceMonths: clearanceMonths,
+    clearanceUnitIds: clearanceUnitIds,
+    clearanceQty: clearanceQty,
+    clearancePlanned: clearancePlanned,
+    clearanceStockState: clearanceStockState,
+    clearanceDistribute: clearanceDistribute,
+    clearancePlanMonthly: clearancePlanMonthly,
+    clearanceLockedRows: clearanceLockedRows,
+    clearClearanceCells: clearClearanceCells,
+    listedNotPlanned: listedNotPlanned,
+    productYear: productYear,
+    groupItems: groupItems,
+    productGroupLevels: productGroupLevels,
+    groupTotal: groupTotal,
+    GROUP_BY: GROUP_BY,
+    ownerYears: ownerYears,
+    yearKind: yearKind,
+    planByTypeMonthly: planByTypeMonthly,
+    planDiff: planDiff,
+    planTypeMix: planTypeMix,
+    planGroupByType: planGroupByType,
+    planClearanceItems: planClearanceItems,
     pivotPlan: pivotPlan,
     unitAllocationBlock: unitAllocationBlock,
     channelTargetAudit: channelTargetAudit,

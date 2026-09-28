@@ -1,5 +1,5 @@
 /*
- * modules/sales-units/sales-units.js — Account Master · Sales Unit & Customer (CR-32 รวมหน้า Account & Platform + เขตและร้านค้า (TT) · CR-33 แก้ไขรายรายการ)
+ * modules/sales-units/sales-units.js — Account Master · Partner List (CR-36 ชื่อหน้า · CR-32 รวมหน้า Account & Platform + เขตและร้านค้า (TT) · CR-33 แก้ไขรายรายการ)
  *
  * แนวคิด: Channel → หน่วยขาย (Account · Platform · เขต) → คู่ค้า (รหัสคู่ค้า = รหัสใน TRCLOUD) · คู่ค้าอยู่ในหน่วยขายตามช่วงเดือน (กลไกเดียวกับร้านค้า TT เดิม ทุก Channel)
  *   ข้อมูล / กฎทั้งหมดจาก core/units.js (หน่วยขาย · คู่ค้า · ช่วง · ย้าย · ข้อมูลที่ต้องตรวจ · คำสั่งแก้ไขที่ตรวจสิทธิ์ในฟังก์ชัน) + core/stores.js + core/master.js
@@ -46,7 +46,7 @@
   var NONE = '__none';
   var KEYS = ['accounts', 'territories', 'provinceSuggestions', 'channels', 'stores', 'storeAssignments', 'storeMoves', 'customers', 'customerAssignments'];
   var SELECTABLE = ['kind', 'trcloudType', 'storeType', 'priceType', 'province', 'export', 'online', 'status', 'unit', 'refL12M', 'taxId', 'legalName', 'period'];
-  var CHECK_KEYS = ['unassigned', 'noOwner', 'prefix', 'noProvince', 'duplicate', 'noCustomers'];
+  var CHECK_KEYS = ['unassigned', 'noOwner', 'prefix', 'noProvince', 'noCustomers'];   // CR-35 ตัด System ID ซ้ำ
   var filters = defaultFilters();
   var sort = { key: 'refL12M', dir: -1 };
   var panelSel = 'all';          // 'all' | 'unassigned' (ทุก Channel ของแท็บ) | 'unassigned:<channelId>' | unitId
@@ -143,7 +143,8 @@
     if (ctx.intro) {
       var h1 = ctx.intro.querySelector('h1');
       ctx.intro.insertBefore(picker, h1 ? h1.nextSibling : ctx.intro.firstChild);
-      ctx.intro.appendChild(h('div', { class: 'su-head-tools' }, exportBtn));
+      // CR-35: ผู้ไม่มีสิทธิ์แก้ = ข้อความอ่านอย่างเดียวข้างปุ่มส่งออก (ชื่อบทบาทจากตารางสิทธิ์)
+      ctx.intro.appendChild(h('div', { class: 'su-head-tools' }, C.viewOnlyNote(['salesUnits']), exportBtn));
     }
 
     // ---------- บันทึกทันที: changes จาก units.command* → store + Audit log + Toast ----------
@@ -174,7 +175,7 @@
     function errorText(code) { return page.errors[code] || page.move.errors[code] || page.errors.failed; }
     // res = ผลของ units.command* → true เมื่อบันทึกแล้ว · ไม่ผ่าน = Toast ข้อความผิดพลาด (ไม่เขียน store)
     function run(res, message) {
-      if (!res || !res.ok) { C.toast(errorText(res && res.error)); return false; }
+      if (!res || !res.ok) { C.toast(res && res.error === 'duplicateCode' ? fill(page.errors.duplicateCode, res) : errorText(res && res.error)); return false; }
       commit(res.changes, message);
       return true;
     }
@@ -229,7 +230,6 @@
         if (filters.data.length && !filters.data.some(function (k) {
           if (k === 'outside') return outside(x);
           if (k === 'noProvince') return x.kind === 'store' && !provincesOf(x).length;
-          if (k === 'duplicate') return x.duplicates > 1;
           return U.movedInYear(model.d, x.id, year);
         })) return false;
         return true;
@@ -265,8 +265,7 @@
       }
       return {
         trcloudId: { key: 'trcloudId', label: X.trcloudId, cls: 'su-id', value: function (x) { return x.trcloudId; },
-          sortValue: function (x) { return (Number(x.trcloudId) || 0) * 10 + (x.id === x.trcloudId ? 0 : Number(String(x.id).split('-').pop()) || 0); },
-          cell: function (x) { return [x.trcloudId, x.duplicates > 1 ? h('span', { class: 'badge tag-warn su-dup', title: fill(T.duplicateTip, { n: x.duplicates }) }, T.duplicate) : null]; } },
+          sortValue: function (x) { return Number(x.trcloudId) || 0; } },
         name: { key: 'name', label: terrTab ? X.nameStore : X.name, cls: 'su-name', value: function (x) { return x.name; },
           cell: function (x) { return [h('span', { class: 'su-name-text', title: x.name }, x.name), x.masked ? C.privacyMark(T.masked) : null]; } },
         kind: { key: 'kind', label: X.kind, value: function (x) { return page.kinds[x.kind] || x.kind; } },
@@ -414,7 +413,7 @@
         multi('priceType', X.priceType, uniq(function (x) { return x.priceType ? [x.priceType] : null; }).map(function (v) { return { value: v, label: noneLabel(v) }; })),
         multi('province', X.province, uniq(function (x) { var p = provincesOf(x); return p.length ? p : null; }).map(function (v) { return { value: v, label: noneLabel(v) }; })),
         multi('channels', X.channels, ['export', 'online'].map(function (v) { return { value: v, label: X.channelOptions[v] }; })),
-        multi('data', X.data, ['outside', 'noProvince', 'moved', 'duplicate'].map(function (v) { return { value: v, label: X.dataOptions[v] }; })));
+        multi('data', X.data, ['outside', 'noProvince', 'moved'].map(function (v) { return { value: v, label: X.dataOptions[v] }; })));
     }
     function filterChips() {
       var X = page.filters;
@@ -475,8 +474,7 @@
             } };
           }),
           more: g.key === 'unassigned' ? function () { panelSel = tab === 'all' ? 'unassigned' : 'unassigned:' + tab; filters.status = 'active'; draw(); }
-            : g.key === 'noProvince' ? function () { panelSel = 'all'; filters.data = ['noProvince']; draw(); }
-            : g.key === 'duplicate' ? function () { panelSel = 'all'; filters.data = ['duplicate']; filters.status = 'all'; draw(); } : null
+            : g.key === 'noProvince' ? function () { panelSel = 'all'; filters.data = ['noProvince']; draw(); } : null
         };
       });
       return C.dataCheck({ title: fill(X.title, { month: F.date(month) }), groups: groups, moreLabel: X.showAll,
@@ -865,6 +863,9 @@
       var body = h('div', { class: 'su-dlg su-import-dlg' },
         h('p', { class: 'dlg-text' }, fill(X.rows, { n: F.number(parsed.rows.length) })),
         diff.unknownTerritories.length ? h('p', { class: 'su-dlg-warn' }, fill(X.unknownTerritory, { names: diff.unknownTerritories.join(', ') })) : null,
+        // CR-35: แถวที่รหัสคู่ค้าซ้ำ = ไม่นำเข้า
+        (diff.rejected || []).length ? h('div', { class: 'su-dlg-warn su-imp-rejected' }, h('strong', null, fill(X.rejected, { n: F.number(diff.rejected.length) })),
+          h('ul', null, diff.rejected.slice(0, MAX).map(function (x) { return h('li', null, fill(page.errors.duplicateCode, { code: x.code, name: x.name })); }))) : null,
         field(X.fromMonth, monthSel),
         section('added', diff.added.map(function (a) { return { id: a.store.id, a: a }; }), function (x) {
           var s = x.a.store;
@@ -1297,7 +1298,6 @@
       custCtl.head.appendChild(h('div', { class: 'su-d-head' },
         h('h2', { class: 'su-d-title' }, x.name, x.masked ? C.privacyMark(page.tips.masked) : null),
         h('div', { class: 'su-d-meta' }, chTag(ch), h('span', null, x.trcloudId),
-          x.duplicates > 1 ? h('span', { class: 'badge tag-warn', title: fill(page.tips.duplicateTip, { n: x.duplicates }) }, page.tips.duplicate) : null,
           h('span', { class: 'badge ' + (active ? 'tag-ok' : 'tag-muted') }, active ? page.status.active : page.status.inactive),
           x.isSample ? h('span', { class: 'su-hint' }, page.tips.sample) : null)));
       function row(label, value) { return h('div', { class: 'su-field' }, h('span', { class: 'field-label' }, label), h('span', { class: 'su-value' }, value)); }

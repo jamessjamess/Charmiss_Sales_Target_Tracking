@@ -37,41 +37,8 @@
 .gd-side .gd-block + .gd-block { margin-top: var(--sp-4); }
 @media (max-width: 1100px) { .gd-glossary { grid-template-columns: minmax(0, 1fr); } }
 
-/* สถานการณ์ทดสอบ (UAT) */
-.gd-uat-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--sp-2) var(--sp-4); }
-.gd-input { font: inherit; font-size: var(--fs-sm); padding: 4px var(--sp-2); border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface); color: var(--c-text); }
-.gd-tester { width: 16em; }
-.gd-progress { font-weight: var(--fw-bold); padding-bottom: 4px; }
-.gd-uat-actions { display: inline-flex; gap: var(--sp-2); margin-left: auto; }
-.gd-uat-warning { margin: var(--sp-3) 0 0; font-size: var(--fs-sm); }
-.gd-sc-tools { display: flex; justify-content: flex-end; margin: var(--sp-2) 0 var(--sp-1); font-size: var(--fs-sm); }
-.gd-scenarios { display: grid; gap: var(--sp-2); }
-.gd-sc { border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface); }
-.gd-sc.is-active { border-color: var(--c-warn-bd); box-shadow: 0 0 0 2px var(--c-warn-bg); }
-.gd-sc-head { display: flex; align-items: center; gap: var(--sp-2); width: 100%; padding: var(--sp-2) var(--sp-3); border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; color: var(--c-text); }
-.gd-sc-head:hover { background: var(--c-surface-2); }
-.gd-sc-caret { width: 1em; color: var(--c-text-muted); }
-.gd-sc-id { font-weight: var(--fw-bold); color: var(--c-primary-strong); min-width: 2em; }
-.gd-sc-title { min-width: 0; }
-.gd-sc-count { margin-left: auto; font-size: var(--fs-sm); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
-.gd-result { min-width: 6em; justify-content: center; }
-.gd-result.is-pass { background: var(--c-success-bg); color: var(--c-success-fg); border-color: var(--c-success-bd); }
-.gd-result.is-fail { background: var(--c-danger-bg); color: var(--c-danger-fg); border-color: var(--c-danger-bd); }
-.gd-result.is-skip, .gd-result.is-none { background: var(--c-surface-2); color: var(--c-text-muted); border-color: var(--c-border); }
-.gd-sc-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-4); padding: var(--sp-2) var(--sp-4) var(--sp-4); border-top: 1px solid var(--c-border); }
-.gd-sc-body h3 { font-size: var(--fs-sm); margin: var(--sp-2) 0 4px; color: var(--c-text-muted); }
-.gd-sc-start { margin-top: var(--sp-2); }
-.gd-steps { margin: 0; padding-left: 1.4em; display: grid; gap: 4px; font-size: var(--fs-sm); }
-.gd-steps li.is-done .gd-step-text { color: var(--c-text-muted); text-decoration: line-through; }
-.gd-step-text { margin-right: var(--sp-2); }
-.gd-step-check { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--c-text-muted); cursor: pointer; white-space: nowrap; vertical-align: middle; }
-.gd-expected { margin: 0; padding: var(--sp-2) var(--sp-3); border-radius: var(--radius-sm); background: var(--c-surface-2); font-size: var(--fs-sm); color: var(--c-text-muted); }
-.gd-sc-body .segmented .seg.gd-res-pass.is-active { background: var(--c-success-bg); color: var(--c-success-fg); }
-.gd-sc-body .segmented .seg.gd-res-fail.is-active { background: var(--c-danger-bg); color: var(--c-danger-fg); }
-.gd-note-field { display: grid; gap: 2px; margin-top: var(--sp-2); }
-.gd-note { width: 100%; resize: vertical; }
-.gd-note-error { margin: 4px 0 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
-@media (max-width: 900px) { .gd-sc-body { grid-template-columns: minmax(0, 1fr); } }
+/* CR-36: ตัดแท็บสถานการณ์ทดสอบ (UAT) · คำศัพท์ตามกลุ่ม */
+.gd-terms tr.gd-term-group > th { background: var(--c-surface-2); color: var(--c-text-muted); font-size: var(--fs-sm); text-align: left; padding-top: var(--sp-2); }
 
 @media (max-height: 760px) {
   .ab-panel { font-size: var(--fs-sm); }

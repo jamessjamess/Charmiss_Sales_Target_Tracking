@@ -289,19 +289,27 @@
         onHover: function (id) { highlightChannel(id, 'columns'); }
       };
     }
+    // CR-36: แนวตั้งเต็มการ์ด (charts.waterfallColumns) · Tooltip ต่อแท่ง = Channel · ยอด L12M · เป้าหมาย · ส่วนต่าง · การเติบโต %
     function waterfallSpec(t) {
       var TD = page;
       var wf = calc.growthWaterfall(t);
+      function signed(v) { return (v < 0 ? '−' : '+') + mb(Math.abs(v)); }
       return {
-        start: { label: fill(TD.wfStart, { year: t.priorYear }), value: wf.start }, end: { label: fill(TD.wfEnd, { year: year }), value: wf.end },
-        steps: wf.steps.map(function (s) { return s.unallocated ? { id: '_rest', label: s.delta >= 0 ? TD.unallocated : TD.overAllocated, value: s.delta } : { id: s.id, label: s.name, value: s.delta, tag: s.isNew ? L.growthNew : null }; }),
+        start: { label: fill(TD.wfStart, { year: t.priorYear }), value: wf.start, title: fill(TD.wfTotalTip, { label: fill(TD.wfStart, { year: t.priorYear }), value: mb(wf.start) }) },
+        end: { label: fill(TD.wfEnd, { year: year }), value: wf.end, title: fill(TD.wfTotalTip, { label: fill(TD.wfEnd, { year: year }), value: mb(wf.end) }) },
+        steps: wf.steps.map(function (s) {
+          if (s.unallocated) { var ul = s.delta >= 0 ? TD.unallocated : TD.overAllocated; return { id: '_rest', label: ul, value: s.delta, title: fill(TD.wfTotalTip, { label: ul, value: signed(s.delta) }) }; }
+          var g = calc.growth(s.target, s.prior);
+          return { id: s.id, label: s.name, value: s.delta, tag: s.isNew ? L.growthNew : null,
+            title: fill(TD.wfStepTip, { name: s.name, prior: s.prior == null ? '–' : mb(s.prior), target: mb(s.target), delta: signed(s.delta), growth: F.growth(g, L.growthNew) }) };
+        }),
         format: mb, signed: function (v) { return (v < 0 ? '−' : '+') + mb(Math.abs(v)); }, tick: G.millionTick,
         axisNote: function (lo) { return fill(TD.wfAxis, { value: F.number(lo / 1e6, 0) }); },
         onHover: function (id) { highlightChannel(id && id !== '_rest' ? id : null, 'waterfall'); }
       };
     }
     function buildCharts(t) {
-      return { columns: G.stackedColumns(columnsSpec(t)), waterfall: G.waterfall(waterfallSpec(t)) };
+      return { columns: G.stackedColumns(columnsSpec(t)), waterfall: G.waterfallColumns(waterfallSpec(t)) };
     }
 
     // ---------- เติมตัวเลข (หลังแก้ค่า ไม่สร้างช่องกรอกใหม่) ----------

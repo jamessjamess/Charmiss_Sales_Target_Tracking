@@ -79,7 +79,7 @@
   // 13 = CR-32 ผูกผู้ใช้กับบุคลากรที่ person.userId ที่เดียว (master.users ไม่มี salesPersonId แล้ว)
   // 14 = CR-30 รอบ 3 Listing ตามช่วงเวลาและสถานะ (master.listings: status · fromMonth · toMonth)
   // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด · CR-32 แจ้งผู้ใช้ 1 ครั้งด้วย ui.toast = content.site.dataVersionToast)
-  var DATA_VERSION = 14;
+  var DATA_VERSION = 15;   // CR-35: 15 = รหัสคู่ค้าไม่ซ้ำ (ร้าน TT ที่รหัสซ้ำรวมเป็นรายการเดียว) · วงจรสถานะสินค้า · รหัสชั่วคราวคำขอ NPD
 
   function sessionAdapter() {
     var ss;
@@ -282,7 +282,18 @@
 
   function get(key) { return clone(Object.prototype.hasOwnProperty.call(values, key) ? values[key] : defaultFor(key)); }
 
+  // CR-35: รหัสคู่ค้าห้ามซ้ำทั้งระบบ (ร้านค้า TT + คู่ค้าของ Account / Platform) — ปฏิเสธที่ Store ไม่ใช่แค่หน้าจอ (core/units.js firstCodeConflict)
+  function checkCustomerCodes(key, value) {
+    if (key !== 'master.stores' && key !== 'master.customers') return;
+    var U = SP.core.units;
+    if (!U || !U.firstCodeConflict) return;
+    var prev = { stores: get('master.stores'), customers: get('master.customers') };
+    var dup = U.firstCodeConflict(key === 'master.stores' ? value : prev.stores, key === 'master.customers' ? value : prev.customers, prev);
+    if (dup) throw new Error(String(SP.data.content.pages.salesUnits.errors.duplicateCode).replace('{code}', dup.code).replace('{name}', dup.name));
+  }
+
   function set(key, value) {
+    checkCustomerCodes(key, value);
     values[key] = clone(value);
     adapter.save(key, values[key]);
     if (key === 'master.channels' && Array.isArray(value)) SP.data.channels = clone(value);   // CR-29

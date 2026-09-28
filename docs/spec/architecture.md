@@ -27,8 +27,8 @@ docs/             SPEC.md (สารบัญ) · spec/ · DECISIONS.md · CHANG
 
 paths → format → data/settings → **features** → **clock** (CR-24 เดือนปัจจุบันกลาง) → data (channels, accounts, territories, salespeople, teams, permissions, users, assignments,
 seed/seed-tt-stores, stores, taxonomy, seed/seed-charmiss, products, listings, pricing, promotions, npd, targets, history, actuals, plan-seeds,
-erp-snapshot, content, **guide** (CR-28 คู่มือ · UAT · ปุ่ม ?)) → calc → **stores** (นำเข้าร้านค้า TT) → **seed** (นำเข้าสินค้าจริง) → taxonomy → workflow → permissions → registry →
-**guide** (CR-28 `core/guide.js` ฟังก์ชันล้วนของคู่มือและ UAT) → **master** (CR-29 `core/master.js` ฟังก์ชันล้วนของ Account Master) → store → components → charts → export → report → layout → JS ของหน้า (`data-module`) → `layout.boot()`
+erp-snapshot, content, **guide** (CR-28 คู่มือ · ปุ่ม ? · CR-36 ไม่มี UAT)) → calc → **stores** (นำเข้าร้านค้า TT) → **seed** (นำเข้าสินค้าจริง) → taxonomy → workflow → permissions → registry →
+**guide** (CR-28 `core/guide.js` ฟังก์ชันล้วนของคู่มือ · CR-36 textVars / textIssues) → **master** (CR-29 `core/master.js` ฟังก์ชันล้วนของ Account Master) → store (CR-35 ปฏิเสธรหัสคู่ค้าซ้ำตอน `set` · `units.firstCodeConflict`) → components → charts → export → report → layout → JS ของหน้า (`data-module`) → `layout.boot()`
 
 - รายการไฟล์ใน `core/` และ `data/` อยู่ที่ `FILES` ที่เดียว ถ้าเพิ่มไฟล์ต้องเพิ่มในรายการนี้ด้วย (`tests/run.js` ใช้รายการเดียวกัน)
 - นำเข้าข้อมูลจริงตอนโหลด:
@@ -38,10 +38,14 @@ erp-snapshot, content, **guide** (CR-28 คู่มือ · UAT · ปุ่�
 
 ## registry (`core/registry.js`)
 
-- 1 บรรทัดต่อหน้า: `{ id, title, short, icon, path, group, tour, visible, fit, year, perm, open }`
+- 1 บรรทัดต่อหน้า: `{ id, title, short, icon, path, group, tour, visible, fit, year, perm, open, alsoPerms }`
+  - CR-35 `alsoPerms`: สิทธิ์ย่อยของหน้าอื่นที่ทำให้หน้านี้มองเห็นด้วย (`permissions.pageLevel` · Price & Promotion ← `listing.clearance`)
   - `group`: `sales-planning` · `product-master` · `account-master` · `role-management` (CR-25 แทน `system-settings`) · `project-info` → Side Menu สร้างกลุ่มตามนี้อัตโนมัติ
   - `tour`: ลำดับขั้นของ Sales Planning (1–4) ใช้กับเลข "ขั้นที่ x/4" (คงที่ทุกบทบาท · `registry.step`) และปุ่มก่อนหน้า/ถัดไป (ข้ามขั้นที่มองไม่เห็น) · หน้ากลุ่มอื่นเป็น `null`
   - `perm` (CR-25): ใช้สิทธิ์ของหน้าอื่น ไม่มีแถวในเมทริกซ์ (Users · Roles ที่ซ่อนแล้ว → `roleManagement`) · `open: true`: ทุกบทบาทเห็นเสมอ (เกี่ยวกับ Prototype)
+  - CR-36 `modules/products` = แท็บ สินค้า | Product Level (โค้ดหน้า Category & Series เดิมเป็น `renderLevel` · CSS `taxonomy.css` โหลดต่อ) · หน้าเดิม `taxonomy` = ทางผ่าน `#level`
+  - CR-35 หน้าที่รวมหลายหน้าเดิม: `modules/launch-listing` (แท็บ NPD | Listing · โค้ดของ 2 หน้าเดิมเป็น `renderNpd` / `renderListing` ในไฟล์เดียว · CSS ของหน้าเดิมโหลดต่อ) ·
+    หน้าเดิม `npd-plan` / `product-master` เหลือ Module สั้นที่ `location.replace` ไปแท็บที่ตรงกัน (`#npd` / `#listing`)
   - หน้าที่ใช้ไฟล์ Module ร่วมกันอยู่ในโฟลเดอร์ย่อยได้: `modules/role-management/{index,roles/index,users/index}.html` โหลด `role-management.js` ไฟล์เดียว
     (ลงทะเบียน `SP.modules.roleManagement / roleRoles / roleUsers` เนื้อหาตาม id ของหน้า)
   - `fit: true`: ที่จอตั้งแต่ 1024px หน้าสูงเท่าจอ (`body.fit-screen`) ตารางเลื่อนภายในการ์ด (`.fit-card` + `.fit-scroll`)
@@ -64,7 +68,7 @@ erp-snapshot, content, **guide** (CR-28 คู่มือ · UAT · ปุ่�
 - ลิงก์ไปหน้าที่ไม่เห็นจะถูกซ่อนเองทั้งหน้า และผู้ที่ไม่มีสิทธิ์ส่งออกจะได้ `body.perm-no-export`
 - Header มีชื่อระบบ · ป้าย Prototype · มุมมองผู้ใช้ · คู่มือ (CR-28) · รีเซ็ตข้อมูล (ไม่มีปีแผนใน Header)
   - CR-29 `master.channels` (ตั้งค่า Channel) บันทึกแล้วแทน `SP.data.channels` ตอนโหลดและตอน set (`core/store.js`) · รีเซ็ต = ค่าจาก `data/channels.js`
-  - CR-28 `รีเซ็ตข้อมูล` = `layout.resetData()`: ล้าง store แต่คง Key `uat.*` (ผลการทดสอบ · `guide.keepOnReset`)
+  - CR-28 `รีเซ็ตข้อมูล` = `layout.resetData()`: CR-36 ล้าง store ทั้งหมด (ตัด UAT)
 - CR-28: หัวข้อทุกหน้าในเมนู (ยกเว้นคู่มือ) มีปุ่ม `?` (`components.pageHelp` · เนื้อหา `data/guide.js` pages) · ระหว่างทดสอบสถานการณ์
   (`uat.results.active`) ทุกหน้ายกเว้นคู่มือมีแถบลอยมุมล่างขวา `กำลังทดสอบ …` + `กลับไปบันทึกผล`
 - ถ้าหน้ามี `page.approve` layout จะต่อกล่อง "สิ่งที่ขออนุมัติ" ท้ายหน้า (CR-28 ไม่มีหน้าที่ใช้แล้ว — เนื้อหาเดิมอยู่ที่ open-items.md)
@@ -81,10 +85,11 @@ erp-snapshot, content, **guide** (CR-28 คู่มือ · UAT · ปุ่�
    | กฎ Workflow | `core/workflow.js` |
    | สิทธิ์ | `core/permissions.js` |
    | ร้านค้าและเขต | `core/stores.js` |
+   | เพิ่ม / ขอ / นำสินค้าออกจากแผน SKU (CR-34 · ตรวจสิทธิ์ในฟังก์ชัน) | `core/plan-edits.js` |
    | หมวดสินค้า | `core/taxonomy.js` |
    | ข้อมูลขั้นที่ 4 | `core/report.js` |
    | UI ที่ใช้หลายหน้า | `core/components.js` + `styles/components.css` |
-   | กราฟ | `core/charts.js` |
+   | กราฟ | `core/charts.js` (มาตรฐานที่ `ui-charts.md`) |
    | ส่งออกไฟล์ | `core/export.js` |
    | ตัวเลขและเดือน | `core/format.js` |
    | ข้อความ | `data/content.js` |
@@ -103,6 +108,7 @@ erp-snapshot, content, **guide** (CR-28 คู่มือ · UAT · ปุ่�
 - CR-30 ลำดับโหลดเพิ่ม: `core/catalog.js` หลัง `core/calc.js` (Product Code · เลขนำหน้า Type · Preset คอลัมน์ · นำเข้าราคา · TRCLOUD) · `core/seed.js` ใส่เลขนำหน้าตั้งต้น แปลงรหัสชั่วคราว และ `calc.normalizeListings` ตอนโหลด
 - CR-32 ลำดับโหลดเพิ่ม: `data/seed/seed-mt-branches.js` หลัง `data/stores.js` · `core/units.js` หลัง `core/seed.js` (แบ่งยอดอ้างอิงของคู่ค้าจาก L12M ของหน่วยขายจึงต้องมี history ก่อน) ·
   `core/permissions.js` ผูก `person.userId` ตั้งต้นตอนโหลด (หลัง `core/stores.js` สร้างบุคลากร TT) · ค่าคงที่สุดแผน `settings.PLAN_HORIZON_END` อ่านผ่าน `clock.horizonEnd` / `horizonYears`
+- CR-34 ลำดับโหลดเพิ่ม: `core/plan-edits.js` หลัง `core/units.js` (ใช้ calc · permissions · clock)
 - store แปลงรูปแบบค่าที่บันทึกจากรุ่นก่อนให้เองตอนโหลด
 - เปิดจากไฟล์ใน Firefox (`location.origin === 'null'`) ค่าไม่ส่งต่อข้ามหน้า Header จึงแสดงคำเตือน
 - Key ทั้งหมดดูที่ `data-model.md`

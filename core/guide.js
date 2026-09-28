@@ -1,5 +1,5 @@
 /*
- * core/guide.js — ฟังก์ชันล้วนของหน้าคู่มือการใช้งาน สถานการณ์ทดสอบ (UAT) และปุ่ม ? ที่หัวหน้า (CR-28)
+ * core/guide.js — ฟังก์ชันล้วนของหน้าคู่มือการใช้งานและปุ่ม ? ที่หัวหน้า (CR-28 · CR-36 ตัดสถานการณ์ทดสอบ UAT ออกทั้งหมด)
  *
  * บทบาทและสิทธิ์ (อ่านจากสิทธิ์จริงผ่าน core/permissions.js · context = { roles, perms, users, teams, list } ไม่ส่ง = ค่าปัจจุบัน):
  *   pageEditors(pageId, context)  → [{ id, name }] บทบาทที่แก้หน้านี้ได้ (ไม่นับบทบาทที่แก้ได้ทุกหน้า เช่น ผู้ดูแลระบบ)
@@ -8,10 +8,8 @@
  *                                   CR-31: รวมบทบาทที่สร้างเอง · จำนวนผู้ใช้ = ผู้ใช้ที่มีบทบาทนั้น (context.users ไม่ส่ง = ค่าปัจจุบัน)
  *                                   everywhere = ค่าตั้งต้นแก้ได้ทุกหน้า → except = หน้าที่เห็นแต่แก้ไม่ได้
  * สูตร:  formulaLines(channels) → [{ kind: 'sale' } | { kind: 'net', channel, gpLabel (null = ไม่มีส่วนแบ่ง) }] จาก Channel Master ที่ใช้งาน
- * UAT (ผลเก็บที่ store Key uat.results = { tester, date, active (id ที่กำลังทดสอบ | null), items: { <id>: { steps: [bool], result, note } } }):
- *   uatBlank · uatNormalize · uatItem · uatSetStep · uatSetResult (ไม่ผ่านต้องมีหมายเหตุ → error 'noteRequired') · uatSetMeta ·
- *   uatProgress (ทดสอบแล้ว / ผ่าน / ไม่ผ่าน / ข้าม) · uatStepInfo (ขั้นที่กำลังทำ) · uatStart (มุมมองผู้ใช้ + หน้าแรก + active) ·
- *   uatExportRows (1 แถวต่อสถานการณ์) · keepOnReset (Key ที่รีเซ็ตข้อมูลไม่ล้าง = uat.*)
+ * CR-36 ชื่อหน้าในข้อความคู่มือ: textVars(context) → { page_<id>: ชื่อหน้าจากเมนู } (ห้ามพิมพ์ชื่อหน้าใน data/guide.js) ·
+ *   textIssues(guide, context) → { unknown: [placeholder ที่ไม่มีหน้า], typed: [ชื่อหน้าที่พิมพ์เอง] } (ใช้ใน Test)
  * ไม่อ่าน DOM · ไม่เขียน store (คืนค่าใหม่ให้ผู้เรียกบันทึกเอง)
  */
 (function (SP) {
@@ -68,105 +66,42 @@
   }
 
   // ---------------------------------------------------------------------
-  // UAT
+  // CR-36 ชื่อหน้าในข้อความคู่มือ = ชื่อจริงจากเมนู ({page_<id>})
   // ---------------------------------------------------------------------
-  var RESULTS = ['pass', 'fail', 'skip'];
-  function uatBlank() { return { tester: '', date: '', active: null, items: {} }; }
-  function uatNormalize(r) {
-    r = r && typeof r === 'object' ? r : {};
-    return { tester: r.tester || '', date: r.date || '', active: r.active || null, items: r.items && typeof r.items === 'object' ? clone(r.items) : {} };
-  }
-  function uatItem(results, id) {
-    var it = uatNormalize(results).items[id] || {};
-    return { steps: Array.isArray(it.steps) ? it.steps.map(Boolean) : [], result: RESULTS.indexOf(it.result) >= 0 ? it.result : null, note: it.note || '' };
-  }
-  function withItem(results, id, fn) {
-    var r = uatNormalize(results);
-    var it = uatItem(r, id);
-    fn(it);
-    r.items[id] = it;
-    return r;
-  }
-  function uatSetStep(results, id, index, done) {
-    return withItem(results, id, function (it) { for (var i = it.steps.length; i < index; i++) it.steps[i] = false; it.steps[index] = !!done; });
-  }
-  // result = 'pass' | 'fail' | 'skip' | null (ล้างผล) · ไม่ผ่านต้องมีหมายเหตุ · บันทึกผลของสถานการณ์ที่กำลังทดสอบ = จบการทดสอบ (active = null)
-  function uatSetResult(results, id, result, note) {
-    var text = note == null ? '' : String(note);
-    if (result != null && RESULTS.indexOf(result) < 0) return { ok: false, error: 'invalid', results: uatNormalize(results) };
-    if (result === 'fail' && !text.trim()) return { ok: false, error: 'noteRequired', results: uatNormalize(results) };
-    var r = withItem(results, id, function (it) { it.result = result || null; it.note = text; });
-    if (result && r.active === id) r.active = null;
-    return { ok: true, error: null, results: r };
-  }
-  function uatSetMeta(results, meta) {
-    var r = uatNormalize(results);
-    if (meta && meta.tester != null) r.tester = String(meta.tester);
-    if (meta && meta.date != null) r.date = String(meta.date);
-    return r;
-  }
-  function uatProgress(results, scenarios) {
-    var out = { total: (scenarios || []).length, tested: 0, pass: 0, fail: 0, skip: 0 };
-    (scenarios || []).forEach(function (s) {
-      var res = uatItem(results, s.id).result;
-      if (!res) return;
-      out.tested++;
-      out[res]++;
-    });
+  function titleOf(e, pages) { return (pages[e.id] && pages[e.id].title) || e.title; }
+  function textVars(context) {
+    var list = (context && context.list) || SP.core.registry.list;
+    var pages = (context && context.pages) || (SP.data.content && SP.data.content.pages) || {};
+    var out = {};
+    list.forEach(function (e) { out['page_' + e.id] = SP.core.layout && !context ? SP.core.layout.pageLabel(e.id) : titleOf(e, pages); });
+    out.npdMonths = String(SP.data.settings.NPD_MONTHS);
     return out;
   }
-  // ขั้นที่กำลังทำ = ขั้นแรกที่ยังไม่ติ๊ก (ทำครบ = ขั้นสุดท้าย) → { done, total, current }
-  function uatStepInfo(results, scenario) {
-    var it = uatItem(results, scenario.id);
-    var n = (scenario.steps || []).length;
-    var done = 0, next = -1;
-    for (var i = 0; i < n; i++) { if (it.steps[i]) done++; else if (next < 0) next = i; }
-    return { done: done, total: n, current: next < 0 ? n : next + 1 };
-  }
-  // เริ่มสถานการณ์: มุมมองผู้ใช้ของ scenario.userId (+ Channel ของทีม) · หน้าแรก · หน่วยขายที่เลือกให้ · active = id
-  //   → { ok, role (ค่าของ ui.role), pageId, selection, results } | { ok: false } เมื่อไม่พบผู้ใช้
-  function uatStart(results, scenario, context) {
-    var users = (context && context.users) || P().usersNow();
-    var raw = users.filter(function (u) { return u.id === scenario.userId; })[0];
-    if (!raw) return { ok: false };
-    var role = P().ref(P().normalize(raw, context));
-    if (scenario.channelId && !role.channelId) role.channelId = scenario.channelId;
-    var r = uatNormalize(results);
-    r.active = scenario.id;
-    return { ok: true, role: role, pageId: scenario.pageId, selection: scenario.selection ? clone(scenario.selection) : null, results: r };
-  }
-  // แถวส่งออก 1 แถวต่อสถานการณ์ · labels = { roleOf(scenario) → ป้ายบทบาท, result: { pass, fail, skip, none } }
-  function uatExportRows(results, scenarios, labels) {
-    var r = uatNormalize(results);
-    var L = labels || {};
-    var RL = L.result || {};
-    return (scenarios || []).map(function (s) {
-      var it = uatItem(r, s.id);
-      var info = uatStepInfo(r, s);
-      return {
-        tester: r.tester, date: r.date, id: s.id, title: s.title, role: L.roleOf ? L.roleOf(s) : s.roleId,
-        steps: info.done + '/' + info.total, result: it.result ? (RL[it.result] || it.result) : (RL.none || ''), note: it.note
-      };
+  // ข้อความทั้งหมดของคู่มือ (แบนเป็นรายการ) → ตรวจ placeholder ที่ไม่มีหน้า และชื่อหน้าในเมนูที่พิมพ์เองแทน placeholder
+  function textIssues(guide, context) {
+    var list = (context && context.list) || SP.core.registry.list;
+    var pages = (context && context.pages) || SP.data.content.pages;
+    var texts = [];
+    (function walk(v) { if (typeof v === 'string') texts.push(v); else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { walk(v[k]); }); })(guide);
+    var ids = list.map(function (e) { return e.id; });
+    var unknown = [], typed = [];
+    texts.forEach(function (t) {
+      (t.match(/\{page_(\w+)\}/g) || []).forEach(function (m) { var id = m.slice(6, -1); if (ids.indexOf(id) < 0 && unknown.indexOf(id) < 0) unknown.push(id); });
     });
+    list.filter(function (e) { return e.visible !== false && e.group && e.id !== 'aboutPrototype'; }).forEach(function (e) {
+      var name = titleOf(e, pages);
+      if (texts.some(function (t) { return t.indexOf(name) >= 0; }) && typed.indexOf(name) < 0) typed.push(name);
+    });
+    return { unknown: unknown, typed: typed };
   }
-  function keepOnReset(keys) { return (keys || []).filter(function (k) { return /^uat\./.test(k); }); }
 
   SP.core.guide = {
     pageEditors: pageEditors,
     groupEditors: groupEditors,
     roleRows: roleRows,
     formulaLines: formulaLines,
-    UAT_RESULTS: RESULTS,
-    uatBlank: uatBlank,
-    uatNormalize: uatNormalize,
-    uatItem: uatItem,
-    uatSetStep: uatSetStep,
-    uatSetResult: uatSetResult,
-    uatSetMeta: uatSetMeta,
-    uatProgress: uatProgress,
-    uatStepInfo: uatStepInfo,
-    uatStart: uatStart,
-    uatExportRows: uatExportRows,
-    keepOnReset: keepOnReset
+    textVars: textVars,
+    textIssues: textIssues
+    // CR-36: ตัดฟังก์ชัน UAT (uatBlank · uatNormalize · uatItem · uatSetStep · uatSetResult · uatSetMeta · uatProgress · uatStepInfo · uatStart · uatExportRows · keepOnReset)
   };
 })(window.SP);

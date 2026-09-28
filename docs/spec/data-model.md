@@ -19,6 +19,7 @@
 - ปีที่ไม่มีใน `targets.years` เริ่มจาก 0 (ใช้ `targets.defaultChannels` / `defaultUnits`)
 - % เก็บความละเอียดเต็ม บาทคำนวณจาก % เสมอ
 - แผน SKU ตั้งต้น = สินค้าที่ขายในหน่วยนั้น (ข้อมูลจำเป็นครบ · Listing · ขายอยู่) + สินค้าใหม่ที่วางแผนหน่วยนี้ + จำนวนชิ้นใน `data/plan-seeds.js` (เป็น Override)
+- CR-34 Key รอบันทึกบนแผนร่าง `newListings` · `listingStarts` · `dropListings` · `cancelRequests` ใช้กับ Master ตอนบันทึก (ไม่เก็บลง store)
 - `baseline.all.snapshot` **[Phase 2]** = `{ gp, basePrices, promoPrices, report }` ตอนล็อก (CR-30) · รายงานที่ล็อกแล้วอ่านตัวเลขทั้งหมดจาก `report`
 
 ### Master (ไม่แยกปี · ค่าตั้งต้นจาก `data/`)
@@ -41,14 +42,15 @@
 - `currentMonth` = เดือนปัจจุบันจำลอง 0–11 (`DEMO_FORECAST_MONTH` = มี.ค.) · `store.currentKey()` = `'YYYY-MM'` · `store.today()`
   - CR-24: แยกจากเดือนปัจจุบันกลาง `settings.DEMO_CURRENT_MONTH` = '2026-09' (`core/clock.js` ใช้กับ L12M · ยอดอ้างอิง · หน้าเขตการขาย) ไม่เก็บใน store
 - `role` = `{ userId, type, personId, channelId }` (ผู้ใช้ปัจจุบัน · ค่ารุ่นก่อนแปลงให้เอง · CR-32 personId ได้จาก `person.userId`)
-- CR-32: `salesUnitsTab` (แท็บ Sales Unit & Customer: 'all' \| channelId · ลิงก์ `#<channelId>` ตั้งค่าให้) · `peopleGroupByChannel` ค่าเริ่มต้น **false** ·
+- CR-32: `salesUnitsTab` (แท็บ Account Master: 'all' \| channelId · ลิงก์ `#<channelId>` ตั้งค่าให้) · `peopleGroupByChannel` ค่าเริ่มต้น **false** ·
   Preset คอลัมน์ของตารางคู่ค้าที่ `columnPresets.<userId>.salesUnits.<แท็บ>` (CR-33 + `version` = `SALES_UNIT_COLUMN_VERSION`) · `toast` = ข้อความแจ้งโหลดข้อมูลตั้งต้นใหม่เมื่อรุ่นข้อมูลเปลี่ยน (`content.site.dataVersionToast`)
 - ค่าที่จำไว้ต่อหน้า:
   - `sidebarCollapsed` · `seriesFilter` · `productMaster.channel` (ร่วมกันหน้า Listing และราคาและ Promotion) · `masterChannel` · `skuShowLastYear`
   - CR-30 `columnPresets.<userId>.<ตาราง>` = Preset คอลัมน์ส่วนตัว `{ presets: [{ id, name, columns }], defaultId, columns }` (`core/catalog.js` · รีเซ็ตข้อมูลล้างด้วย) · `productMoreFilters` (กางแถวตัวกรองที่สอง) · `pricesTab` ('base' \| 'promo')
   - CR-29 `unitsTab` (แท็บ Account & Platform: 'all' \| channelId) · `peopleTab` ('list' \| 'monthly') · `peopleGroupByChannel` (ค่าเริ่มต้น true)
   - `summaryTab` (`null` = เปิดแท็บรายงาน) · CR-28 `statusFilter` = แท็บตัวกรองของติดตามสถานะ `'all' | 'short' | 'over' | 'ok' | 'vacant'` ·
-    `guideTab` = แท็บของหน้าคู่มือ `'overview' | 'glossary' | 'uat'`
+    `guideTab` = แท็บของหน้าคู่มือ `'overview' | 'glossary'` (CR-36 ตัด `uat`)
+  - CR-36 `productListTab` (`'items' | 'level'`) · `groupBy.<userId>.<productList | npd>` = เกณฑ์จัดกลุ่ม · `skuAddHandoff` = `{ unitId, key }` (Launch & Listing → เพิ่มสินค้าในแผน · อ่านครั้งเดียว)
 - `toast` (CR-25) = ข้อความที่ต้องแสดงครั้งเดียวหลังโหลดหน้าถัดไป (layout ล้างเป็น `null` หลังแสดง)
 - CR-26: `summaryPivot` = `{ rows, cols, value, show, filters: { series, channels, units, statuses, q } }` (ตาราง Pivot ของรายงาน) ·
   `skuSearchHandoff` = Product Code ที่ SKU Planning ค้นหาให้ครั้งเดียว (คลิกช่องใน Pivot)
@@ -56,11 +58,9 @@
   - `productFilterHandoff` (หน้ารายการสินค้าอ่านครั้งเดียวแล้วลบ)
 - ตัวกรอง ค้นหา จัดกลุ่ม เรียง แถวที่เลือก และแท็บย่อยอื่นเป็นตัวแปรใน Module ไม่เก็บลง store
 
-### ผลการทดสอบ (`uat.*` · CR-28)
+### ผลการทดสอบ (`uat.*`)
 
-- `uat.results` = `{ tester, date: 'YYYY-MM-DD', active: 'S4' | null, items: { <id>: { steps: [bool], result: 'pass' | 'fail' | 'skip' | null, note } } }`
-  (หน้าคู่มือแท็บ UAT · `core/guide.js` อ่านและสร้างค่าใหม่ · `active` = สถานการณ์ที่กำลังทดสอบ → แถบลอยทุกหน้า)
-- `รีเซ็ตข้อมูล` ไม่ล้าง Key `uat.*` (`layout.resetData`) · `ล้างผลการทดสอบ` = `uatBlank()` · อยู่ใน sessionStorage เหมือน Key อื่น (ปิดแท็บแล้วหาย)
+- CR-36 ตัดทั้งหมด (คู่มือไม่มี UAT · `รีเซ็ตข้อมูล` ล้าง store ทั้งหมด)
 
 ## ข้อมูลหลัก (`data/`)
 
@@ -110,11 +110,13 @@
   | TT-02 | อีสานตอนบน–ลาว | ฝนเทพ |
   | TT-03 | อีสานใต้–ตะวันออก | อภิญญา |
   | TT-04 | ตะวันตก–ใต้ | อัมพร (ลาออก ก.ค. 2026) → กฤษดา |
-- ร้าน 220 ร้าน:
-  - ใช้งาน 185 · ยกเลิกการขาย 35
-  - ยังไม่จัดสรร ณ ก.ย. 2026 = 9 (ไม่มีจังหวัดทั้งหมด) · ไม่ระบุจังหวัด 30
-  - บุคคลธรรมดา 29 ร้าน แสดงเป็น `ร้านค้า {ID} (บุคคลธรรมดา)`
-  - System ID ซ้ำ 8 ID (9 แถว) → id ภายใน `{ID}-2`
+- ร้าน 211 ร้าน (CR-35 หลังรวมรหัสซ้ำ · ไฟล์ต้นทาง 220 แถว):
+  - ใช้งาน 177 · ยกเลิกการขาย 34
+  - ยังไม่จัดสรร ณ ก.ย. 2026 = 9 (ไม่มีจังหวัดทั้งหมด) · ไม่ระบุจังหวัด 27
+  - บุคคลธรรมดา 26 ร้าน แสดงเป็น `ร้านค้า {ID} (บุคคลธรรมดา)`
+  - CR-35 **รหัสคู่ค้าห้ามซ้ำ**: รหัสซ้ำในไฟล์ต้นทาง 8 รหัส (9 แถวเพิ่ม) รวมตอนโหลด (`stores.mergeDuplicates` หลังปัดยอดอ้างอิง · ไม่แก้ seed):
+    ชื่อเหมือนกัน = รายการเดียว (ยอดอ้างอิงรวม · ข้อมูลและเขตของแถวแรก) · ชื่อต่างกัน = เก็บแถวที่ยอดอ้างอิงสูงกว่า · บันทึกที่ `SP.data.storeCodeMerges` = `[{ code, name, action: merged | kept, rows, salesRef }]` ·
+    ข้อมูลตั้งต้นชื่อเหมือนกันทุกรหัส (merged 8) · ยอดอ้างอิงรวม TT เท่าเดิม 22,900,000 · รายชื่อรหัสอยู่ใน [open-items.md](open-items.md) · ตัด id ภายใน `{ID}-2`
   - ยอดอ้างอิงติดลบ 2 ร้าน
 - ไม่นำเข้าเงื่อนไขเครดิต วงเงินเครดิต และช่องทางชำระ
 - `storeAssignments` = `[{ storeId, territoryId, fromMonth, toMonth | null }]`
@@ -140,44 +142,9 @@
   - บทบาทละ 1 คน: วรวุฒิ · ปรียา · ชนิดา · ธีรพล · กมลวรรณ · ศิริพร
   - Sales Person ในทีมขายทุกคน (วิทยาและอัมพรปิดใช้งาน)
 
-### Product Master (ข้อมูลจริง)
+### Product Master · ราคา · Listing · แผน NPD
 
-- `data/seed/seed-charmiss.js` สร้างจาก `Sales_Planning_2026_R2.xlsx` (ฉบับที่ 2 ราคารวม VAT)
-- สินค้า 122 รายการ: จริง 117 + สินค้าใหม่ใน `data/products.js` 5 รายการ (ชื่อลงท้าย "(ชื่อชั่วคราว)")
-  - 32210 · 34150 · 33480 เปิดตัว มิ.ย. 2027 (เดิมรหัสชั่วคราว `NPD_2027Q2_01..03`)
-  - 16490 เปิดตัว ก.พ. 2028 · 22110 เปิดตัว `2028-Q2` (ไตรมาส · เดือนเปิดตัวยังไม่ยืนยัน)
-- ฟิลด์: `{ trCode, barcode, name, nameEn, shortName, categoryId, subCategoryId, typeId, inferred, seriesId, subSeriesId, packSize, uom, image,
-  inTrcloud, launchDate, launchQuarter?, discontinueMonth, clearance, source, request, note, createdAt, updatedAt }` (CR-30 ตัด `tempCode` · `tempCodeHistory` · `internalCode` · `itemType`)
-- Product Code (`trCode` = `productKey` ใช้อ้างสินค้าทุกที่) ระบบสร้างและเป็นเลขเดียวกับ TRCLOUD:
-  - `CODE_DIGITS` 5 หลัก = เลขนำหน้าของ Type 2 หลัก (`taxonomy.category[TYPE].codePrefix`) + 3 หลัก · ขั้น `CODE_STEP` 10 (`core/catalog.js nextCode`)
-  - เลขนำหน้าตั้งต้นจากรหัสที่พบมากที่สุดของสินค้าใน Type (`catalog.applyPrefixDefaults` · Lip Stick = 17 เพราะ 16 เป็นของ Blush · Highlighter ยังไม่มี)
-  - รหัสชั่วคราวเดิมแปลงตอนโหลด (`catalog.assignSystemCodes` → `SP.data.codeMigration`) และย้ายการอ้างอิงใน Listing · ราคา · แผน NPD · ยอดจริง · แผน SKU ตั้งต้น
-  - `inTrcloud` = มีรหัสใน TRCLOUD แล้ว (สินค้าจริง = true · สินค้าใหม่ = false)
-- การแปลงตอนนำเข้า:
-  - Campaign → Series 8 รายการ · `Existing` ไม่ใช่ Series (5 SKU คิ้วและไพรเมอร์ จึงขาดข้อมูลจำเป็น)
-  - หมวดสินค้ากำหนดจากคำในชื่อ (`inferred: true` ป้าย "ระบบกำหนด") และขนาดบรรจุอ่านจากชื่อ
-- หมวดสินค้า (`data/taxonomy.js`): Category Face · Cheek · Lip · Eye · Skincare → Sub Category → Type (`codePrefix`) / Series → Sub Series
-  (Series มีวันเริ่ม / วันสิ้นสุดได้)
-- ไม่มี Tester / Gift / Premium และ Clearance ในข้อมูลจริง
-- สินค้าที่ Sales สร้าง: `source: 'SALES_REQUEST'` · `requestedBy` · `requestedAt` · `request = { unitId, unitIds, price, launchDate, startMonth, note }`
-
-### ราคาและ Listing (CR-30)
-
-- ราคาทุกรายการรวม VAT (`PRICE_INCLUDES_VAT = true`) · ราคาที่ใช้ = `calc.resolvePrice` (Promotion ของหน่วยขาย → ของ Channel → ราคาหลัก)
-- ราคาหลัก `basePrices` = `{ productKey, priceType: RSP | TT_DEALER | TT_WHOLESALE, effectiveMonth, price, by, at }`
-  - ราคาที่มีผล ณ เดือน = รายการล่าสุดที่ `effectiveMonth` ไม่เกินเดือนนั้น (บันทึกราคาใหม่ = เพิ่มรายการ ไม่เขียนทับ)
-  - ตั้งต้นจาก `data/pricing.js priceImport` (`baseFrom` 2024-01 + `changes` เช่น Perfect Heart Cushion 399 → 429 · TT 220 → 240 ตั้งแต่ ก.ค. 2027)
-  - TT ใช้ `TT_DEALER` (`channel.priceBasis`) · Channel อื่นใช้ RSP · `TT_WHOLESALE` ยังไม่มีข้อมูล
-- Promotion Price `promoPrices` = `{ productKey, channelId, unitId | null (= ทั้ง Channel), month, price, by, at }` รายเดือน
-  - ย้ายจากราคาต่อ Account เดิม = ระดับหน่วยขายทุกเดือนของปี 2027 (Juicy Pop Tint 02 / 05 ที่ 7-Eleven 149 บาท)
-- Listing (`data/listings.js`) = `{ productKey, accountId (= unitId), status: offered | listed | delisted, fromMonth, toMonth, addedBy?, addedAt?, addedByName? }`
-  - `calc.normalizeListings` ตอนโหลด: ไม่มีสถานะ = `listed` · `fromMonth` = เดือนเริ่มขายต่อหน่วยจากแผน NPD หรือเดือนเปิดตัวของสินค้า
-  - 7-Eleven 11 · EVEANDBOY 76 SKU จาก Excel
-  - หน่วยอื่นใช้รายการของหน่วยต้นแบบ แล้วตัดประเภทสินค้าหรือ Series ที่กำหนดไว้ (TT ไม่มี Palette และ Toner · Watsons ไม่มี Toner · Lazada ไม่มีดินสอเขียนคิ้ว)
-  - `addedBy: 'SALES'` = Listing ที่ Sales สร้าง
-- แผน NPD (`data/npd.js`) = `{ id, productKey, seriesId, stage: plan | concept | production | ready, plannedLaunchDate, launchQuarter, stageTargets: { <ขั้น>: 'YYYY-MM' },
-  plannedAccounts: [{ accountId, plannedStartMonth }], expectedRsp, owner, source: PRODUCT | SALES, note, workflow }`
-- ข้อมูล ERP ตัวอย่าง (`data/erp-snapshot.js`) ใช้กับปุ่มเปรียบเทียบกับ ERP ในหน้ารายการสินค้า
+CR-35 แยกไป [data-model-products.md](data-model-products.md) (ไฟล์นี้ใกล้ 30 KB)
 
 ### ยอดขาย
 

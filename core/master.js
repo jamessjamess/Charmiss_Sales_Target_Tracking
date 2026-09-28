@@ -377,21 +377,20 @@
     });
     return out;
   }
-  // ข้อมูลที่ต้องตรวจ → { unassigned: [storeId], noProvince: [storeId], duplicate: [systemId], noOwner: [territoryId], total }
+  // ข้อมูลที่ต้องตรวจ → { unassigned: [storeId], noProvince: [storeId], noOwner: [territoryId], total } (CR-35 ตัดเกณฑ์ System ID ซ้ำ · รหัสห้ามซ้ำแล้ว)
   function territoryChecks(d, month) {
     var m = S().membership(d, month);
-    var out = { unassigned: [], noProvince: [], duplicate: [], noOwner: [] };
+    var out = { unassigned: [], noProvince: [], noOwner: [] };
     (d.stores || []).forEach(function (s) {
       if (!activeStore(s)) return;
       if (!m[s.id]) out.unassigned.push(s.id);
       if (!S().provincesOf(s).length) out.noProvince.push(s.id);
-      if (s.duplicates > 1 && out.duplicate.indexOf(s.systemId) < 0) out.duplicate.push(s.systemId);
     });
     S().storeTerritories(d).forEach(function (t) {
       if (t.active === false) return;
       if (!calc().ownerOf(d.assignments, d.salespeople, t.id, month)) out.noOwner.push(t.id);
     });
-    out.total = out.unassigned.length + out.noProvince.length + out.duplicate.length + out.noOwner.length;
+    out.total = out.unassigned.length + out.noProvince.length + out.noOwner.length;
     return out;
   }
   // ปิดใช้งานเขตได้เมื่อไม่มีร้านที่ใช้งานอยู่ในเขตตั้งแต่เดือนนั้น
@@ -446,9 +445,12 @@
     rules = rules || {};
     var mem = S().membership(d, month);
     var used = {};
-    var out = { added: [], changed: [], missing: [], unknownTerritories: [], total: (rows || []).length };
+    var out = { added: [], changed: [], missing: [], unknownTerritories: [], rejected: [], total: (rows || []).length };
     var ids = {};
     (d.stores || []).forEach(function (s) { ids[s.id] = true; });
+    // CR-35: รหัสคู่ค้าห้ามซ้ำทั้งระบบ — ร้านใหม่ที่รหัสตรงกับคู่ค้าของ Channel อื่น หรือซ้ำกับแถวก่อนหน้าในไฟล์ = ไม่นำเข้า (rejected)
+    var owners = {};
+    (d.customers || []).forEach(function (c) { owners[String(c.trcloudId || c.id)] = c.name; });
     (rows || []).forEach(function (r) {
       var cands = (d.stores || []).filter(function (s) { return String(s.systemId) === r.systemId && !used[s.id]; });
       var s = cands.filter(function (x) { return r.name && norm(x.name) === r.name; })[0] || cands[0];
@@ -460,14 +462,17 @@
         active: r.active != null && r.active !== '' ? (rules.inactive || []).map(function (x) { return String(x).toLowerCase(); }).indexOf(r.active.toLowerCase()) < 0 : undefined
       };
       if (!s) {
-        var id = r.systemId, n = 1;
-        while (ids[id]) { n++; id = r.systemId + '-' + n; }
+        var id = r.systemId;
+        if (ids[id] || owners[id] != null) {
+          out.rejected.push({ row: r, code: id, name: owners[id] != null ? owners[id] : (out.added.filter(function (a) { return a.store.id === id; })[0] || { store: {} }).store.name || id });
+          return;
+        }
         ids[id] = true;
         var personal = (rules.personalPrefixes || []).some(function (x) { return r.name && r.name.indexOf(x) === 0; });
         out.added.push({ row: r, territoryId: r.territory != null ? tid : null, store: {
           id: id, systemId: r.systemId, name: personal ? String(rules.maskedName || '{id}').replace('{id}', r.systemId) : (r.name || r.systemId),
           masked: personal, storeType: val.storeType || null, tags: [], priceType: val.priceType || null, active: val.active !== false,
-          province: val.province || '', hasExport: !!val.hasExport, hasOnline: !!val.hasOnline, salesRef: 0, duplicates: 1
+          province: val.province || '', hasExport: !!val.hasExport, hasOnline: !!val.hasOnline, salesRef: 0
         } });
         return;
       }
@@ -513,9 +518,6 @@
       if (c.territoryId !== undefined) move([c.storeId], c.territoryId);
     });
     (diff.missing || []).forEach(function (id) { if ((pick.missing || []).indexOf(id) >= 0) { var s = findById(dd.stores, id); if (s) s.active = false; } });
-    var count = {};
-    dd.stores.forEach(function (s) { count[s.systemId] = (count[s.systemId] || 0) + 1; });
-    dd.stores.forEach(function (s) { s.duplicates = count[s.systemId]; });
     return { stores: dd.stores, storeAssignments: dd.storeAssignments, moves: moves };
   }
 

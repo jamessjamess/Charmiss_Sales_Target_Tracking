@@ -17,7 +17,7 @@
  * CR-21: data/permissions.js (บทบาท + ค่าตั้งต้นของสิทธิ์) · data/users.js (ผู้ใช้จำลอง) หลัง data/teams.js
  * CR-24: core/clock.js (เดือนปัจจุบันกลาง · L12M) หลัง core/features.js
  * CR-29: core/master.js (ฟังก์ชันล้วนของ Account Master) หลัง core/guide.js
- * CR-28: data/guide.js (คู่มือ · สถานการณ์ทดสอบ · ปุ่ม ? ของแต่ละหน้า) หลัง data/content.js · core/guide.js (ฟังก์ชันล้วนของคู่มือและ UAT) หลัง core/registry.js
+ * CR-28: data/guide.js (คู่มือ · ปุ่ม ? ของแต่ละหน้า · CR-36 ไม่มีสถานการณ์ทดสอบ) หลัง data/content.js · core/guide.js (ฟังก์ชันล้วนของคู่มือ) หลัง core/registry.js
  * CR-32: data/seed/seed-mt-branches.js (คู่ค้าของ Account / Platform ตัวอย่าง) หลัง data/stores.js · core/units.js (หน่วยขายและคู่ค้า) หลัง core/seed.js
  *   (แบ่งยอดอ้างอิงของคู่ค้าจากยอด L12M ของหน่วยขาย จึงต้องมี history ก่อน)
  *   (ยอดขายปีก่อนของเขตต้องมีก่อน core/seed.js สร้างยอดขายปีก่อนราย SKU ของเขต)
@@ -60,6 +60,7 @@
     'core/stores.js',
     'core/seed.js',
     'core/units.js',
+    'core/plan-edits.js',   // CR-34: เพิ่ม / ขอ / นำสินค้าออกจากแผน SKU (ตรวจสิทธิ์ในฟังก์ชัน)
     'core/taxonomy.js',
     'core/workflow.js',
     'core/permissions.js',

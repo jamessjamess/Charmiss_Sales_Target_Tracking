@@ -21,8 +21,6 @@
       aboutLink: 'คู่มือ',   // CR-28 ลิงก์ Header ไปหน้าคู่มือการใช้งาน
       // CR-28: ปุ่ม ? ต่อท้ายชื่อหน้า (components.pageHelp · เนื้อหาจาก data/guide.js pages)
       help: { button: 'วิธีใช้หน้านี้', purpose: 'หน้านี้ใช้ทำอะไร', editors: 'ผู้แก้ไข', steps: 'ขั้นตอนหลัก', all: 'ดูคู่มือทั้งหมด', viewOnly: 'ทุกบทบาทดูได้อย่างเดียว', back: '← กลับ' },
-      // CR-28: แถบลอยระหว่างทดสอบสถานการณ์ (ทุกหน้ายกเว้นคู่มือ · ซ่อนตอนพิมพ์)
-      uatBar: 'กำลังทดสอบ {id} · ขั้นที่ {n}/{total}', uatBack: 'กลับไปบันทึกผล',
       menu: 'เมนู',
       menuOpen: 'เปิดเมนู',
       collapse: 'พับเมนู',
@@ -67,15 +65,42 @@
           province: 'จังหวัด', hasExport: 'Export', hasOnline: 'Online', suggest: 'คำนำหน้าชื่อคู่ค้าที่แนะนำ', salesUnit: 'หน่วยขาย' },
         change: '{field}: {from} → {to}', added: '{field}: {to}'
       },
-      // CR-32: ข้อมูลที่ต้องตรวจ มาตรฐานใหม่ (components.dataCheck · ใช้ใน Sales Unit & Customer และ Sales Person Management ก่อน)
+      // CR-32: ข้อมูลที่ต้องตรวจ มาตรฐานใหม่ (components.dataCheck · ใช้ใน Account Master และ Sales Person Management ก่อน)
       dataCheck: {
         chip: 'ข้อมูลที่ต้องตรวจ ({n})', ok: 'ข้อมูลครบ', group: '{label} ({n})', go: 'ไปที่รายการ', more: 'และอีก {n} รายการ',
         criteria: 'เกณฑ์ที่ตรวจ:', none: 'ไม่พบรายการที่ต้องตรวจ'
       },
       remainingText: { ok: 'จัดสรรครบ', short: 'ขาด {amount}', over: 'เกิน {amount}', empty: 'ยังไม่กำหนด' },
+      // CR-35: ตัวเลือกปี ‹ 2027 ▾ › (components.yearPicker)
+      yearPicker: { label: 'ปี', prev: 'ปีก่อนหน้า', next: 'ปีถัดไป', plan: 'ปีแผน', actual: 'ข้อมูลจริง' },
+      // CR-36: ปุ่มจัดกลุ่ม (components.groupPicker) · ชื่อเกณฑ์ (Product List · แท็บ NPD ของ Launch & Listing)
+      groupPicker: { label: 'จัดกลุ่ม', text: 'จัดกลุ่ม: {value}' },
+      groupBy: { none: 'ไม่จัดกลุ่ม', category: 'Category', subCategory: 'Sub Category', type: 'Type', series: 'Series', level: 'Product Level (Category › Sub Category › Type)',
+        levelShort: 'Product Level', status: 'Status', year: 'Product Year', launchMonth: 'เดือนเปิดตัว', noneName: '(ไม่ระบุ)', noYear: 'ยังไม่มี Listing', noLaunch: 'ยังไม่กำหนดเดือนเปิดตัว',
+        head: '{name} · {n} SKU', expand: 'กาง {name}', collapse: 'พับ {name}' },
       // Status สินค้า (calc.productStatus) ชุดเดียวทั้งระบบ คำนวณจากวันที่
       // CR-30: New → NPD (ค่าภายในยังเป็น 'new')
-      status: { planned: 'Planned', 'new': 'NPD', active: 'Active', clearance: 'Clearance', discontinued: 'Discontinued' },
+      status: { planned: 'Planned', 'new': 'NPD', active: 'Active', clearance: 'Clearance', discontinued: 'Discontinued', request: 'Request', 'delete': 'Delete' },
+      // CR-35: วงจรสถานะ 7 แบบ (ลำดับ calc.PRODUCT_STATUSES) · ประเภทรายได้ (calc.revenueTypeOf · Phase 2) · ป้ายชื่อชั่วคราว · ยืนยันคำขอ NPD
+      revenueTypes: { npd: 'NPD', existing: 'Existing', clearance: 'Clearance' },
+      tempName: { tag: 'ชื่อชั่วคราว', tip: 'ชื่อชั่วคราวของคำขอ NPD · ทีม Product ตั้งชื่อจริงตอนยืนยัน' },
+      tempCode: { tag: 'รหัสชั่วคราว', tip: 'รหัสชั่วคราว NPD-ปีเดือนที่เริ่มขาย-ลำดับ · ได้ Product Code 5 หลักเมื่อทีม Product ยืนยัน', old: 'รหัสชั่วคราวเดิม {code}' },
+      confirmRequest: {
+        button: 'ยืนยันเป็น NPD', title: 'ยืนยันคำขอเป็น NPD · {code}', temp: 'รหัสชั่วคราว', name: 'ชื่อสินค้าจริง', type: 'Type (กำหนดเลขนำหน้า Product Code)',
+        code: 'Product Code ที่จะได้', note: 'ยืนยันแล้ว Status เป็น Planned · แผน SKU Listing และราคาของคำขอยังอยู่ครบ · เปลี่ยนกลับเป็น Request ไม่ได้',
+        confirm: 'ยืนยันเป็น NPD', done: 'ยืนยันแล้ว · {code} {name}', placeholder: 'เลือก',
+        errors: { name: 'กรุณากรอกชื่อสินค้า', type: 'กรุณาเลือกหมวดสินค้าถึง Type', prefix: 'Type นี้ยังไม่มีเลขนำหน้า Product Code (Product List แท็บ Product Level)', full: 'เลข Product Code ของ Type นี้เต็มแล้ว', notRequest: 'สินค้านี้ไม่ใช่คำขอ NPD' }
+      },
+      // CR-34: ประเภทสินค้าในแผน (calc.planTypeOf) — ป้ายและสีที่เดียว ใช้ร่วมกัน SKU Planning · Plan Summary (token = สีใน styles/tokens.css)
+      planTypes: {
+        existing: { label: 'สินค้าเดิม', badge: '', token: '--c-type-existing', tip: 'เคยมียอดขายในหน่วยขายนี้' },
+        newListing: { label: 'Listing ใหม่', badge: 'Listing ใหม่', token: '--c-type-existing', tip: 'สินค้าที่ขายอยู่แต่ยังไม่เคยมียอดขายในหน่วยขายนี้' },
+        npdConfirmed: { label: 'NPD ยืนยันแล้ว', badge: 'NPD', token: '--c-type-npd', tip: 'สินค้าใหม่ที่ทีม Product ยืนยันแล้ว (เปิดตัวหรืออยู่ในช่วง NPD ในปีแผน)' },
+        npdRequest: { label: 'ขอ NPD', badge: 'ขอ NPD', token: '--c-type-request', borderToken: '--c-type-request-bd', pattern: 'hatch', tip: 'คำขอสินค้าใหม่จาก Sales ที่ทีม Product ยังไม่ยืนยัน' },
+        clearance: { label: 'Clearance', badge: 'Clearance', token: '--c-type-clearance', tip: 'สินค้าที่อยู่ในช่วง Clearance · ไม่ควรอยู่ในแผน' },
+        // CR-36: แผน Clearance ของ Supply Chain (Price & Promotion › Clearance) · แสดงแยก ไม่นับในรวมแผน / คงเหลือ
+        clearancePlan: { label: 'แผน Clearance (ไม่นับในเป้าหมาย)', token: '--c-type-clearance-plan', tip: 'แผนระบายสินค้า Clearance ของ Supply Chain · ไม่นับในรวมแผน คงเหลือ และสถานะของ Sales Planning' }
+      },
       statusHint: { planned: 'ก่อนเดือนเปิดตัว', 'new': '3 เดือนแรกนับจากเดือนเปิดตัว', active: 'พ้นช่วง NPD แล้ว', clearance: 'อยู่ในช่วง Clearance', discontinued: 'หลังเดือนเลิกขาย' },
       inactive: 'ปิดใช้งาน',
       // CR-30 ประเภทราคาหลัก (settings.PRICE_TYPES)
@@ -182,7 +207,7 @@
       addUnitButton: '+ {unit}',
       noUnitsOf: 'ยังไม่มี {unit}',
       noMoreUnitsOf: 'เพิ่ม {unit} ที่เปิดใช้งานครบแล้ว · เปิดใช้งาน {unit} ใหม่ได้ที่ {master}',
-      masterOf: { ACCOUNT: 'Sales Unit & Customer', TERRITORY: 'Sales Unit & Customer' },   // CR-32: หน่วยขายทุก Channel อยู่ที่หน้าเดียว
+      masterOf: { ACCOUNT: 'Partner List', TERRITORY: 'Partner List' },   // CR-36 ชื่อหน้า Partner List   // CR-32: หน่วยขายทุก Channel อยู่ที่หน้าเดียว
       // ชื่อฟิลด์ของสินค้า (ความครบถ้วน, Audit log, ฟอร์ม)
       productFields: {
         code: 'Product Code', trCode: 'Product Code', barcode: 'Barcode', inTrcloud: 'ใน TRCLOUD',
@@ -247,6 +272,8 @@
         switchTitle: 'เปลี่ยนมุมมองผู้ใช้เป็น {name} เพื่อการนำเสนอ',
         // CR-19: สิทธิ์แยกตาม Module (core/permissions.js)
         readOnlyBy: 'อ่านอย่างเดียว · หน้านี้แก้ไขโดย {roles}',
+        viewOnlyBy: 'ดูอย่างเดียว · แก้ไขได้โดย {roles}',   // CR-35: หน้าที่แก้ไขรายรายการ (ไม่มี workflowBar) · components.viewOnlyNote
+        editingHint: ' · {hint}',   // CR-35: ข้อความต่อท้ายแถบโหมดแก้ไข (components.editBanner opts.suffix)
         readOnlyTeam: 'อ่านอย่างเดียว · หน่วยขายนี้อยู่ในทีม {channel}',
         readOnlyNone: 'อ่านอย่างเดียว',
         noTeam: 'ยังไม่มีทีมขายของ {channel}',
@@ -349,7 +376,7 @@
         net: 'Net Sales',
         gpMissing: 'ยังไม่ได้กำหนด GP',
         // CR-30 ที่มาของราคารายช่อง
-        priceSource: { promoUnit: 'Promotion Price · {unit}', promoChannel: 'Promotion Price · ทั้ง {channel}', dealer: 'TT Dealer', rsp: 'RSP' },
+        priceSource: { promoUnit: 'Promotion Price · {unit}', promoChannel: 'Promotion Price · ทั้ง {channel}', dealer: 'TT Dealer', rsp: 'RSP', clearance: 'ราคา Clearance' },
         source: 'ที่มา',
         actual: 'Actual (ยอดขายจริง)',
         override: 'Override (ค่าระบบ {value})',
@@ -361,7 +388,8 @@
           delisted: 'ถอดจาก Listing แล้ว',
           beforeStart: 'ก่อนเดือนเริ่มขาย',
           planned: 'Planned (ก่อนวันเริ่มขายใน Product Master)',
-          discontinued: 'Discontinued (เลิกขายแล้ว)'
+          discontinued: 'Discontinued (เลิกขายแล้ว)',
+          clearance: 'วางแผนที่ Price & Promotion › Clearance'   // CR-36: เดือน Clearance อ่านอย่างเดียว (แผน Clearance ไม่นับในแผนนี้)
         },
         price: 'ราคาที่มีผล {price} บาท (RSP {rsp})',
         // CR-11: ที่มาของช่องระบบเติม และยอดอ้างอิงของช่อง — CR-24: ค่าตั้งต้น = ยอดจริงล่าสุดของเดือนนั้น (ปีจาก core/clock.js)
@@ -433,7 +461,10 @@
         wfStart: 'ยอดขาย L12M',
         wfEnd: 'Total Target {year}',
         wfTip: '{name}: เป้าหมาย {target} · ยอดขาย L12M {prior} ล้านบาท',
-        wfAxis: 'แกนเริ่มที่ {value} ล้านบาท · ตัวเลขท้ายแท่ง = ส่วนต่างเทียบ L12M',
+        wfAxis: 'แกนเริ่มที่ {value} ล้านบาท · ตัวเลขบนแท่ง = ส่วนต่างเทียบ L12M',
+        // CR-36: Tooltip ของ Waterfall แนวตั้ง (ล้านบาท)
+        wfStepTip: '{name} · ยอดขาย L12M {prior} · เป้าหมาย {target} · ส่วนต่าง {delta} · เติบโต {growth} (ล้านบาท)',
+        wfTotalTip: '{label}: {value} ล้านบาท',
         shareTitle: 'สัดส่วน Channel L12M เทียบเป้าหมายปี {year}',
         shareTip: '{name} {pct}',
         unallocated: 'ยังไม่จัดสรร',
@@ -504,7 +535,7 @@
         monthlyStatus: 'เป้าหมายรายเดือน: {status}',
         remainingIn: 'คงเหลือใน {channel}',
         noUnits: 'ยังไม่มี {unit}',
-        noUnitsHint: 'กด แก้ไข แล้ว + {unit} เพื่อเพิ่มจาก Account Master',
+        noUnitsHint: 'กด แก้ไข แล้ว + {unit} เพื่อเพิ่มจาก Partner List',
         usePriorShares: 'เติมตามสัดส่วน L12M',
         usePriorSharesTitle: 'กำหนดสัดส่วนของหน่วยขายตามยอดขาย L12M (หน่วยที่ไม่มียอดขาย L12M ได้ 0%)',
         normalize: 'กระจายตามสัดส่วนปัจจุบัน',
@@ -565,16 +596,22 @@
       // โหมดดู/แก้ไข (workflowBar แบบง่าย ไม่มีขั้นอนุมัติ)
       // Product Master · รายการสินค้า (modules/products)
       productList: {
-        title: 'รายการสินค้า',
-        lead: ['ข้อมูลหลักของสินค้า ราคา และสถานะความครบถ้วนของข้อมูล'],
-        // CR-30: KPI 6 ใบ กดเพื่อกรอง · NPD = Planned + NPD
-        kpi: { all: 'ทั้งหมด', active: 'Active', npd: 'NPD', npdSub: 'ยังไม่เปิดขาย {a} · เปิดขายแล้ว {b}', required: 'ขาดข้อมูลจำเป็น', recommended: 'ขาดข้อมูลที่ควรมี',
+        // CR-35: ชื่อหน้าภาษาอังกฤษ · คำอธิบายใต้หัวข้อย้ายไปบรรทัดแรกของปุ่ม ? (helpLead)
+        title: 'Product List', short: 'Product List',
+        lead: [],
+        helpLead: 'ข้อมูลหลักของสินค้า ราคา และสถานะความครบถ้วนของข้อมูล',
+        // CR-36: แท็บ สินค้า | Product Level (หน้า Category & Series เดิม) · ป้าย ระบบกำหนด = ลิงก์ไปแท็บ Product Level
+        pageTabLabel: 'แท็บ', pageTabs: { items: 'สินค้า', level: 'Product Level' }, levelLinkTip: 'กดเพื่อเปิด Product Level ที่ Type นี้',
+        // CR-30: KPI 6 ใบ กดเพื่อกรอง · CR-35 ทั้งหมด = ไม่นับ Delete · NPD = Request + Planned + NPD (บรรทัดย่อยกดแยกได้) · ยังไม่เปิดใน TRCLOUD = Request
+        kpi: { all: 'ทั้งหมด', active: 'Active', activeSub: 'Discontinued {n}', npd: 'NPD', npdSubs: { request: 'ขอ NPD {n}', planned: 'ยืนยันแล้ว {n}', 'new': 'เปิดขายแล้ว {n}' }, tempCodeSub: 'รหัสชั่วคราว', npdSub: 'ยังไม่เปิดขาย {a} · เปิดขายแล้ว {b}', required: 'ขาดข้อมูลจำเป็น', recommended: 'ขาดข้อมูลที่ควรมี',
           notInTrcloud: 'ยังไม่เปิดใน TRCLOUD', unit: 'SKU', title: 'กดเพื่อกรองตาราง' },
         searchPlaceholder: 'ค้นหา Product Code / ชื่อ / Barcode',
         viewLabel: 'มุมมอง',
         views: { list: 'รายการ', group: 'จัดกลุ่ม' },
         filters: {
-          status: 'Status', statusAll: 'ทุก Status', category: 'หมวดสินค้า', categoryAll: 'ทุกหมวดสินค้า',
+          status: 'Status', statusAll: 'ไม่รวม Delete', statusEverything: 'ทั้งหมด', category: 'หมวดสินค้า', categoryAll: 'ทุกหมวดสินค้า',
+          year: 'Product Year', yearAll: 'ทุก Product Year', yearSelected: '{n} ปี',
+          revenue: 'ประเภทรายได้', revenueAll: 'ทุกประเภทรายได้',
           channel: 'Channel ที่ Listing', channelAll: 'ทุก Channel',
           completeness: 'ความครบถ้วน', completenessAll: 'ทุกระดับ',
           // CR-20: สินค้าที่ Sales สร้างจากหน้าวางแผน SKU
@@ -598,7 +635,7 @@
           image: 'รูป', code: 'Product Code', name: 'ชื่อสินค้า', status: 'Status',
           category: 'Category', subCategory: 'Sub Category', type: 'Type', series: 'Series', subSeries: 'Sub Series',
           rsp: 'RSP (บาท)', completeness: 'ความครบถ้วน', manage: 'จัดการ',
-          barcode: 'Barcode', packSize: 'ขนาดบรรจุ', launchDate: 'เดือนเปิดตัว',
+          barcode: 'Barcode', packSize: 'ขนาดบรรจุ', launchDate: 'เดือนเปิดตัว', productYear: 'Product Year',
           listedCount: 'Listing (หน่วยขาย)', sellIn: 'ราคา Dealer {channel} (บาท)', inTrcloud: 'ใน TRCLOUD', source: 'ที่มา', updatedAt: 'แก้ไขล่าสุด'
         },
         trcloud: { open: 'เปิดแล้ว', notOpen: 'ยังไม่เปิด' },
@@ -611,7 +648,7 @@
         removeConfirm: 'ลบ {code} ออกจาก Product Master (เลข Product Code นี้จะไม่ถูกนำกลับมาใช้)',
         removeBlocked: 'ลบได้เฉพาะ SKU ที่ยังไม่มี Listing ราคาต่อ Account หรือแผน NPD · ปิดการขายด้วยเดือนเลิกขายแทน',
         exportFile: 'Product-List_{date}',
-        exportSheet: 'รายการสินค้า',
+        exportSheet: 'Product List',
         tabs: { general: 'ข้อมูลทั่วไป', price: 'ราคา', listing: 'Listing และวงจรสินค้า', history: 'ประวัติการแก้ไข' },
         edit: 'แก้ไข',
         completenessPct: 'ความครบถ้วน {pct}',
@@ -636,8 +673,11 @@
         },
         listing: {
           launch: 'เดือนเปิดตัว', listedTitle: 'หน่วยขายที่ Listing ({n})', listedEmpty: 'ยังไม่ได้ Listing',
-          listingLink: 'แก้ไข Listing ที่หน้า Listing', clearance: 'Clearance', clearanceNone: 'ไม่มี',
-          clearanceText: '{from} – {to} · Stock {stock} ชิ้น', discontinue: 'เดือนเลิกขาย', discontinueNone: 'ยังขายอยู่',
+          listingLink: 'แก้ไขที่ Launch & Listing แท็บ Listing', clearance: 'Clearance', clearanceNone: 'ไม่มี',
+          clearanceText: '{from} – {to} · Stock {stock} ชิ้น', clearanceUntilSold: 'จนสินค้าหมด', discontinue: 'เดือนเลิกขาย', discontinueNone: 'ยังขายอยู่',
+          // CR-35: Status Delete (เลิกขายแล้ว ไม่ผลิต ไม่ขาย) · ถามยืนยันเมื่อสินค้ายังมีในแผน
+          deleted: 'Delete ตั้งแต่เดือน', deletedNone: 'ยังไม่ Delete', deletedTip: 'เลิกขายแล้ว ไม่ผลิต ไม่ขาย · แถวในแผน SKU อ่านอย่างเดียว (ไม่ล้างค่าให้อัตโนมัติ)',
+          deleteConfirm: { title: 'เปลี่ยนเป็น Delete · {name}', inPlan: 'สินค้านี้มีในแผน {n} หน่วยขาย ({units})', none: 'สินค้านี้ไม่มีในแผน SKU', note: 'แถวในแผนยังแสดงแต่อ่านอย่างเดียว · ไม่ล้างค่าให้อัตโนมัติ', confirm: 'เปลี่ยนเป็น Delete' },
           timelineTitle: 'Status ปี {year}', npdLink: 'แผน NPD: {stage} · {status}', npdLinkStage: 'แผน NPD: {stage}'
         },
         history: { columns: { at: 'วันเวลา', by: 'ผู้แก้ไข', field: 'ฟิลด์', change: 'ค่าเดิม → ค่าใหม่' }, empty: 'ยังไม่มีประวัติการแก้ไข', imageYes: 'มีรูป', imageNo: 'ไม่มีรูป' },
@@ -659,29 +699,46 @@
       },
 
       // Product Master · แผน NPD (modules/npd-plan · CR-30 ช่วงเวลาต่อเนื่อง · ขั้นงานมีเดือนเป้าหมาย · เดือนเปิดตัวแบบไตรมาส)
+      // CR-35: Launch & Listing = แท็บ NPD (pages.npdPlan) | Listing (pages.productMaster) · คำอธิบายอยู่ในปุ่ม ?
+      launchListing: {
+        title: 'Launch & Listing', short: 'Launch & Listing', lead: [],
+        helpLead: 'แผนการเปิดตัวสินค้าใหม่ (NPD) และสถานะ / ช่วงเวลาวางขายของสินค้าในแต่ละหน่วยขาย (Listing)',
+        tabLabel: 'แท็บ', tabs: { npd: 'NPD', listing: 'Listing' }
+      },
       npdPlan: {
         title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)',
+        moved: 'หน้านี้รวมอยู่ใน Launch & Listing แล้ว (แท็บ NPD)', go: 'ไปหน้า Launch & Listing', viewListing: 'ดู Listing',
         lead: ['ติดตามสินค้าใหม่ตั้งแต่วางแผนจนเปิดตัว ทีมขายใช้ดูว่าสินค้าใหม่ใดพร้อมขายเมื่อใด ทีม Product ใช้ติดตามขั้นงานและคำขอจากทีมขาย'],
         kpi: {
-          all: 'NPD ทั้งหมด', notLaunched: 'ยังไม่เปิดตัว', soon: 'เปิดตัวใน 3 เดือน', bySeries: 'ตาม Series',
+          all: 'NPD ทั้งหมด', notLaunched: 'ยังไม่เปิดตัว', soon: 'เปิดตัวใน 3 เดือน', bySeries: 'ตาม Series',   // CR-36 ไม่ใช้แล้ว (แทนด้วย kpi3)
           missing: 'หน่วยขายที่ยังไม่อยู่ในแผน SKU', missingTitle: 'หน่วยขายที่วางแผนแต่ยังไม่อยู่ในแผน SKU', missingEmpty: 'ทุกหน่วยขายที่วางแผนอยู่ในแผน SKU แล้ว',
           missingLine: '{sku} · {unit}', missingYear: 'แผน SKU ปี {year}', open: 'เปิด SKU Planning ›'
         },
+        // CR-36: การ์ด KPI 3 ใบ · หน่วยขายที่มี Listing ในปีแผนแต่ยังไม่อยู่ในแผน SKU (calc.listedNotPlanned)
+        kpi3: { planned: 'NPD ยังไม่เปิดตัว', 'new': 'NPD เปิดตัวแล้ว', request: 'Request จาก Sales', unit: 'SKU', title: 'กดเพื่อกรองตาม Status', chip: 'KPI: {value}' },
+        notPlanned: { chip: 'มี Listing แต่ยังไม่อยู่ในแผน SKU ({n})', chipTip: 'สินค้าที่มีอย่างน้อย 1 หน่วยขายที่ Listing ปี {year} แต่แผน SKU ของหน่วยขายนั้นยังไม่มีสินค้านี้',
+          chipOn: 'มี Listing แต่ยังไม่อยู่ในแผน SKU ปี {year}', cell: 'ยังไม่อยู่ในแผน {n}', title: 'หน่วยขายที่มี Listing ปี {year} แต่ยังไม่อยู่ในแผน SKU', go: 'ไปที่ SKU Planning ›' },
         viewLabel: 'มุมมอง',
         views: { timeline: 'Timeline', table: 'ตาราง' },
         range: 'ช่วงเวลา', rangeOption: '{n} เดือน', from: 'ตั้งแต่',
         seriesAll: 'ทุก Series', stageFilter: 'ขั้นงาน', stageAll: 'ทุกขั้นงาน', sourceFilter: 'ที่มา', sourceAll: 'ทุกที่มา',
         sources: { PRODUCT: 'ทีม Product', SALES: 'จาก Sales' },
-        requestsChip: '● คำขอจาก Sales {n}', requestsTip: 'กดเพื่อแสดงเฉพาะ NPD ที่ Sales สร้างจากหน้า SKU Planning · กดอีกครั้งเพื่อแสดงทั้งหมด',
+        // CR-34: ที่มา = ทีม Product | Sales · ชื่อผู้ขอ (Tooltip เหตุผล) · Chip นับเฉพาะคำขอที่ยังไม่ยืนยัน
+        sourceSales: 'Sales · {name}', sourceReason: 'เหตุผล: {reason}', sourceNoReason: 'ไม่ได้ระบุเหตุผล',
+        requestsChip: 'คำขอจาก Sales ({n})', requestsTip: 'คำขอ NPD จาก Sales ที่ทีม Product ยังไม่ยืนยัน · กดเพื่อแสดงเฉพาะคำขอ · กดอีกครั้งเพื่อแสดงทั้งหมด',
+        requestBadge: 'ขอ NPD',
         stages: { plan: 'วางแผน', concept: 'สรุปแนวคิด', production: 'เตรียมผลิต', ready: 'พร้อมขาย', launched: 'เปิดตัวแล้ว' },
         stageAuto: 'ระบบตั้ง เปิดตัวแล้ว ให้เมื่อถึงเดือนเปิดตัว',
-        columns: { sku: 'SKU', series: 'Series', stage: 'ขั้นงาน', launch: 'เดือนเปิดตัว', accounts: 'Channel / หน่วยขายที่วางแผน', inPlan: 'ในแผน SKU',
+        columns: { sku: 'SKU', series: 'Series', stage: 'ขั้นงาน', launch: 'เดือนเปิดตัว', accounts: 'Channel / หน่วยขายที่วางแผน', inPlan: 'ใช้ในแผน',
           rsp: 'ราคา RSP ที่คาด (บาท)', owner: 'ผู้รับผิดชอบ', source: 'ที่มา', trcloud: 'ใน TRCLOUD' },
         rowLine: 'เปิดตัว {launch} · {n} หน่วยขาย · ในแผน SKU {x}/{n}',
         quarter: '{q} {y}', unconfirmed: 'เดือนเปิดตัวยังไม่ยืนยัน', noLaunch: 'ยังไม่กำหนด',
         pin: 'เปิดตัว {month}', quarterBand: 'เปิดตัวใน {q} (ยังไม่ยืนยันเดือน)', npdBand: 'NPD', npdBandTip: 'ช่วง NPD 3 เดือนแรกนับจากเดือนเปิดตัว',
         stageTip: '{stage}: {from} – {to}', currentStage: ' (ขั้นปัจจุบัน)', overdue: 'เลยเดือนเป้าหมายแล้วยังไม่เสร็จ: {stages}',
         accountsCount: '{n} หน่วย', inPlanText: '{x} / {y}',
+        // CR-34: ใช้ในแผน = จำนวนหน่วยขายที่มีสินค้านี้ในแผน SKU (ปีเปิดตัว)
+        usedText: '{n} หน่วยขาย', usedTip: 'อยู่ในแผน SKU ปี {year}: {units}', usedNone: 'ยังไม่มีหน่วยขายใดมีสินค้านี้ในแผน SKU ปี {year}',
+        usedMissing: 'วางแผนแต่ยังไม่อยู่ในแผน SKU: {units}',
         empty: 'ไม่มีแผน NPD ตามตัวกรองในช่วงเวลานี้',
         create: '+ เพิ่ม NPD', createTitle: 'เพิ่มแผน NPD',
         pickSku: 'SKU ที่ยังไม่มีแผน NPD', pickPlaceholder: 'เลือก SKU',
@@ -691,8 +748,13 @@
         fields: {
           product: 'SKU', series: 'Series', stage: 'ขั้นปัจจุบัน', targets: 'เดือนเป้าหมายของขั้นงาน (ไม่บังคับ)', launch: 'เดือนเปิดตัว',
           launchModes: { month: 'เดือน', quarter: 'ไตรมาส' }, quarterSelect: 'ไตรมาส', rsp: 'ราคา RSP ที่คาด (บาท)', owner: 'ผู้รับผิดชอบฝั่ง Product',
-          source: 'ที่มา', accounts: 'หน่วยขายที่วางแผนและเดือนเริ่มขาย', note: 'หมายเหตุ'
+          source: 'ที่มา', accounts: 'หน่วยขายที่วางแผนและเดือนเริ่มขาย', note: 'หมายเหตุ',
+          requestedBy: 'ผู้ขอ', reason: 'เหตุผล / แนวคิดสินค้า', request: 'สถานะคำขอ'
         },
+        // CR-34: ทีม Product ยืนยันคำขอ NPD จาก Sales (การแก้ไขปกติของหน้า ไม่มีขั้นอนุมัติ · ไม่ใช้ Flag npdApproval)
+        requestStates: { pending: 'รอทีม Product ยืนยัน (Request)', confirmed: 'ยืนยันเป็น NPD แล้ว (Planned)' },
+        confirmedLine: 'ยืนยันโดย {by} · {date}',
+        confirmNote: 'ยืนยันแล้ว แถวของสินค้านี้ในหน้า SKU Planning เปลี่ยนเป็นประเภท NPD ยืนยันแล้ว เมื่อบันทึก',
         addAccount: '+ หน่วยขาย',
         startMonth: 'เดือนเริ่มขาย',
         removeAccount: 'นำหน่วยขายออกจากแผน NPD',
@@ -711,13 +773,33 @@
 
       // Product Master · ราคาและ Promotion (modules/promotions · CR-30 แทนราคาขายต่อ Account และปฏิทิน Promotion)
       promotionPrice: {
-        title: 'ราคาและ Promotion',
-        short: 'ราคาและ Promotion',
-        lead: ['ราคาหลักตามรอบเวลา และ Promotion Price รายเดือนของแต่ละ Channel และหน่วยขาย'],
-        tabs: { base: 'ราคาหลัก', promo: 'Promotion Price' },
+        title: 'Price & Promotion',
+        short: 'Price & Promotion',
+        lead: [],
+        helpLead: 'ราคาหลักตามรอบเวลา และ Promotion Price รายเดือนของแต่ละ Channel และหน่วยขาย',
+        tabs: { base: 'ราคาหลัก', promo: 'Promotion Price', clearance: 'Clearance' },
         tabLead: {
           base: 'ราคาหลักรวม VAT เปลี่ยนได้รายเดือน มีผลวันที่ 1 · MT / ECOM / Export ใช้ RSP · TT ใช้ TT Dealer',
-          promo: 'ราคาของหน่วยขายรายเดือน: Promotion Price ของหน่วยขาย → ของทั้ง Channel → ราคาหลัก'
+          promo: 'ราคาของหน่วยขายรายเดือน: ราคา Clearance → Promotion Price ของหน่วยขาย → ของทั้ง Channel → ราคาหลัก',
+          clearance: 'ราคา Clearance ใช้แทนทุกลำดับราคาในเดือนที่อยู่ในช่วง Clearance ของหน่วยขายนั้น · แก้ได้เฉพาะผู้มีสิทธิ์ Clearance'
+        },
+        // CR-35: แท็บ Clearance (1 แถวต่อ SKU × ช่วง Clearance · สิทธิ์ย่อย listing.clearance · หน้าจัดการ Clearance แยกและรายงานรายได้ = Phase 2)
+        clearance: {
+          columns: { sku: 'SKU', base: 'ราคาหลัก (บาท)', price: 'ราคา Clearance (บาท)', discount: 'ส่วนลด', range: 'ช่วงเดือน', units: 'หน่วยขาย', expiry: 'วันหมดอายุ', note: 'หมายเหตุ',
+            stock: 'สต็อกที่ต้องระบาย (ชิ้น)', planned: 'แผนระบาย (ชิ้น)', remaining: 'คงเหลือสต็อก', net: 'Net Sales แผน {year} (บาท)', manage: '' },
+          // CR-36: แผน Clearance (Supply Chain · ไม่นับในเป้าหมายและคงเหลือของ Sales Planning)
+          planNote: 'แผน Clearance ไม่นับในเป้าหมายและคงเหลือของ Sales Planning · คลิกแถวเพื่อวางแผนจำนวนรายเดือน ({year})',
+          stockStatus: { ok: 'ครบ', left: 'ยังระบายไม่หมด {n}', over: 'เกินสต็อก {n}' }, stockTip: 'คงเหลือสต็อก = สต็อกที่ต้องระบาย − แผนระบาย',
+          netTip: 'Net Sales ของแผนระบายปี {year} = จำนวน × ราคา Clearance ตามสูตร Net Sales ของ Channel', expand: 'กางแผนรายเดือน', collapse: 'พับแผนรายเดือน',
+          plan: { title: 'แผน Clearance {year}', note: 'ไม่นับในเป้าหมาย', unit: 'หน่วยขาย', total: 'รวม', sumUnits: 'รวมชิ้น', sumNet: 'Net Sales (บาท)',
+            distribute: 'กระจายเท่ากันทุกเดือน', distributeTip: 'แบ่งคงเหลือสต็อกให้ทุกหน่วยขายและทุกเดือนเท่ากัน (ปัดลง · เศษไปเดือนสุดท้าย)',
+            noMonths: 'ช่วง Clearance ไม่อยู่ในปีแผน {year}', noUnits: 'ยังไม่มีหน่วยขาย · เลือกหน่วยขาย หรือ Listing สินค้านี้ก่อน' },
+          baseTip: 'RSP ของเดือนเริ่ม Clearance (อ่านอย่างเดียว)', openEndTip: 'เดือนสิ้นสุด · ว่าง = จนสินค้าหมด', allUnits: 'ทุกหน่วยขาย', untilSold: 'จนสินค้าหมด', unitsSelected: '{n} หน่วยขาย',
+          add: '+ เพิ่ม Clearance', addTitle: 'เพิ่ม Clearance', pickSku: 'SKU (Active หรือ Discontinued)', fromMonth: 'เริ่ม Clearance', pickPlaceholder: 'เลือก SKU',
+          confirmStatus: 'เปลี่ยน Status ของ {name} เป็น Clearance ตั้งแต่ {month}', confirmTitle: 'ยืนยันการเปลี่ยน Status', confirm: 'เปลี่ยนเป็น Clearance',
+          remove: 'นำออกจาก Clearance', empty: 'ยังไม่มีสินค้า Clearance', noRight: 'ดูอย่างเดียว · แก้ Clearance ได้เฉพาะผู้มีสิทธิ์ Clearance',
+          usesPrice: 'ใช้ราคา Clearance {range}', pickUnits: 'เลือกหน่วยขาย (ว่าง = ทุกหน่วยขาย)', errors: { sku: 'กรุณาเลือก SKU', month: 'กรุณาเลือกเดือนเริ่ม' },
+          exportSheet: 'Clearance'
         },
         search: 'ค้นหา SKU',
         noSkus: 'ไม่มี SKU ตามตัวกรอง',
@@ -773,6 +855,7 @@
 
       // Product Master · Listing (modules/product-master)
       productMaster: {
+        moved: 'หน้านี้รวมอยู่ใน Launch & Listing แล้ว (แท็บ Listing)', go: 'ไปหน้า Launch & Listing',   // CR-35
         // CR-30 รอบ 3: หน้า Listing = สถานะและช่วงเวลา Listing ต่อหน่วยขาย (แทน Checkbox · ตัดคอลัมน์วันเริ่มขาย / Status ปีแผน / เลิกขาย)
         title: 'Listing',
         lead: ['กำหนดสถานะและช่วงเวลาวางขายของสินค้าในแต่ละหน่วยขาย และช่วง Clearance'],
@@ -784,6 +867,7 @@
         columns: { sku: 'SKU (ชื่อสั้น · Code · Series)', coverage: 'ความครอบคลุม', listing: 'Listing ต่อ {unit} · {channel}', clearance: 'Clearance' },
         discontinuedAt: 'Discontinued {month}',
         listing: {
+          newOnly: 'เฉพาะสินค้าใหม่', newOnlyTip: 'แสดงเฉพาะสินค้า Request / Planned / NPD (CR-35)',
           statuses: { listed: 'วางขาย', offered: 'เสนอขาย', delisted: 'ถอดแล้ว', none: 'ไม่เคย Listing' },
           marks: { listed: '✓', offered: '◌', delisted: '✕' },
           fromText: 'เริ่ม {month}', toText: 'วางขายถึง {month}',
@@ -816,16 +900,17 @@
         },
         clearanceOwner: 'Supply Chain',
         clearanceFrom: 'ตั้งแต่',
-        clearanceTo: 'ถึง',
+        clearanceTo: 'ถึง (ว่าง = จนสินค้าหมด)',
         clearanceStock: 'Stock (ชิ้น)',
         clearanceStockNote: 'Prototype แบ่ง Stock เท่ากันทุกหน่วยขายที่ Listing',
         clearanceNone: '–',
-        clearanceText: '{from}–{to} · {stock}',
+        clearanceText: '{from}–{to} · {stock}', clearanceUntilSold: 'จนสินค้าหมด',
         clearanceEdit: 'แก้ไข Clearance',
         clearanceTitle: 'Clearance · {sku}',
         clearanceSave: 'ใช้ค่านี้',
         clearanceClear: 'ไม่มี Clearance',
-        clearanceError: 'กรุณาระบุเดือนเริ่มและเดือนสิ้นสุด (เดือนสิ้นสุดต้องไม่ก่อนเดือนเริ่ม)',
+        clearanceError: 'กรุณาระบุเดือนเริ่ม (เดือนสิ้นสุดต้องไม่ก่อนเดือนเริ่ม · ว่าง = จนสินค้าหมด)',
+        clearancePriceNote: 'ราคา Clearance หน่วยขาย และหมายเหตุ แก้ที่แท็บ Clearance ของหน้า Price & Promotion',
         bySales: 'Listing โดย Sales',
         bySalesTip: 'Listing โดย Sales · {unit} · เพิ่มโดย {by} · {date} · เริ่มขาย {from} · ทีม Product ตรวจสอบได้ที่นี่',
         selectShort: 'เลือก',
@@ -841,9 +926,12 @@
 
       // Product Master · หมวดสินค้าและ Series (modules/taxonomy)
       // CR-15: มุมมองแบบคอลัมน์ (Category → Sub Category → Type | Series → Sub Series) + แผงรายละเอียด + ตัวกรอง + ตารางไขว้
+      // CR-36: เป็นแท็บ Product Level ของ Product List (หน้าเดิม modules/taxonomy = ทางผ่าน)
       taxonomy: {
-        title: 'หมวดสินค้าและ Series',
-        lead: ['รายการหมวดสินค้าและ Series ที่ใช้อ้างอิงในข้อมูลสินค้า'],
+        title: 'Product Level', short: 'Product Level',
+        moved: 'หน้านี้ย้ายเป็นแท็บ Product Level ของ Product List แล้ว', go: 'ไปหน้า Product List',
+        lead: [],
+        helpLead: 'รายการหมวดสินค้าและ Series ที่ใช้อ้างอิงในข้อมูลสินค้า',
         tabLabel: 'มุมมอง',
         tabs: { category: 'หมวดสินค้า', series: 'Series', cross: 'ตารางไขว้' },
         columnHead: '{level} ({n})',
@@ -927,14 +1015,14 @@
         blockedReason: 'ขาดข้อมูลจำเป็น: {fields} · แก้ไขได้ที่รายการสินค้า',
         productTip: {
           category: 'หมวดสินค้า', series: 'Series', rsp: 'RSP', rspValue: '{price} บาท (ณ {date})', noRsp: 'ยังไม่มีราคา',
-          promoPrice: { promoUnit: 'Promotion Price ({unit})', promoChannel: 'Promotion Price (ทั้ง {channel})' }, dealer: 'TT Dealer', status: 'Status ปี {year}'
+          promoPrice: { promoUnit: 'Promotion Price ({unit})', promoChannel: 'Promotion Price (ทั้ง {channel})', clearance: 'ราคา Clearance' }, dealer: 'TT Dealer', status: 'Status ปี {year}'
         },
         // CR-11: แถบเครื่องมือตาราง (แถวที่ 2)
         searchPlaceholder: 'ค้นหา SKU / ชื่อ',
         searchLabel: 'ค้นหา SKU หรือชื่อสินค้า',
         searchEmpty: 'ไม่พบ SKU ที่ตรงกับคำค้น',
         groupLabel: 'จัดกลุ่ม',
-        groupBy: { series: 'Series', status: 'Status', none: 'ไม่จัดกลุ่ม' },
+        groupBy: { series: 'Series', type: 'ประเภท', status: 'Status', none: 'ไม่จัดกลุ่ม' },
         collapseAll: 'พับทั้งหมด',
         expandAll: 'กางทั้งหมด',
         sortLabel: 'เรียง',
@@ -970,7 +1058,7 @@
         lyColumn: 'L12M',
         lyColumnTip: 'ยอดขาย L12M ({range}) ของ SKU ในแผน = ผลรวมยอดอ้างอิง 12 เดือน (ไม่รวม SKU ที่ไม่อยู่ในแผน)',
         growthColumn: 'การเติบโต',
-        groupRows: { active: 'สินค้าที่วางขายแล้ว', 'new': 'สินค้าใหม่ (NPD) ปี {year}', clearance: 'Clearance', discontinued: 'เลิกขายระหว่างปี', all: 'ทุก SKU', noSeries: '(ไม่ระบุ Series)' },
+        groupRows: { active: 'สินค้าที่วางขายแล้ว', 'new': 'สินค้าใหม่ (NPD) ปี {year}', clearance: 'Clearance', discontinued: 'เลิกขายระหว่างปี', all: 'ทุก SKU', noSeries: '(ไม่ระบุ Series)' },   // CR-34 จัดกลุ่มตามประเภทใช้ labels.planTypes
         groupSearchCount: '{n} จาก {total} รายการ',
         groupToggle: 'พับหรือกางกลุ่ม {group}',
         selectRow: 'เลือก {sku}',
@@ -982,33 +1070,34 @@
           fill: 'ปรับให้ครบตามเป้าหมาย', fillTitle: 'ปรับทุก SKU ที่มีค่ามากกว่า 0 ตามสัดส่วน ให้คงเหลือรายเดือนเป็น 0 (ดูตารางก่อน/หลังก่อนยืนยัน)',
           fillDialog: 'ปรับให้ครบตามเป้าหมาย · {unit}'
         },
-        remHint: 'ขาด {amount} ล้านบาท · ปรับจำนวน หรือเพิ่ม NPD',
-        remHintSmall: 'ขาด {amount} บาท · ปรับจำนวน หรือเพิ่ม NPD',
-        // CR-20: + เพิ่ม SKU จาก Product Master (Drawer)
-        addDrawer: {
-          title: 'เพิ่ม SKU ในแผน · {unit}',
-          lead: 'เลือกจาก Product Master · SKU ที่ยังไม่ได้ Listing ระบบสร้าง Listing ให้เมื่อบันทึกแผน (Listing โดย Sales ทีม Product ตรวจสอบภายหลัง)',
-          month: 'เดือนเริ่มขาย',
-          groups: { listed: 'Listing แล้วใน {unit}', unlisted: 'ยังไม่ได้ Listing' },
-          unlistedNote: 'เลือกแล้วระบบสร้าง Listing ให้หน่วยขายนี้ตั้งแต่เดือนเริ่มขายที่เลือก',
-          selectAll: 'เลือกทั้งหมดในกลุ่ม {group}',
-          selected: 'เลือก {n} รายการ',
-          confirm: 'เพิ่ม {n} SKU'
+        remHint: 'ขาด {amount} ล้านบาท · ปรับจำนวน หรือเพิ่มสินค้าในแผน',
+        remHintSmall: 'ขาด {amount} บาท · ปรับจำนวน หรือเพิ่มสินค้าในแผน',
+        // CR-34: + เพิ่มสินค้าในแผน (แทน + เพิ่ม SKU · + เพิ่มสินค้าใหม่ · + สร้าง NPD) — 3 แท็บ
+        addPlan: {
+          button: '+ เพิ่มสินค้าในแผน', title: 'เพิ่มสินค้าในแผน · {unit}',
+          tabs: { existing: 'สินค้าเดิมที่ยังไม่เคยขายในหน่วยขายนี้', npd: 'NPD ที่ยืนยันแล้ว', request: 'ขอ NPD เพิ่ม' },
+          notes: {
+            existing: 'สินค้าที่ขายอยู่แต่ยังไม่อยู่ในแผนของหน่วยขายนี้ · เพิ่มแล้วสร้าง Listing ของหน่วยขายนี้ตั้งแต่เดือนที่เลือกเมื่อบันทึกแผน',
+            npd: 'สินค้าใหม่ที่ทีม Product ยืนยันแล้ว · เดือนเริ่มค่าเริ่มต้น = เดือนเปิดตัวตามแผน NPD',
+            request: 'ทีม Product จะเห็นคำขอนี้ในหน้าแผน NPD และเปลี่ยนเป็น NPD เมื่อยืนยัน'
+          },
+          month: 'เดือนเริ่มขาย', monthNote: 'ใช้เดือนเดียวกันทุกรายการ · แก้รายแถวได้ภายหลังที่คอลัมน์ช่วงเวลาขาย · จำนวนเริ่มต้น 0 ทุกเดือน',
+          l12m: 'L12M {n} ชิ้น (ทุกหน่วยขาย)', launch: 'เปิดตัว {month}', listed: 'Listing แล้ว',
+          empty: 'ไม่มีรายการ', selectAll: 'เลือกทั้งหมด', selected: 'เลือก {n} รายการ', confirm: 'เพิ่ม {n} รายการ',
+          monthLaunch: 'ตามเดือนเปิดตัวของแต่ละรายการ',
+          noRequest: 'บทบาทนี้ขอ NPD ไม่ได้ (สิทธิ์ สร้าง NPD ของหน้า SKU Planning)', link: 'เพิ่มสินค้าในแผน',
+          errors: { permission: 'ไม่มีสิทธิ์แก้ไขแผนของหน่วยขายนี้', invalid: 'รายการที่เลือกเพิ่มในแผนไม่ได้' }
         },
-        fromSales: 'จาก Sales',
-        // CR-20: + สร้าง NPD (Sales Manager / Officer ของ Channel)
+        // CR-20: ฟอร์มสร้าง NPD → CR-34 แท็บ ขอ NPD เพิ่ม ของ Dialog เพิ่มสินค้าในแผน (Sales Manager / Officer ของ Channel · สิทธิ์ สร้าง NPD)
         npdForm: {
-          button: '+ สร้าง NPD',
-          title: 'สร้าง NPD · {unit}',
-          lead: 'บันทึกแล้วใช้วางแผนได้ทันที · ได้ Product Code จากระบบตาม Type ที่เลือก · ทีม Product เติมข้อมูลที่ขาดภายหลัง',
-          fields: { name: 'ชื่อสินค้า', series: 'Series', category: 'หมวดสินค้า (ถึง Type)', price: 'ราคาขายที่ {unit} (รวม VAT)', month: 'เดือนเริ่มขาย',
-            units: 'หน่วยขายอื่นใน {channel} ที่จะขาย', note: 'หมายเหตุถึงทีม Product' },
+          fields: { name: 'ชื่อสินค้า (ชั่วคราว)', series: 'Series', category: 'หมวดสินค้า (ถึง Type)', price: 'ราคาขายที่ {unit} (รวม VAT)', month: 'เดือนเริ่มขาย',
+            units: 'หน่วยขายอื่นใน {channel} ที่จะขาย', note: 'หมายเหตุถึงทีม Product', reason: 'เหตุผล / แนวคิดสินค้า' },
           seriesPlaceholder: 'เลือก Series', seriesNone: 'ยังไม่ระบุ', categoryPlaceholder: 'ยังไม่ระบุ',
           noOtherUnits: 'ไม่มีหน่วยขายอื่นในแผนของ Channel นี้',
           hint: '* = ต้องกรอก · ราคาบันทึกเป็นราคาต่อ Account ของหน่วยขายนี้ และใช้เป็น RSP ตั้งต้น · เดือนก่อนเดือนเริ่มขายล็อก 0',
-          save: 'บันทึก NPD', cancel: 'ยกเลิก',
+          save: 'ส่งคำขอ NPD', cancel: 'ยกเลิก',
           errors: { name: 'กรุณากรอกชื่อสินค้า', series: 'กรุณาเลือก Series (หรือเลือก ยังไม่ระบุ)',
-            type: 'กรุณาเลือกหมวดสินค้าถึง Type (Product Code สร้างจากเลขนำหน้าของ Type)', prefix: 'กำหนดเลขนำหน้า Product Code ของ Type นี้ก่อน (ทีม Product · หน้าหมวดสินค้าและ Series)', price: 'ราคาขายต้องมากกว่า 0', month: 'กรุณาเลือกเดือนเริ่มขายในปีแผน' }
+            type: 'กรุณาเลือกหมวดสินค้าถึง Type (Product Code สร้างจากเลขนำหน้าของ Type)', prefix: 'กำหนดเลขนำหน้า Product Code ของ Type นี้ก่อน (ทีม Product · Product List แท็บ Product Level)', price: 'ราคาขายต้องมากกว่า 0', month: 'กรุณาเลือกเดือนเริ่มขายในปีแผน' }
         },
         requestChanged: { title: 'ข้อมูลสินค้าถูกแก้โดยทีม Product', fields: { price: 'ราคาเปลี่ยนจากที่ Sales กรอก', launch: 'วันเริ่มขายเปลี่ยน (แผนยังใช้เดือนที่ Sales กรอก)' } },
         bulk: { selected: 'เลือก {n} รายการ', scale: 'ปรับ ±%', lastYear: 'ตั้งเท่ายอดอ้างอิง', reset: 'คืนค่าตั้งต้น', clear: 'ล้างค่า', unselect: 'ยกเลิกการเลือก' },
@@ -1075,10 +1164,21 @@
           remaining: 'คงเหลือ',
           remainingNote: 'เป้าหมาย − แผน เทียบกับเป้าหมายทั้งหน่วยขายเสมอ (ค่าบวก = ขาด ค่าลบ = เกิน)'
         },
-        startMonthLabel: 'เริ่มขาย',
-        startMonthInvalid: 'เลือกเดือนก่อนวันเริ่มขายใน Product Master ไม่ได้',
-        addSku: '+ เพิ่ม SKU',
-        addNpd: '+ เพิ่มสินค้าใหม่',
+        // CR-34: เดือนเริ่มขายในคอลัมน์ช่วงเวลาขาย (โหมดแก้ไข · สินค้าใหม่ 3 ประเภท)
+        startEdit: {
+          label: 'เริ่ม', aria: 'เดือนเริ่มขาย {sku}', tip: 'เดือนเริ่มขายในหน่วยขายนี้ · เดือนก่อนหน้าล็อก 0',
+          reasons: { beforeLaunch: 'เปิดตัวตามแผน NPD {month}', beforeListing: 'Listing ที่ทีม Product สร้างเริ่ม {month}' },
+          clearTitle: 'เลื่อนเดือนเริ่มขาย · {sku}', clearLine: 'ค่าใน {months} จะถูกล้างเป็น 0', clearConfirm: 'เลื่อนเดือนเริ่ม'
+        },
+        removePlanListing: 'Listing ที่สร้างจาก SKU Planning ของหน่วยขายนี้จะถูกนำออกเมื่อบันทึกแผน',
+        cancelRequest: {
+          title: 'ยกเลิกคำขอ NPD {sku} ด้วยหรือไม่', lines: ['ไม่มีหน่วยขายอื่นใช้สินค้านี้', 'ยกเลิกแล้วสินค้า ราคา และแผน NPD ของคำขอนี้จะถูกนำออกเมื่อบันทึกแผน'],
+          yes: 'ยกเลิกคำขอด้วย', no: 'เก็บคำขอไว้'
+        },
+        // CR-34 ส่วน 5: ข้อมูลที่ต้องตรวจของหน่วยขายนี้
+        checks: { title: 'ข้อมูลที่ต้องตรวจ', types: { clearance: 'มีแผนสินค้า Clearance', 'delete': 'มีแผนสินค้า Delete' }, item: '{sku} {name}', criteria: ['มีแผนสินค้า Clearance', 'มีแผนสินค้า Delete'],
+          clearValues: 'ล้างค่า' },   // CR-36: ล้างค่าในเดือน Clearance ที่ล็อก (โหมดแก้ไข)
+        deletedCell: 'สินค้าเป็น Delete · อ่านอย่างเดียว (ไม่ล้างค่าให้อัตโนมัติ)',
         addSearch: 'ค้นหา SKU',
         addEmpty: 'ไม่มี SKU ตามตัวกรอง',
         npdEmpty: 'ยังไม่มีสินค้าใหม่ในแผน',
@@ -1106,22 +1206,23 @@
       },
 
       // Account Master (workflowBar แบบง่าย)
-      // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น Sales Unit & Customer (หน้าเดิมซ่อน · เปิดลิงก์เดิมแล้วพาไปหน้าใหม่)
+      // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น Account Master (หน้าเดิมซ่อน · เปิดลิงก์เดิมแล้วพาไปหน้าใหม่)
       accounts: {
         title: 'Account & Platform',
-        moved: 'หน้านี้รวมอยู่ใน Sales Unit & Customer แล้ว', go: 'ไปหน้า Sales Unit & Customer'
+        moved: 'หน้านี้รวมอยู่ใน Partner List แล้ว', go: 'ไปหน้า Partner List'
       },
       territories: {
         title: 'เขตและร้านค้า ({territoryChannels})',
         short: 'เขตและร้านค้า ({territoryChannels})',
-        moved: 'หน้านี้รวมอยู่ใน Sales Unit & Customer แล้ว (แท็บ {channel})', go: 'ไปหน้า Sales Unit & Customer'
+        moved: 'หน้านี้รวมอยู่ใน Partner List แล้ว (แท็บ {channel})', go: 'ไปหน้า Partner List'
       },
 
-      // CR-32: Sales Unit & Customer — Channel → หน่วยขาย (Account · Platform · เขต) → คู่ค้า (รหัสคู่ค้า = รหัสใน TRCLOUD) ตามช่วงเดือน · CR-33 แก้ไขรายรายการ
+      // CR-32: Account Master — Channel → หน่วยขาย (Account · Platform · เขต) → คู่ค้า (รหัสคู่ค้า = รหัสใน TRCLOUD) ตามช่วงเดือน · CR-33 แก้ไขรายรายการ
       //   ป้ายหน่วยขายใช้ unitLabel / gpLabel ของ Channel Master · ผู้รับผิดชอบแก้ไขที่หน้าบุคลากร (อ่านอย่างเดียวในหน้านี้)
       salesUnits: {
-        title: 'Sales Unit & Customer',
-        short: 'Sales Unit & Customer',
+        // CR-36: ชื่อหน้า Partner List (หัวกลุ่มเมนู ACCOUNT MASTER คงเดิม)
+        title: 'Partner List',
+        short: 'Partner List',
         titleTip: 'หน่วยขายและคู่ค้า',
         lead: ['หน่วยขายของทุก Channel และคู่ค้าตามรหัสคู่ค้าที่อยู่ในแต่ละหน่วยขายตามช่วงเดือน'],
         month: { label: 'ข้อมูล ณ เดือน', tip: 'ตัวเลขและการจัดสรรทั้งหน้าแสดงตามเดือนที่เลือก', current: 'เดือนปัจจุบัน' },
@@ -1133,7 +1234,7 @@
           kind: 'ประเภท', trcloudType: 'ประเภทคู่ค้า', priceType: 'ประเภทราคา', province: 'จังหวัด', channels: 'Export/Online', data: 'ข้อมูล',
           all: 'ทั้งหมด', selected: '{n} รายการ', clear: 'ล้าง', empty: 'ไม่พบรายการ', find: 'ค้นหา', none: 'ไม่ระบุ',
           channelOptions: { export: 'Export', online: 'Online' },
-          dataOptions: { outside: 'อยู่นอกจังหวัดของเขต', noProvince: 'ไม่ระบุจังหวัด', moved: 'ย้ายหน่วยขายในปีนี้', duplicate: 'System ID ซ้ำ' },
+          dataOptions: { outside: 'อยู่นอกจังหวัดของเขต', noProvince: 'ไม่ระบุจังหวัด', moved: 'ย้ายหน่วยขายในปีนี้' },
           chipSearch: 'ค้นหา: {q}', chip: '{label}: {value}'
         },
         kinds: { headOffice: 'สำนักงานใหญ่', branch: 'สาขา', store: 'ร้านค้า', platform: 'Platform' },
@@ -1162,7 +1263,7 @@
           suggestTag: 'แนะนำ {name}', suggestTip: 'หน่วยขายแนะนำ: {name} (จากคำนำหน้าชื่อคู่ค้า หรือจังหวัดของร้าน)', unassignedSuggest: 'ยังไม่จัดสรร · แนะนำ {name}',
           export: 'ร้านที่ขายส่งออก', online: 'ขายออนไลน์', has: 'มี',
           masked: 'ชื่อบุคคลธรรมดา · ซ่อนเพื่อคุ้มครองข้อมูลส่วนบุคคล',
-          duplicate: 'ID ซ้ำ', duplicateTip: 'System ID นี้มี {n} แถวในไฟล์ต้นทาง · ยอดอ้างอิงนับแยกแต่ละแถว',
+
           outside: 'นอกจังหวัด', outsideTip: 'จังหวัดของร้านไม่อยู่ในรายชื่อจังหวัดแนะนำของ {territory}', sort: 'เรียงตาม{name}',
           sample: 'ข้อมูลตัวอย่าง · ยังไม่มีข้อมูลจริงจาก TRCLOUD', period: '{from} – {to}', periodNow: 'ปัจจุบัน'
         },
@@ -1207,7 +1308,8 @@
         },
         errors: {
           permission: 'บทบาทนี้แก้ไขข้อมูลส่วนนี้ไม่ได้', name: 'กรุณากรอกชื่อ', duplicate: 'มีหน่วยขายชื่อนี้ใน Channel นี้แล้ว',
-          blocked: 'นำออกไม่ได้เพราะอยู่ในแผน มียอดขายย้อนหลัง หรือเคยมีผู้รับผิดชอบ', channelId: 'รหัส Channel ห้ามว่างหรือซ้ำ', failed: 'บันทึกไม่สำเร็จ'
+          blocked: 'นำออกไม่ได้เพราะอยู่ในแผน มียอดขายย้อนหลัง หรือเคยมีผู้รับผิดชอบ', channelId: 'รหัส Channel ห้ามว่างหรือซ้ำ', failed: 'บันทึกไม่สำเร็จ',
+          duplicateCode: 'รหัสคู่ค้า {code} มีอยู่แล้ว ({name})'   // CR-35: รหัสคู่ค้าห้ามซ้ำทั้งระบบ (units.firstCodeConflict · store.js)
         },
         drawerActions: {
           save: 'บันทึก', cancel: 'ยกเลิก', dirty: 'มีการแก้ไขที่ยังไม่บันทึก',
@@ -1217,7 +1319,7 @@
           title: 'ข้อมูลที่ต้องตรวจ ณ {month}',
           types: {
             unassigned: 'คู่ค้าใช้งานที่ยังไม่จัดสรร', noOwner: 'หน่วยขายใช้งานที่ไม่มีผู้รับผิดชอบ', prefix: 'คู่ค้าที่คำนำหน้าชื่อชี้ไปหน่วยขายอื่น',
-            noProvince: 'ไม่ระบุจังหวัด', duplicate: 'System ID ซ้ำ', noCustomers: 'หน่วยขายใช้งานที่ไม่มีคู่ค้าใช้งาน'
+            noProvince: 'ไม่ระบุจังหวัด', noCustomers: 'หน่วยขายใช้งานที่ไม่มีคู่ค้าใช้งาน'
           },
           item: '{name}', unitItem: '{channel} · {name}', prefixItem: '{name} → {unit}', showAll: 'กรองตารางตามเกณฑ์นี้'
         },
@@ -1273,13 +1375,14 @@
           title: 'นำเข้าร้านค้าจากไฟล์: {file}', failed: 'อ่านไฟล์ไม่ได้ · ใช้ไฟล์ .xlsx หรือ .csv รูปแบบเดียวกับไฟล์ส่งออก',
           noHeader: 'ไม่พบหัวคอลัมน์ System ID ในไฟล์', rows: 'อ่านได้ {n} แถว',
           groups: { added: 'ร้านใหม่ ({n})', changed: 'ข้อมูลเปลี่ยน ({n})', missing: 'ไม่พบในไฟล์ ({n}) · เสนอปิดใช้งาน' },
-          missingNote: 'ไม่ปิดใช้งานอัตโนมัติ · เลือกเฉพาะร้านที่ต้องการปิด', selectAll: 'เลือกทั้งหมด', fromMonth: 'การเปลี่ยนเขตมีผลตั้งแต่เดือน',
+          missingNote: 'ไม่ปิดใช้งานอัตโนมัติ · เลือกเฉพาะร้านที่ต้องการปิด',
+          rejected: 'ไม่นำเข้า {n} แถว เพราะรหัสคู่ค้าซ้ำ', selectAll: 'เลือกทั้งหมด', fromMonth: 'การเปลี่ยนเขตมีผลตั้งแต่เดือน',
           unknownTerritory: 'ไม่พบเขตชื่อ {names} · ร้านเหล่านี้จะไม่ถูกจัดสรรเขต', masked: 'ชื่อบุคคลธรรมดาถูกซ่อนตามกฎเดิม',
           nothing: 'ไม่มีรายการที่เปลี่ยน', confirm: 'นำเข้ารายการที่เลือก', more: 'และอีก {n} รายการ',
           fields: { name: 'ชื่อร้าน', storeType: 'ประเภทร้าน', priceType: 'ประเภทราคา', province: 'จังหวัด', hasExport: 'Export', hasOnline: 'Online', active: 'สถานะ', territory: 'เขตการขาย' },
           yes: 'มี', no: 'ไม่มี', none: '–'
         },
-        exportFile: 'Sales-Unit-Customer_{tab}_{month}_{date}',
+        exportFile: 'Partner-List_{tab}_{month}_{date}',
         exportSheets: { units: 'หน่วยขาย', customers: 'คู่ค้า', history: 'ประวัติการจัดสรร' },
         exportHeader: { month: 'ข้อมูล ณ เดือน', tab: 'แท็บ', view: 'รายการ', filters: 'ตัวกรอง', noFilters: 'ไม่มี' },
         exportColumns: {
@@ -1398,6 +1501,8 @@
       // CR-29: หน้าบุคลากรและทีม (ใหม่ · แทนหน้าผู้รับผิดชอบและทีมขายเดิม) — บุคคล / ทีม · ทีมตามช่วงเวลา · สิ้นสุดการรับผิดชอบ · ผู้รับผิดชอบรายเดือน
       // CR-32: เปลี่ยนชื่อเป็น Sales Person Management · ตัดคำอธิบายใต้หัวข้อ · บัญชีผู้ใช้ (person.userId) · ข้อมูลที่ต้องตรวจมาตรฐานใหม่
       people: {
+        // CR-35: แท็บรายชื่อและทีม (โหมดแก้ไข) = ปุ่ม แก้ไข ขวาสุดทุกแถว · คลิกแถวเพื่อแก้ไข
+        rowEdit: 'แก้ไข', rowEditTip: 'แก้ไข {name}', listEditHint: 'คลิกแถวเพื่อแก้ไขบุคลากร', openTip: 'ดูรายละเอียด {name}',
         title: 'Sales Person Management',
         short: 'Sales Person Management',
         titleTip: 'บุคลากรและทีมขาย · ผู้รับผิดชอบหน่วยขายรายเดือน',
@@ -1466,7 +1571,9 @@
           note: 'สมาชิกทีมเป็นผู้มีสิทธิ์แก้ไขแผนยอดขายราย SKU ของ Channel นั้น'
         },
         monthly: {
-          title: 'ผู้รับผิดชอบรายเดือน {year}', year: 'ปี', unit: 'หน่วยขาย', hint: 'คลิกเดือนแรกและเดือนสุดท้ายของหน่วยเดียวกัน แล้วเลือกคนหรือทีม',
+          title: 'ผู้รับผิดชอบรายเดือน {year}', year: 'ปี', unit: 'หน่วยขาย', hint: 'คลิกเดือนแรกและเดือนสุดท้ายของหน่วยขายเดียวกัน แล้วเลือกคนหรือทีม',
+          // CR-35: สัญญาณโหมดแก้ไข (แถบโหมดแก้ไขมีคำอธิบาย · ขวาบนเหลือสิ้นสุดแผน · โหมดดูบอกผู้มีสิทธิ์ให้กด แก้ไข)
+          viewHint: 'กด แก้ไข เพื่อเปลี่ยนผู้รับผิดชอบ', startTag: 'เริ่ม', cancelPick: 'กด Esc หรือคลิกนอกตารางเพื่อยกเลิกการเลือก',
           past: 'เดือนที่ผ่านไปแล้ว แก้ไม่ได้', none: 'ไม่มีผู้รับผิดชอบ', ended: '{name} (สิ้นสุดแล้ว)',
           assignFor: '{unit}: {months}', person: 'ผู้รับผิดชอบ', vacant: 'ยังไม่กำหนด (ว่าง)', apply: 'กำหนด', clear: 'ยกเลิกการเลือก',
           note: 'การเปลี่ยนผู้รับผิดชอบไม่เปลี่ยนเป้าหมายและแผนยอดขาย', errors: { past: 'แก้เดือนที่ผ่านไปแล้วไม่ได้', range: 'ช่วงเดือนไม่ถูกต้อง' },
@@ -1474,8 +1581,10 @@
           // CR-32: ปุ่มปีถึงสุดแผน · ตามหน่วยขาย | ตามบุคคล · กล่องถามการแทนที่
           horizon: 'สิ้นสุดแผน {month}', viewLabel: 'มุมมอง', views: { unit: 'ตามหน่วยขาย', person: 'ตามบุคคล' },
           byPerson: {
-            actualTitle: 'ยอดจริง {year} (ล้านบาท)', targetTitle: 'เป้าหมายรายเดือน {year} (ล้านบาท)', notAllocated: 'ยังไม่ได้จัดสรรเป้ารายเดือน {year}',
-            person: 'ผู้รับผิดชอบ / หน่วยขาย', yearTotal: 'รวมปี', vacant: 'ไม่มีผู้รับผิดชอบ', editNote: 'แก้ไขได้ในมุมมองตามหน่วยขาย'
+            actualTitle: 'ยอดจริง {year} (พันบาท)', targetTitle: 'เป้าหมายรายเดือน {year} (พันบาท)', notAllocated: 'ยังไม่ได้จัดสรรเป้ารายเดือน {year}',
+            person: 'ผู้รับผิดชอบ / หน่วยขาย', yearTotal: 'รวมปี', vacant: 'ไม่มีผู้รับผิดชอบ',
+            // CR-35: พันบาท ไม่มีทศนิยม (Tooltip = บาทเต็ม) · โหมดแก้ไข = ดูอย่างเดียว + ปุ่มสลับ
+            cellTip: '{name} · {month} · {amount} บาท', noTarget: 'ไม่มีเป้าหมายในปีนี้', readOnly: 'มุมมองนี้ดูอย่างเดียว', switchUnit: 'สลับเป็นตามหน่วยขาย'
           },
           replace: {
             title: 'เปลี่ยนผู้รับผิดชอบ {unit}', line1: '{name} จะรับผิดชอบช่วง {range}', line2: '{name} ยังรับผิดชอบต่อหลังจากนั้น ({from} – {to})',
@@ -1627,10 +1736,13 @@
           allocatedSub: 'แผน SKU เท่าเป้าหมาย (±1 บาท)'
         },
         monthlyTitle: 'เป้าหมายเทียบแผน รายเดือน (ล้านบาท)',
-        // CR-24: เส้นประ = ยอดขายอ้างอิงรายเดือน (ยอดจริงล่าสุดของแต่ละเดือน)
-        monthlyLegend: { bar: 'เป้าหมาย (Top-down Phasing)', line: 'แผน Bottom-up', dashed: 'ยอดขายอ้างอิง' },
-        monthlyEnd: { line: 'แผน', dashed: 'อ้างอิง' },
-        monthlyTip: { target: 'เป้าหมาย', plan: 'แผน', gap: 'ส่วนต่าง', prior: 'ยอดขายอ้างอิง' },
+        // CR-34: แท่งซ้อนแผนตามประเภท (labels.planTypes) · ขีดเป้าหมาย · เส้นประยอดขายอ้างอิง (CR-24 ยอดจริงล่าสุดของแต่ละเดือน) · แถวส่วนต่าง · สรุปทั้งปีหัวกราฟ
+        monthlyLegend: { target: 'เป้าหมาย Top-down', reference: 'ยอดขายอ้างอิง', refToggle: 'กดเพื่อซ่อน / แสดงเส้นยอดขายอ้างอิง', diff: 'ส่วนต่าง' },
+        monthlyDiffOk: 'ครบ',
+        monthlyAnnual: 'ทั้งปี · เป้าหมาย {target} · แผน {plan} · {gap}',
+        monthlyClearance: ' · Clearance {value} (ไม่นับในเป้า)',   // CR-36 ต่อท้ายเมื่อมีแผน Clearance
+        monthlyGap: { ok: 'ครบ', short: 'ขาด {amount} ({pct})', over: 'เกิน {amount} ({pct})', empty: 'ยังไม่มีเป้าหมาย' },
+        monthlyTip: { target: 'เป้าหมาย Top-down', plan: 'แผนรวม', existingListing: '{label} (Listing ใหม่ {value})', gap: 'ส่วนต่าง', prior: 'ยอดขายอ้างอิง' },
         wfAxis: 'แกนเริ่มที่ {value} ล้านบาท',
         tableTitle: 'เป้าหมายและแผนราย Channel และหน่วยขาย (ล้านบาท)',
         // CR-26: ตารางแผนตามสินค้าและช่องทาง (report.pivotPlan)
@@ -1666,8 +1778,17 @@
         channelApproved: 'อนุมัติแล้ว {done}/{total}',
         collapseTitle: 'ย่อหรือขยายรายการใน Channel นี้',
         mixTitle: 'สัดส่วนแผนตามกลุ่มสินค้า (ล้านบาท)',
-        mixStatusZero: '{status} · 0%',   // CR-27: Status ที่ไม่มีแผน (Legend ของแท่ง Status)
-        mixByStatus: 'ตาม Status',
+        // CR-34: ซ้าย = ตามประเภทแผน (แทนแท่ง ตาม Status) · ขวา = ตามกลุ่มสินค้าซ้อนตามประเภท
+        mixByType: 'ตามประเภทแผน',
+        mixSkus: '{n} SKU',
+        mixListing: '{n} SKU · รวม Listing ใหม่ {value} · {m} SKU',
+        mixClearanceNote: 'ไม่นับในเป้าหมาย',   // CR-36 แถวแผน Clearance
+        mixNewTotal: 'สินค้าใหม่รวม {value} · {pct} ของแผน',
+        mixGap: 'ช่องว่างที่สินค้าใหม่ต้องปิด {value}',
+        mixNewTip: 'สินค้าใหม่ = Listing ใหม่ + NPD ยืนยันแล้ว + ขอ NPD · ช่องว่าง = เป้าหมาย − สินค้าเดิม (ไม่รวม Listing ใหม่)',
+        mixPartsTip: '{label}: {parts}',
+        // CR-34 ส่วน 5: ข้อมูลที่ต้องตรวจของรายงาน (ตาม Channel ที่เลือก)
+        checks: { title: 'ข้อมูลที่ต้องตรวจ', types: { clearance: 'มีแผนสินค้า Clearance' }, item: '{sku} {name} · {unit}', criteria: ['มีแผนสินค้า Clearance (จำนวนในแผนมากกว่า 0)'] },
         mixGroupLabel: 'ตามกลุ่มสินค้า',
         mixBy: { series: 'Series', category: 'Category' },
         mixNoCategory: '(ไม่ระบุ Category)',
@@ -1704,7 +1825,7 @@
         short: 'คู่มือการใช้งาน',
         lead: ['ภาพรวมระบบ ลำดับการทำงาน และคำศัพท์ที่ใช้'],
         tabLabel: 'หัวข้อในคู่มือ',
-        tabs: { overview: 'ภาพรวมและลำดับงาน', glossary: 'คำศัพท์และสูตร', uat: 'สถานการณ์ทดสอบ (UAT)' },
+        tabs: { overview: 'ภาพรวมและลำดับงาน', glossary: 'คำศัพท์และสูตร' },   // CR-36 ตัดแท็บทดสอบ
         overviewTitle: 'ภาพรวม',
         flowTitle: 'ลำดับการทำงาน',
         flow: {
@@ -1712,7 +1833,7 @@
           yourRole: 'บทบาทของคุณ', allRoles: 'ทุกบทบาท', result: 'ผลลัพธ์', does: 'สิ่งที่ทำ', loopTip: 'กลับมาที่ขั้นนี้จนแผนครบตามเป้าหมาย'
         },
         rolesTitle: 'บทบาทและหน้าที่',
-        rolesNote: 'สร้างจากสิทธิ์ปัจจุบันในหน้า Permissions',
+        rolesNote: 'สร้างจากสิทธิ์ปัจจุบันในหน้า {page_roleManagement}',   // CR-36 ชื่อหน้าจากเมนู
         // CR-31: ข้อมูลบทบาทย้ายมาจากหน้า Roles (สร้างจากข้อมูลจริง รวมบทบาทที่สร้างเอง)
         rolesColumns: { role: 'บทบาท', description: 'คำอธิบาย', edit: 'แก้ไขได้ที่', home: 'หน้าเริ่มต้น', users: 'จำนวนผู้ใช้' },
         usersCount: '{n} คน', customRole: 'สร้างเอง',
@@ -1725,27 +1846,8 @@
         formulaSale: 'Sale Amount = จำนวนชิ้น × ราคาขาย (รวม VAT)',
         formulaNetGp: '{channel} Net Sales = Sale Amount ÷ {vat} × (1 − {gp})',
         formulaNet: '{channel} Net Sales = Sale Amount ÷ {vat}',
-        // แท็บสถานการณ์ทดสอบ
-        uat: {
-          tester: 'ชื่อผู้ทดสอบ', testerPlaceholder: 'ชื่อ-นามสกุล', date: 'วันที่ทดสอบ',
-          progress: 'ทดสอบแล้ว {tested}/{total} · ผ่าน {pass} · ไม่ผ่าน {fail}',
-          exportButton: 'ส่งออกผลการทดสอบ', clear: 'ล้างผลการทดสอบ',
-          clearConfirm: 'ล้างผลการทดสอบทั้งหมด',
-          clearLines: ['ผลการทดสอบ ขั้นตอนที่ติ๊กไว้ และหมายเหตุของทุกสถานการณ์จะถูกลบ', 'ข้อมูลแผนที่แก้ไว้ไม่เปลี่ยน'],
-          warning: 'ผลการทดสอบเก็บในเบราว์เซอร์นี้เท่านั้น ส่งออกก่อนปิดแท็บ · รีเซ็ตข้อมูลไม่ล้างผลการทดสอบ',
-          start: 'เริ่มสถานการณ์นี้', startTip: 'สลับมุมมองผู้ใช้เป็น {role} แล้วเปิดหน้า {page}',
-          steps: 'ขั้นตอน', stepDone: 'ทำแล้ว', expected: 'ผลที่คาดหวัง', result: 'ผล',
-          results: { pass: 'ผ่าน', fail: 'ไม่ผ่าน', skip: 'ข้าม', none: 'ยังไม่ทดสอบ' },
-          note: 'หมายเหตุ / ปัญหาที่พบ', notePlaceholder: 'จำเป็นเมื่อเลือก ไม่ผ่าน',
-          noteRequired: 'กรุณาระบุหมายเหตุหรือปัญหาที่พบก่อนเลือก ไม่ผ่าน',
-          active: 'กำลังทดสอบ',
-          expandAll: 'กางทั้งหมด', collapseAll: 'พับทั้งหมด'
-        },
-        exportSpec: {
-          file: 'UAT-Results_{date}', sheet: 'ผลการทดสอบ',
-          headerTester: 'ผู้ทดสอบ', headerDate: 'วันที่ทดสอบ', headerProgress: 'ความคืบหน้า',
-          cols: { tester: 'ผู้ทดสอบ', date: 'วันที่', id: 'รหัส', title: 'สถานการณ์', role: 'บทบาท', steps: 'ขั้นตอนที่ทำ', result: 'ผล', note: 'หมายเหตุ' }
-        }
+        // CR-36: สูตร Net Sales ของแผน Clearance (ราคา Clearance · GP / Platform Fee ตาม Channel)
+        formulaClearance: 'Clearance Net Sales = จำนวน × ราคา Clearance ÷ {vat} × (1 − {gp} ตาม Channel)'
       }
     }
   };

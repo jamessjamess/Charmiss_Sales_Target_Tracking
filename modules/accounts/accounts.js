@@ -1,7 +1,7 @@
 /*
- * modules/accounts/accounts.js — หน้า Account & Platform เดิม (CR-32 รวมเป็น Sales Unit & Customer · registry visible: false · ใช้สิทธิ์ของ salesUnits)
+ * modules/accounts/accounts.js — หน้า Account & Platform เดิม (CR-32 รวมเป็น Account Master · registry visible: false · ใช้สิทธิ์ของ salesUnits)
  *
- * หน้าที่:        ลิงก์เดิมพาไปหน้า Sales Unit & Customer ทันที
+ * หน้าที่:        ลิงก์เดิมพาไปหน้า Account Master ทันที
  * อ่านจาก data/:  content (pages.accounts) · store: –
  */
 (function (SP) {

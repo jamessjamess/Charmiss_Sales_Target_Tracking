@@ -602,6 +602,34 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .hbar-track { height: 12px; background: var(--c-surface-2); border-radius: 3px; position: relative; }
 .hbar-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--c, var(--c-bar)); border-radius: 3px; }
 .hbar-text { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* CR-34: แผนซ้อนตามประเภท + ขีดเป้าหมาย (planTargetBars) · แท่งแนวนอนซ้อนหลายส่วน (partBars) · ลายเส้น = ขอ NPD */
+.ptb-body { flex: 1 1 auto; display: grid; grid-template-columns: 3.4em minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; min-height: 240px; }
+.ptb-body > .barline-yaxis { margin-bottom: 20px; }
+.ptb-plot { min-height: 200px; }
+.ptb-stack { position: absolute; bottom: 0; display: flex; flex-direction: column-reverse; border-radius: 2px 2px 0 0; overflow: hidden; }
+.ptb-seg { display: block; min-height: 0; min-width: 0; background: var(--c); }
+/* CR-36: แผน Clearance (ไม่นับในเป้าหมาย) = สีเทาลายจุด */
+.ptb-seg.is-dots, .ptb-swatch.is-dots { background: radial-gradient(circle, var(--c) 1.1px, transparent 1.4px) 0 0 / 5px 5px, var(--c-type-clearance-plan-bg); box-shadow: inset 0 0 0 1px var(--c); }
+.type-swatch.is-clearancePlan { background: radial-gradient(circle, var(--c-type-clearance-plan) 1.1px, transparent 1.4px) 0 0 / 5px 5px, var(--c-type-clearance-plan-bg); box-shadow: inset 0 0 0 1px var(--c-type-clearance-plan); }
+.ptb-seg.is-hatch, .ptb-swatch.is-hatch { background: repeating-linear-gradient(135deg, var(--c) 0 3px, var(--c-surface) 3px 5px); box-shadow: inset 0 0 0 1px var(--c-bd, var(--c)); }
+.ptb-target { position: absolute; height: 3px; margin-top: -1.5px; background: var(--chart-target-tick); border-radius: 1px; z-index: 2; pointer-events: none; }
+.ptb-target-sym { stroke: var(--chart-target-tick); stroke-width: 3; }
+.ptb-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: var(--c); flex: none; }
+.ptb-diff-label { grid-column: 1; align-self: center; padding-right: 6px; font-size: 11px; line-height: 1.1; color: var(--c-text-muted); text-align: right; }
+.ptb-diff { grid-column: 2; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); margin-top: 4px; font-size: 11.5px; font-weight: var(--fw-bold); text-align: center; font-variant-numeric: tabular-nums; }
+.ptb-diff-cell { white-space: nowrap; }
+.ptb-diff-cell.is-ok { color: var(--status-complete-fg); }
+.ptb-diff-cell.is-short { color: var(--status-short-fg); }
+.ptb-diff-cell.is-over { color: var(--status-over-fg); }
+.ptb-diff-cell.is-empty { color: var(--status-empty-fg); }
+.ptb-ref-btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.ptb-ref-btn[aria-pressed="false"] { opacity: 0.5; text-decoration: line-through; }
+.ptb.is-ref-off .ptb-ref { display: none; }
+.ptbar-label { display: flex; flex-direction: column; min-width: 0; }
+.ptbar-sub { font-size: 11px; line-height: 1.25; color: var(--c-text-muted); }
+.ptbar-note { font-size: 11px; line-height: 1.25; color: var(--status-short-fg); }
+.ptbar-fill { position: absolute; left: 0; top: 0; bottom: 0; display: flex; border-radius: 3px; overflow: hidden; }
+.ptbar-fill .ptb-seg { height: 100%; }
 .wf-text { font-size: var(--fs-xs); font-weight: var(--fw-bold); white-space: nowrap; }
 .wf-text.wf-draft { background: transparent; color: var(--c-wf-draft-fg); }
 .wf-text.wf-submitted { background: transparent; color: var(--c-wf-submitted-fg); }
@@ -635,6 +663,15 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .st-active       { background: var(--c-st-active-bg);       color: var(--c-st-active-fg); }
 .st-clearance    { background: var(--c-st-clearance-bg);    color: var(--c-st-clearance-fg); }
 .st-discontinued { background: var(--c-st-discontinued-bg); color: var(--c-st-discontinued-fg); }
+.st-request      { background: var(--c-st-request-bg);      color: var(--c-st-request-fg); border: 1px dashed var(--c-type-request-bd); }
+.st-delete       { background: var(--c-st-delete-bg);       color: var(--c-st-delete-fg); text-decoration: line-through; }
+/* CR-35: ป้ายชื่อชั่วคราว / รหัสชั่วคราว (Status Request) · ป้าย จาก Sales ไม่ถูกตัดข้อความ */
+.temp-name-tag, .temp-code-tag { display: inline-block; flex: none; white-space: nowrap; font-size: 11px; line-height: 1.45; padding: 0 6px; border-radius: 999px; border: 1px dashed var(--c-type-request-bd); color: var(--c-st-request-fg); background: var(--c-surface); font-weight: var(--fw-medium); vertical-align: 1px; }
+.pl-from-sales, .sp-from-sales { flex: none; white-space: nowrap; }
+.cr-body { display: grid; gap: var(--sp-2); }
+.cr-body .pd-field { display: grid; grid-template-columns: 11em minmax(0, 1fr); align-items: center; gap: var(--sp-2); }
+.cr-code { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.page-help-lead { margin: 0 0 var(--sp-2); }
 
 .win-past    { background: var(--c-win-past-bg);    color: var(--c-win-past-fg); }
 .win-current { background: var(--c-win-current-bg); color: var(--c-win-current-fg); }
@@ -749,6 +786,34 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 .wfc.has-hl .wfc-row[data-id]:not(.is-hl) { opacity: 0.45; }
 .wfc-row.is-hl { background: var(--c-surface-2); }
 .wfc-axis { grid-column: 1 / -1; margin: 0; font-size: 11px; color: var(--c-text-muted); }
+
+/* CR-36 Waterfall แนวตั้ง (charts.waterfallColumns) — แกน Y ซ้าย · ค่าบนแท่ง · เส้นประยอดสะสม · เต็มพื้นที่ของผู้วาง */
+.wfv { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 150px; font-size: 12px; }
+.wfv-body { flex: 1 1 auto; display: grid; grid-template-columns: 44px minmax(0, 1fr); min-height: 0; padding-top: 18px; }
+.wfv-yaxis { position: relative; }
+.wfv-tick { position: absolute; right: 6px; transform: translateY(50%); font-size: 11px; line-height: 1; color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
+.wfv-plot { position: relative; border-left: 1px solid var(--c-border-strong); }
+.wfv-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--c-border); }
+.wfv-grid.is-base { border-top-color: var(--c-border-strong); }
+.wfv-break { position: absolute; left: -7px; bottom: 2px; width: 12px; height: 12px; background: var(--c-surface); overflow: visible; }
+.wfv-break path { stroke: var(--c-text-muted); stroke-width: 1.5; stroke-linejoin: round; }
+.wfv-cols { position: absolute; inset: 0; display: flex; padding: 0 var(--sp-2); }
+.wfv-col { position: relative; flex: 1 1 0; min-width: 0; cursor: default; }
+.wfv-bar { position: absolute; left: 20%; right: 20%; border-radius: 2px; background: var(--wfc-total); }
+.wfv-col.is-up .wfv-bar { background: var(--wfc-up); }
+.wfv-col.is-down .wfv-bar { background: var(--wfc-down); }
+.wfv-value { position: absolute; left: 0; right: 0; transform: translateY(-3px); text-align: center; font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wfv-col.is-up .wfv-value { color: var(--c-growth-pos); }
+.wfv-col.is-down .wfv-value { color: var(--c-growth-neg); }
+.wfv-link { position: absolute; left: 80%; right: -20%; height: 0; border-top: 1px dashed var(--c-text-muted); z-index: 1; }
+.wfv.has-hl .wfv-col[data-id]:not(.is-hl) { opacity: 0.45; }
+.wfv-col.is-hl .wfv-bar { filter: brightness(1.08); box-shadow: 0 0 0 2px var(--c-surface-2); }
+.wfv-xrow { display: grid; grid-template-columns: 44px minmax(0, 1fr); margin-top: 4px; }
+.wfv-xlabels { display: flex; padding: 0 var(--sp-2); }
+.wfv-xlabel { flex: 1 1 0; min-width: 0; text-align: center; font-weight: var(--fw-bold); line-height: 1.15; }
+.wfv-xlabel small { display: block; font-size: 10px; font-weight: var(--fw-medium); color: var(--c-text-muted); }
+.wfv-tag { font-size: 10px; padding: 0 5px; margin-left: 4px; }
+.wfv-axis { margin: 4px 0 0; font-size: 11px; color: var(--c-text-muted); }
 .ssc { display: grid; gap: 6px; font-size: 13px; }
 .ssc-row { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); align-items: center; gap: var(--sp-2); }
 .ssc-label { font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
@@ -897,23 +962,16 @@ body.perm-no-export .export-btn, body.perm-no-export .pl-csv, body.perm-no-expor
 .flow-masters-label { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--c-text-muted); }
 .flow-master { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 4px 4px 4px var(--sp-3); border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface-2); font-size: var(--fs-sm); }
 .flow-master-roles { color: var(--c-text-muted); }
+/* CR-36: กล่องข้อมูลที่ต้องมีก่อน = หน้าในกลุ่ม + ผู้แก้ไขของแต่ละหน้า */
+.flow-master.has-lines { align-items: flex-start; padding: var(--sp-1) var(--sp-2) var(--sp-1) var(--sp-3); }
+.flow-master-pages { display: flex; flex-direction: column; gap: 4px; }
+.flow-master-page { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.flow-master-name { font-weight: var(--fw-medium); white-space: nowrap; }
 @media (max-width: 1100px) {
   .flow-steps { grid-template-columns: minmax(0, 1fr); gap: var(--sp-1); }
   .flow-arrow { transform: rotate(90deg); height: 20px; }
 }
 
-/* ---------------- CR-28: แถบลอยระหว่างทดสอบสถานการณ์ (layout) ---------------- */
-.uat-bar {
-  position: fixed; right: 16px; bottom: 16px; z-index: 900;
-  display: flex; align-items: center; gap: var(--sp-2); max-width: calc(100vw - 32px);
-  padding: 6px 6px 6px var(--sp-3); border-radius: var(--radius-sm);
-  background: var(--c-text); color: var(--c-surface); font-size: var(--fs-sm); box-shadow: 0 8px 24px var(--c-shadow);
-}
-.uat-bar.has-tour { bottom: 64px; }
-.uat-bar-text { font-weight: var(--fw-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media print { .uat-bar { display: none !important; } }
-/* ส่งออกผลการทดสอบได้ทุกบทบาท (ไม่ใช่ข้อมูลแผน) */
-body.perm-no-export .uat-export.export-btn { display: inline-flex !important; }
 /* ---------------- CR-29: Account Master ร่วมกัน (Chip ข้อมูลที่ต้องตรวจ · Drawer · ประวัติ · ไทม์ไลน์ผู้รับผิดชอบ) ---------------- */
 .checks-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px var(--sp-3); border-radius: 999px; border: 1px solid var(--c-border-strong);
   background: var(--c-surface); color: var(--c-text-muted); font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-medium); cursor: pointer; white-space: nowrap; }
@@ -995,3 +1053,43 @@ body.perm-no-export .uat-export.export-btn { display: inline-flex !important; }
 .data-check-criteria-label { font-weight: var(--fw-bold); }
 .is-flash, tr.is-flash > td, tr.is-flash > th { animation: flash-row 2s ease-out; }
 @keyframes flash-row { 0%, 55% { background-color: var(--c-warn-bg); } 100% { background-color: transparent; } }
+
+/* CR-34 ป้ายและ Swatch ประเภทสินค้าในแผน (components.planTypeBadge / planTypeSwatch) */
+/* CR-35: ตัวเลือกปี ‹ 2027 ▾ › (components.yearPicker) · สูงเท่าตัวกรองอื่น (select) */
+/* CR-36 treeSelect (หมวดสินค้าแบบลำดับชั้น) · groupPicker (จัดกลุ่ม: <เกณฑ์> ▾) */
+.ts-popover { padding: var(--sp-1); max-height: 60vh; overflow-y: auto; min-width: 14em; }
+.ts-list { list-style: none; margin: 0; padding: 0; }
+.ts-option { display: block; width: 100%; text-align: left; font: inherit; font-size: var(--fs-sm); color: var(--c-text); background: transparent; border: 0; border-radius: var(--radius-sm); padding: 4px var(--sp-2); cursor: pointer; white-space: nowrap; }
+.ts-option:hover, .ts-option:focus-visible { background: var(--c-surface-2); outline: none; }
+.ts-option.is-selected { background: var(--c-primary-soft); color: var(--c-primary-strong); }
+.ts-option.ts-depth-0:not(.is-all) { font-weight: var(--fw-bold); }
+.ts-option.ts-depth-1 { padding-left: calc(var(--sp-2) + 1em); }
+.ts-option.ts-depth-2 { padding-left: calc(var(--sp-2) + 2em); }
+.tree-select .ts-value { max-width: 12em; overflow: hidden; text-overflow: ellipsis; }
+.group-picker { white-space: nowrap; }
+.year-picker { display: inline-flex; align-items: stretch; border: 1px solid var(--c-border-strong); border-radius: var(--radius-sm); background: var(--c-surface); overflow: hidden; }
+.year-picker button { font: inherit; font-size: var(--fs-base); line-height: normal; color: var(--c-text); background: transparent; border: 0; cursor: pointer; padding: var(--sp-1) var(--sp-2); }
+.year-picker .yp-step { padding: var(--sp-1) 10px; color: var(--c-text-muted); }
+.year-picker .yp-step:disabled { opacity: 0.35; cursor: default; }
+.year-picker .yp-value { display: inline-flex; align-items: center; gap: 6px; border-left: 1px solid var(--c-border); border-right: 1px solid var(--c-border); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.year-picker button:not(:disabled):hover { background: var(--c-surface-2); }
+.year-picker button:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+.yp-caret { font-size: 0.8em; color: var(--c-text-muted); font-weight: normal; }
+.tool-row .year-picker button { font-size: var(--fs-sm); padding-top: 4px; padding-bottom: 4px; }   /* สูงเท่า .tool-row .select */
+.yp-list { list-style: none; margin: 0; padding: 4px; display: grid; gap: 2px; min-width: 11em; }
+.yp-option { display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: var(--sp-3); padding: 4px var(--sp-2); border: 0; border-radius: var(--radius-sm); background: transparent; font: inherit; cursor: pointer; text-align: left; }
+.yp-option:hover { background: var(--c-surface-2); }
+.yp-option.is-active { background: var(--c-primary-soft); font-weight: var(--fw-bold); }
+.yp-tag { font-size: var(--fs-xs); color: var(--c-text-muted); font-weight: normal; }
+.edit-banner-extra { font-weight: normal; }
+/* CR-35: ข้อความอ่านอย่างเดียวของหน้าที่แก้ไขรายรายการ (components.viewOnlyNote) */
+.view-only-note { font-size: var(--fs-xs); color: var(--c-text-muted); white-space: nowrap; }
+.type-badge { display: inline-block; font-size: 11px; line-height: 1.45; padding: 0 6px; border-radius: 999px; font-weight: var(--fw-medium); white-space: nowrap; border: 1px solid transparent; vertical-align: 1px; }
+.type-badge.is-newListing { color: var(--c-type-existing); background: var(--c-surface); border-color: var(--c-type-existing); }
+.type-badge.is-npdConfirmed { color: var(--c-st-new-fg); background: var(--c-type-npd-bg); }
+.type-badge.is-npdRequest { color: var(--c-type-request-bd); background: var(--c-surface); border: 1px dashed var(--c-type-request-bd); }
+.type-badge.is-clearance { color: var(--c-text-muted); background: var(--c-type-clearance-bg); }
+.type-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 2px; background: var(--c-type-existing); vertical-align: -1px; }
+.type-swatch.is-npdConfirmed { background: var(--c-type-npd); }
+.type-swatch.is-npdRequest { background: repeating-linear-gradient(135deg, var(--c-type-request) 0 3px, var(--c-surface) 3px 5px); box-shadow: inset 0 0 0 1px var(--c-type-request-bd); }
+.type-swatch.is-clearance { background: var(--c-type-clearance); }

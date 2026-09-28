@@ -78,7 +78,14 @@
         note: src.note || (skipped ? cfg.notSeriesNote : ''), createdAt: src.createdAt || stamp, updatedAt: src.createdAt || stamp
       };
     }
-    function withQuarter(p, src) { if (src.launchQuarter) p.launchQuarter = src.launchQuarter; return p; }   // CR-30 แผน NPD แบบไตรมาส
+    function withQuarter(p, src) {
+      if (src.launchQuarter) p.launchQuarter = src.launchQuarter;   // CR-30 แผน NPD แบบไตรมาส
+      if (src.deletedFrom) p.deletedFrom = src.deletedFrom;           // CR-35 Status Delete (ตัวอย่าง)
+      if (src.isSample) p.isSample = true;
+      // CR-34: คำขอ NPD จาก Sales (ข้อมูลตัวอย่าง) = โครงเดียวกับ calc.createSalesNpd
+      if (src.source) { p.source = src.source; p.requestedBy = src.requestedBy || ''; p.requestedAt = src.requestedAt || ''; p.request = src.request ? JSON.parse(JSON.stringify(src.request)) : null; }
+      return p;
+    }
     return { products: (seed.products || []).map(make).concat((cfg.newProducts || []).map(function (src) { return withQuarter(make(src), src); })), series: series };
   }
 
@@ -326,6 +333,29 @@
     SP.data.codeMigration = coded.map;
     // CR-30 รอบ 3: Listing เดิม → สถานะ วางขาย + เดือนเริ่มวางขาย (แผน NPD ต่อหน่วย หรือเดือนเปิดตัว)
     SP.data.listings = SP.core.calc.normalizeListings(SP.data.listings, SP.data.products, SP.data.npdPlans);
+    // CR-34: Listing จาก SKU Planning — สินค้าที่ Sales ขอ NPD (ทุก Listing ของสินค้านั้น) + listingRules.salesListings (เพิ่มหลังสร้างยอดขายย้อนหลัง)
+    var reqKeys = {};
+    SP.data.products.forEach(function (p) { if (p.source === 'SALES_REQUEST') reqKeys[SP.core.calc.productKey(p)] = p; });
+    SP.data.listings = SP.data.listings.map(function (l) {
+      var rp = reqKeys[l.productKey];   // CR-35: Key ของคำขอ = ID ภายใน (REQ-nnn)
+      if (!rp) return l;
+      var o = JSON.parse(JSON.stringify(l));
+      o.addedBy = 'SALES'; o.source = 'skuPlanning'; o.addedByName = rp.requestedBy || null; o.addedAt = rp.requestedAt || null;
+      return o;
+    });
+    ((SP.data.listingRules || {}).salesListings || []).forEach(function (r) {
+      var key = (SP.data.codeMigration || {})[r.productKey] || r.productKey;
+      SP.data.listings = SP.core.calc.addSalesListings(SP.data.listings, [key], [r.unit], { fromMonth: r.fromMonth, at: r.at, by: r.by });
+    });
+    // CR-36: ข้อมูลตัวอย่างที่แก้สินค้าจาก seed (ไม่แก้ data/seed/) · productImport.samplePatches = [{ trCode, patch }] ใส่ทับฟิลด์ของสินค้านั้น
+    ((SP.data.productImport || {}).samplePatches || []).forEach(function (sp) {
+      SP.data.products = SP.data.products.map(function (pr) {
+        if (pr.trCode !== sp.trCode) return pr;
+        var o = JSON.parse(JSON.stringify(pr));
+        Object.keys(sp.patch).forEach(function (k) { o[k] = JSON.parse(JSON.stringify(sp.patch[k])); });
+        return o;
+      });
+    });
   }
 
   SP.core.seed = { build: build, imported: !!result, packOf: packOf, seriesIdOf: seriesIdOf, startMonths: startMonths, priorSkuQty: priorSkuQty };

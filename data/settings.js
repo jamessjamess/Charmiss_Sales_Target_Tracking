@@ -42,7 +42,7 @@
     CODE_STEP: 10,
     // CR-30 Preset คอลัมน์ของระบบในหน้ารายการสินค้า (ชื่อใน content.js pages.productList.presets) · Product Code และชื่อสินค้าแสดงเสมอ
     PRODUCT_COLUMN_PRESETS: [
-      { id: 'standard', columns: ['image', 'status', 'category', 'subCategory', 'type', 'series', 'rsp', 'completeness'] },
+      { id: 'standard', columns: ['image', 'status', 'category', 'subCategory', 'type', 'series', 'subSeries', 'rsp', 'completeness'] },   // CR-36 + Sub Series
       { id: 'price', columns: ['image', 'status', 'series', 'rsp', 'sellIn', 'listedCount'] },
       { id: 'completeness', columns: ['completeness', 'category', 'subCategory', 'type', 'series', 'rsp', 'launchDate', 'barcode', 'image', 'inTrcloud'] }
     ],
@@ -128,7 +128,7 @@
     //   ยอดอ้างอิงรายเดือน (ม.ค.–ส.ค. ปี 2026 · ก.ย.–ธ.ค. ปี 2025) · หน้าร้านค้า TT "ข้อมูล ณ เดือน" / ลบค่า = ใช้เดือนจริงของเครื่อง
     DEMO_CURRENT_MONTH: '2026-09',
 
-    // CR-32: คอลัมน์ของตารางคู่ค้า (หน้า Sales Unit & Customer · components.columnPicker) รหัสคู่ค้าและชื่อแสดงเสมอ
+    // CR-32: คอลัมน์ของตารางคู่ค้า (หน้า Account Master · components.columnPicker) รหัสคู่ค้าและชื่อแสดงเสมอ
     //   standard = ค่าตั้งต้นของแท็บทั้งหมด / Channel ที่แบ่งเป้าตาม Account · territory = ค่าตั้งต้นของ Channel ที่แบ่งเป้าตามเขต (+ คอลัมน์ของหน้าเขตเดิม)
     // CR-33: ค่าเริ่มต้นตามแท็บ (core/units.js columnPresetFor): standard = แท็บทั้งหมด / Channel ที่คู่ค้ามีหลายประเภท · single = คู่ค้าประเภทเดียว ·
     //   territory = ร้านค้าของเขต · full = ทุกคอลัมน์ · ตัดยอดอ้างอิงและหน่วยขายแนะนำออกจากค่าเริ่มต้น (หน่วยขายแนะนำแสดงในช่องหน่วยขาย)

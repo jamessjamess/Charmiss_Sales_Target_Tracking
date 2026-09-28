@@ -19,12 +19,11 @@
  *     (permissions.pageVisible) / เปิดหน้าที่ไม่เห็นตรงด้วย URL = "ไม่มีสิทธิ์เข้าถึงหน้านี้" (ไม่เรียก Module) / ลิงก์ไปหน้าที่ไม่เห็นซ่อนอัตโนมัติ
  *     (MutationObserver ทั้งหน้า) / ไม่มีสิทธิ์ export = body.perm-no-export (styles/components.css ซ่อนปุ่มส่งออก CSV และพิมพ์)
  *   CR-28: ลิงก์ Header คู่มือ (หน้า aboutPrototype = คู่มือการใช้งาน) · ปุ่ม ? ต่อท้ายชื่อหน้า (components.pageHelp · ยกเว้นหน้าคู่มือ ·
- *     Module เพิ่มหัวข้อใน Popover ได้ด้วย ctx.addHelp(label, build)) · รีเซ็ตข้อมูลคง Key uat.* (core/guide.js keepOnReset) ·
- *     แถบลอยมุมล่างขวา กำลังทดสอบ {id} · ขั้นที่ x/y + กลับไปบันทึกผล เมื่อ uat.results.active มีค่า (ทุกหน้ายกเว้นคู่มือ · ไม่พิมพ์)
+ *     Module เพิ่มหัวข้อใน Popover ได้ด้วย ctx.addHelp(label, build)) · CR-36 ตัดแถบลอยสถานการณ์ทดสอบ (UAT) · รีเซ็ตข้อมูล = ล้างทั้งหมด
  *   CR-25: กลุ่ม Role Management (Permissions · Roles · Users) · กลุ่มที่ไม่เหลือหน้าไม่มีหัวกลุ่ม · เกี่ยวกับ Prototype เห็นเสมอ ·
  *     เลขขั้นคงที่ (registry.step) ปุ่มก่อนหน้า/ถัดไปและลูกศรข้ามขั้นที่มองไม่เห็น · CR-27 ไม่มีเลขขั้นในหัวข้อ (เฉพาะเมนูข้าง) · index.html / ไม่มีสิทธิ์ → หน้าเริ่มต้นของบทบาท (permissions.homePage) ·
  *     สลับมุมมองผู้ใช้แล้วหน้าปัจจุบันถูกซ่อน → ไปหน้าเริ่มต้น + Toast (ข้อความพักที่ ui.toast แสดงหลังโหลดหน้าใหม่ครั้งเดียว)
- * store อ่าน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection, ui.planMode, ui.toast, uat.results, plan.<ปี>.workflow.*, master.salespeople, master.teams,
+ * store อ่าน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection, ui.planMode, ui.toast, plan.<ปี>.workflow.*, master.salespeople, master.teams,
  *             master.users, master.roles, master.permissions (ผ่าน core/permissions.js)
  * store เขียน: app.planYear, ui.role, ui.sidebarCollapsed, ui.selection (เลือก Sales Manager / Officer → หน่วยขายแรกของทีม), ui.toast
  */
@@ -90,13 +89,8 @@
       h('label', { class: 'role-field' }, h('span', { class: 'field-label has-tip', title: site.roleNote }, site.roleLabel), select));
   }
 
-  // CR-28: รีเซ็ตข้อมูล = ล้าง store ทั้งหมด แต่คงผลการทดสอบ (Key uat.* · ทดสอบหลายรอบโดยรีเซ็ตข้อมูลระหว่างสถานการณ์ได้)
-  function resetData() {
-    var store = SP.core.store;
-    var keep = SP.core.guide.keepOnReset(store.keys()).map(function (k) { return [k, store.get(k)]; });
-    store.reset();
-    keep.forEach(function (kv) { store.set(kv[0], kv[1]); });
-  }
+  // CR-36: รีเซ็ตข้อมูล = ล้าง store ทั้งหมด (ตัด UAT · ไม่มี Key ที่ต้องคงไว้แล้ว)
+  function resetData() { SP.core.store.reset(); }
 
   // หน่วยขายแรกของ Channel ในแผนปีนี้ (ไม่มี = หน่วยแรกใน Master) → ui.selection (หน้าเป้าหมายรายเดือนและวางแผน SKU ใช้ร่วมกัน)
   function selectTeamUnit(channelId) {
@@ -361,8 +355,6 @@
     root.appendChild(body);
     if (page.approve && page.approve.length) root.appendChild(C.approveBox(page.approve, page.approveTitle));
     if (step) mainCol.appendChild(buildTourNav(step, entry));
-    var uatBar = buildUatBar(entry, !!step);
-    if (uatBar) document.body.appendChild(uatBar);
 
     bindKeyboard(step);
     refreshMenu();
@@ -377,20 +369,6 @@
     }
   }
 
-  // CR-28: แถบลอยมุมล่างขวาระหว่างทดสอบสถานการณ์ (uat.results.active) · หน้าคู่มือไม่แสดง · ปุ่มกลับไปบันทึกผล = แท็บ UAT ของสถานการณ์นั้น
-  function buildUatBar(entry, hasTour) {
-    var G = SP.core.guide;
-    var results = G.uatNormalize(SP.core.store.get('uat.results'));
-    if (!results.active || (entry && entry.id === 'aboutPrototype')) return null;
-    var sc = ((SP.data.guide && SP.data.guide.scenarios) || []).filter(function (s) { return s.id === results.active; })[0];
-    var guide = SP.core.registry.byId('aboutPrototype');
-    if (!sc || !guide) return null;
-    var site = SP.data.content.site;
-    var info = G.uatStepInfo(results, sc);
-    return h('div', { class: 'uat-bar no-print' + (hasTour ? ' has-tour' : ''), role: 'status' },
-      h('span', { class: 'uat-bar-text', title: sc.title }, C.fill(site.uatBar, { id: sc.id, n: info.current, total: info.total })),
-      h('a', { class: 'btn btn-primary btn-sm uat-bar-back', href: link(guide) + '#uat-' + sc.id }, site.uatBack));
-  }
 
   // CR-25: หน้าเริ่มต้นของผู้ใช้ปัจจุบัน (permissions.homePage) → entry | null
   function homeEntry() { return SP.core.registry.byId(SP.core.permissions.homePage(SP.core.permissions.user())); }

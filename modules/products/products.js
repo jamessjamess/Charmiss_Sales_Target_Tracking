@@ -1,6 +1,19 @@
 /*
- * modules/products/products.js — Product Master · รายการสินค้า
+ * modules/products/products.js — Product Master · Product List (CR-36 แท็บ สินค้า | Product Level)
  *
+ * CR-36:          แท็บ สินค้า | Product Level ต่อจากหัวข้อ (ui.productListTab · #items / #level) · แท็บ Product Level = โค้ดเดิมของหน้า Category & Series ทั้งหมด
+ *                 (สิทธิ์ส่วนของหน้า taxonomy · key เดิม · ไม่เห็น = ไม่มีแท็บ) · หน้าเดิม modules/taxonomy = ทางผ่าน (registry visible: false · perm productList)
+ *                 แท็บสินค้า: หมวดสินค้าแบบลำดับชั้น (components.treeSelect) · จัดกลุ่มเลือกเกณฑ์ (components.groupPicker · ui.groupBy · ค่าเริ่มต้น Series) ·
+ *                 Product Year (calc.productYear: ตัวกรองเพิ่มเติม · คอลัมน์ · จัดกลุ่ม) · Sub Series ในคอลัมน์ค่าเริ่มต้น · Drawer 50% 2 คอลัมน์ รูปอยู่ขวาของรหัสและชื่อ ·
+ *                 ป้าย ระบบกำหนด = ลิงก์ไปแท็บ Product Level ที่เลือก Type นั้น
+ *
+ * ---------------- หัวไฟล์เดิมของแท็บสินค้า ----------------
+ * 
+ * modules/products/products.js — Product Master · Product List (CR-35 ชื่อหน้าภาษาอังกฤษ · คำอธิบายอยู่ในปุ่ม ?)
+ * CR-35:          วงจรสถานะ 7 แบบ (ตัวกรองค่าเริ่มต้น = ทุก Status ยกเว้น Delete) · KPI ตามข้อ 10.1 · ตัวกรองประเภทรายได้ (calc.revenueTypeOf) ·
+ *                 รหัสที่แสดง = calc.productCode (คำขอ = รหัสชั่วคราว NPD-YYMM-NNN · Key = ID ภายใน) · ป้าย ชื่อชั่วคราว + จาก Sales ต่อท้ายชื่อ ·
+ *                 ยืนยันเป็น NPD (Drawer · catalog.confirmRequest) · Delete ตั้งแต่เดือน (ถามยืนยันเมื่อยังมีในแผน)
+ * 
  * หน้าที่:        KPI 6 ใบ (ทั้งหมด · Active · NPD · ขาดข้อมูลจำเป็น · ขาดข้อมูลที่ควรมี · ยังไม่เปิดใน TRCLOUD) กดแล้วกรองตาราง
  *                 ตัวกรองแถวแรก (แสดงตลอด): ค้นหา · Status · Series · หมวดสินค้า (เลือกแบบลำดับชั้นในตัวเดียว) · มุมมอง รายการ | จัดกลุ่ม
  *                 ปุ่ม ตัวกรองเพิ่มเติม (n) กางแถวที่สอง (จำที่ ui.productMoreFilters): Channel ที่ Listing · ความครบถ้วน · ที่มา · ใน TRCLOUD
@@ -17,6 +30,29 @@
  * store เขียน:    master.products, master.basePrices, master.codeCounters, master.audit (ตอนกด บันทึก) / ui.seriesFilter, ui.columnPresets, ui.productMoreFilters
  * CR-20:          ป้าย "จาก Sales" (สินค้าที่ Sales สร้างจากหน้าวางแผน SKU source SALES_REQUEST) + ตัวกรองที่มา: ทีม Product / จาก Sales
  * CR-30:          แท็บราคา (อ่านอย่างเดียว) = ราคาหลักตามรอบเวลา + Promotion Price ของสินค้านี้ · แก้ที่หน้าราคาและ Promotion
+ *  
+ * ---------------- หัวไฟล์เดิมของแท็บ Product Level (หน้า Category & Series เดิม) ----------------
+ * 
+ * modules/taxonomy/taxonomy.js — หมวดสินค้าและ Series (Product Master) — CR-15 มุมมองแบบคอลัมน์
+ * 
+ * หน้าที่:        แท็บ หมวดสินค้า | Series | ตารางไขว้ (จำแท็บและรายการที่เลือกที่ ui.taxonomySelection)
+ *                 แถบตัวกรองแถวเดียว (จำที่ ui.taxonomyFilters · CR-30): ค้นหาชื่อ (ผลลัพธ์พร้อมเส้นทาง) · Series (เฉพาะแท็บหมวดสินค้า) ·
+ *                 หมวดสินค้า (เฉพาะแท็บ Series · ตารางไขว้ใช้ทั้งสอง) · สถานะ · ข้อมูลที่ต้องตรวจ + Chip ตัวกรองที่ใช้อยู่ (components.filterChips)
+ *                 (ตัดตัวกรอง Category / Sub Category / Sub Series ที่ซ้ำกับคอลัมน์)
+ *                 หมวดสินค้า / Series: คอลัมน์ต่อระดับ (Category · Sub Category · Type | Series · Sub Series) เลื่อนภายในคอลัมน์ +
+ *                 แผงรายละเอียด (จอแคบกว่า 1280px = Drawer ด้านขวา) / คีย์บอร์ด ↑↓ ← → F2
+ *                 ตัวกรองข้ามมิติ = นับเฉพาะ SKU ที่ตรง (x / y) ซ่อนรายการที่ได้ 0 / ตารางไขว้ Series × หมวดสินค้า (อ่านอย่างเดียว กดช่อง = รายการสินค้า)
+ *                 เปิดมาเป็นโหมดดู / แก้ไข (ทีม Product, workflowBar แบบง่าย): เพิ่ม (แถวใหม่ช่องว่าง) · เปลี่ยนชื่อในแถว · ลากจัดลำดับ
+ *                 ภายในรายการแม่เดียวกัน · แผงรายละเอียด: ย้ายไปอยู่ใต้… · ย้าย SKU ไป… · รวมกับ… · เปิด/ปิดใช้งาน · ลบ (เฉพาะไม่มี SKU
+ *                 และไม่มีรายการย่อย) · วันเริ่ม / วันสิ้นสุดของ Series · เลขนำหน้า Product Code ของ Type (2 หลัก ห้ามซ้ำ + รหัสถัดไป · core/catalog.js)
+ *                 → บันทึก / ยกเลิก (แก้สำเนา ไม่เขียน store จนกดบันทึก) · แผงรายละเอียด: ชื่อ + {ระดับ} · อยู่ใน {เส้นทางแม่} + คำเตือนใต้ชื่อ
+ *                 ⚠ แสดงเฉพาะรายการที่มีปัญหา (ไม่แสดงซ้ำที่รายการแม่) · Type ที่ยังไม่มีเลขนำหน้าอยู่ใน ข้อมูลที่ต้องตรวจ
+ *                 กฎทั้งหมดจาก core/taxonomy.js (Pure functions)
+ * อ่านจาก data/:  settings (TAXONOMY_SKU_LIST_MAX), content (pages.taxonomy, labels) + Master ผ่าน store (taxonomy, products)
+ * store อ่าน:     master.taxonomy, master.products, master.codeCounters, ui.taxonomySelection, ui.taxonomyFilters, ui.role, ui.currentMonth
+ * store เขียน:    master.taxonomy, master.products และ master.audit (ตอนกด บันทึก) / ui.taxonomySelection, ui.taxonomyFilters /
+ *                 ui.productFilterHandoff (ก่อนเปิดหน้ารายการสินค้าที่กรองตามรายการนั้น — หน้ารายการสินค้าอ่านแล้วลบ)
+ *  
  */
 (function (SP) {
   'use strict';
@@ -33,16 +69,19 @@
   var TABLE = 'productList';
   // คอลัมน์ที่เลือกได้ (Product Code และชื่อสินค้าแสดงเสมอ)
   var SELECTABLE = ['image', 'status', 'category', 'subCategory', 'type', 'series', 'subSeries', 'rsp', 'completeness', 'barcode', 'packSize',
-    'launchDate', 'listedCount', 'sellIn', 'inTrcloud', 'source', 'updatedAt'];
-  var MORE = ['channel', 'completeness', 'source', 'trcloud'];
-  function emptyFilters() { return { q: '', status: '', node: '', nodeLevel: '', channel: '', completeness: '', source: '', trcloud: '', kpi: '' }; }
+    'launchDate', 'productYear', 'listedCount', 'sellIn', 'inTrcloud', 'source', 'updatedAt'];
+  var MORE = ['channel', 'completeness', 'source', 'trcloud', 'revenue', 'year'];
+  function emptyFilters() { return { q: '', status: '', node: '', nodeLevel: '', channel: '', completeness: '', source: '', trcloud: '', revenue: '', year: [], kpi: '' }; }
+  function hasValue(v) { return Array.isArray(v) ? v.length > 0 : !!v; }
   var filters = emptyFilters();
-  var view = 'list';
+  // CR-36: จัดกลุ่มเลือกเกณฑ์ได้ (components.groupPicker · จำต่อผู้ใช้ ui.groupBy.<ผู้ใช้>.productList · ค่าเริ่มต้น Series) · กลุ่มที่พับไว้
+  var GROUP_OPTIONS = ['none', 'category', 'subCategory', 'type', 'series', 'level', 'status', 'year'];
+  var collapsed = {};
   var tab = 'general';
 
   function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
 
-  function render(root, ctx) {
+  function renderItems(root, ctx) {
     var page = ctx.page;
     var L = SP.data.content.labels;
     var PF = L.productFields;
@@ -93,15 +132,36 @@
 
     var exportBtn = C.exportButton({ unsaved: dirty, build: exportSpec });
     var bar = C.workflowBar({
-      simple: true, extra: exportBtn,
+      simple: true, extra: exportBtn, modules: ['productList'],   // CR-36: แท็บสินค้า = สิทธิ์ productList (Product Level = taxonomy)
       editing: function () { return editing; },
       onEdit: function () { startEdit(); },
-      onSave: function () { save(); },
+      onSave: function () { confirmDeletes().then(function (ok) { if (ok) save(); }); },
       onCancel: function () { editing = false; creating = false; draft = clone(saved); notice = null; draw(); }
     });
     if (ctx.intro) ctx.intro.appendChild(bar);
 
     function startEdit() { editing = true; draft = clone(saved); draw(); }
+
+    // CR-35: สินค้าที่เพิ่งตั้ง Delete และยังมีในแผน SKU (ปีแผน) → ถามยืนยัน สินค้านี้มีในแผน N หน่วยขาย (ไม่ล้างค่าในแผน)
+    function unitsWithPlan(key) {
+      var td = store.get(store.planKey('topDown'));
+      var plans = {};
+      Object.keys(td.units || {}).forEach(function (ch) { (td.units[ch] || []).forEach(function (u) { plans[u] = store.get(store.planKey('sku.' + u)); }); });
+      return SP.core.planEdits.unitsInPlan(plans, key);
+    }
+    function confirmDeletes() {
+      var D2 = page.listing.deleteConfirm;
+      var list = draft.products.filter(function (p) { var o = calc.findProduct(saved.products, calc.productKey(p)); return p.deletedFrom && (!o || o.deletedFrom !== p.deletedFrom); });
+      return list.reduce(function (chain, p) {
+        return chain.then(function (ok) {
+          if (!ok) return false;
+          var units = unitsWithPlan(calc.productKey(p));
+          var names = units.map(function (u) { var i = calc.unitInfo(store.data(), u); return i ? i.unit.name : u; }).join(', ');
+          return C.dialog({ title: fill(D2.title, { name: calc.productCode(p) + ' ' + p.name }), lines: [units.length ? fill(D2.inPlan, { n: units.length, units: names }) : D2.none, D2.note], danger: true, confirmLabel: D2.confirm })
+            .then(function (r) { return r.ok; });
+        });
+      }, Promise.resolve(true));
+    }
 
     function save() {
       var by = byName(), at = new Date().toISOString();
@@ -148,6 +208,11 @@
     function packText(p) { return p.packSize != null && p.packSize !== '' ? p.packSize + ' ' + (p.uom || '') : ''; }
 
     function sourceOf(p) { return p.source === 'SALES_REQUEST' ? 'sales' : 'product'; }
+    // CR-36: Product Year = ปีของ Listing แรก → ปีของยอดขายแรก → null (calc.productYear)
+    var historyData = store.data().history;
+    function yearOf(p) { return calc.productYear(p, listings(), historyData); }
+    function groupBy() { var all = store.get('ui.groupBy') || {}; var v = (all[uid()] || {}).productList; return GROUP_OPTIONS.indexOf(v) >= 0 ? v : 'series'; }
+    function setGroupBy(v) { var all = clone(store.get('ui.groupBy') || {}); all[uid()] = all[uid()] || {}; all[uid()].productList = v; store.set('ui.groupBy', all); }
     // ป้าย "จาก Sales" + Tooltip ผู้ขอ · วันที่ · หน่วยขาย · หมายเหตุ
     function salesTag(p) {
       if (sourceOf(p) !== 'sales') return null;
@@ -160,20 +225,27 @@
     function matches(p, skipKpi) {
       var q = filters.q.trim().toLowerCase();
       if (q) {
-        var text = [p.trCode, p.barcode, p.name, p.shortName, p.nameEn].filter(Boolean).join(' ').toLowerCase();
+        // CR-35: ค้นหาด้วยรหัสชั่วคราวได้ (รหัสที่แสดง · รหัสชั่วคราวเดิม · ID ภายใน)
+        var text = [calc.productCode(p), calc.productKey(p), p.tempCode, p.barcode, p.name, p.shortName, p.nameEn].filter(Boolean).join(' ').toLowerCase();
         if (text.indexOf(q) < 0) return false;
       }
       var st = statusOf(p), c = completeness(p);
-      if (filters.status && st !== filters.status) return false;
+      // CR-35: ค่าเริ่มต้น = ทุก Status ยกเว้น Delete · 'all' = ทั้งหมด
+      if (!filters.status && st === 'delete') return false;
+      if (filters.status && filters.status !== 'all' && st !== filters.status) return false;
+      if (filters.revenue && calc.revenueTypeOf(st) !== filters.revenue) return false;
       if (filters.node && p[calc.taxonomyField(filters.nodeLevel)] !== filters.node) return false;
       if (!calc.inSeries(p, store.get('ui.seriesFilter') || [])) return false;
       if (filters.channel && !listings().some(function (l) { return l.productKey === calc.productKey(p) && unitChannel(l.accountId) === filters.channel; })) return false;
       if (filters.completeness && c.level !== filters.completeness) return false;
       if (filters.source && sourceOf(p) !== filters.source) return false;
       if (filters.trcloud && trcloudOf(p) !== filters.trcloud) return false;
+      // CR-36: Product Year (หลายปี · none = ยังไม่มี Listing)
+      if (filters.year.length) { var py = yearOf(p); if (filters.year.indexOf(py == null ? 'none' : String(py)) < 0) return false; }
       if (!skipKpi && filters.kpi) {
         if (filters.kpi === 'active' && st !== 'active') return false;
-        if (filters.kpi === 'npd' && st !== 'planned' && st !== 'new') return false;
+        if (filters.kpi === 'npd' && st !== 'request' && st !== 'planned' && st !== 'new') return false;
+        if (filters.kpi.indexOf('npd:') === 0 && st !== filters.kpi.slice(4)) return false;
         if ((filters.kpi === 'required' || filters.kpi === 'recommended') && c.level !== filters.kpi) return false;
         if (filters.kpi === 'notInTrcloud' && CAT.inTrcloud(p)) return false;
       }
@@ -195,7 +267,7 @@
       var T = tax();
       var X = page.columns;
       return {
-        code: { key: 'code', label: X.code, value: function (p) { return calc.productKey(p); } },
+        code: { key: 'code', label: X.code, value: function (p) { return calc.productCode(p); } },
         name: { key: 'name', label: X.name, value: function (p) { return p.name; } },
         image: { key: 'image', label: X.image, value: function (p) { return p.image ? L.productFields.image : ''; } },
         status: { key: 'status', label: X.status, value: function (p) { return L.status[statusOf(p)]; } },
@@ -209,6 +281,7 @@
         barcode: { key: 'barcode', label: X.barcode, value: function (p) { return p.barcode; } },
         packSize: { key: 'packSize', label: X.packSize, value: packText },
         launchDate: { key: 'launchDate', label: X.launchDate, value: function (p) { return p.launchDate ? F.date(p.launchDate.slice(0, 7)) : ''; } },
+        productYear: { key: 'productYear', label: X.productYear, value: function (p) { var y = yearOf(p); return y == null ? L.groupBy.noYear : String(y); } },
         listedCount: { key: 'listedCount', label: X.listedCount, num: true, value: function (p) { return calc.listedAccounts(listings(), calc.productKey(p)).length; } },
         sellIn: { key: 'sellIn', label: colLabel('sellIn'), num: true, money: true, value: function (p) { return calc.basePriceAt(cur().basePrices, calc.productKey(p), calc.channelPriceType(sellInChannel()) === 'RSP' ? 'TT_DEALER' : calc.channelPriceType(sellInChannel()), month); } },
         inTrcloud: { key: 'inTrcloud', label: X.inTrcloud, value: function (p) { return page.trcloud[trcloudOf(p)]; } },
@@ -243,7 +316,13 @@
 
     // ป้าย "ระบบกำหนด" ของหมวดสินค้าที่ได้จากคำในชื่อสินค้า (CR-11)
     function inferredTag(p) {
-      return p.inferred ? h('span', { class: 'badge tag-muted pd-inferred', title: L.product.inferredTitle }, L.product.inferredTag) : null;
+      if (!p.inferred) return null;
+      // CR-36: ลิงก์ไปแท็บ Product Level ที่เลือก Type นั้นไว้ (ผู้ที่เห็นแท็บ Product Level)
+      if (ctx.openLevel && (p.typeId || p.subCategoryId || p.categoryId)) {
+        return h('button', { type: 'button', class: 'link-btn badge tag-muted pd-inferred pd-inferred-link', title: L.product.inferredTitle + ' · ' + page.levelLinkTip,
+          onClick: function () { ctx.openLevel(p); } }, L.product.inferredTag);
+      }
+      return h('span', { class: 'badge tag-muted pd-inferred', title: L.product.inferredTitle }, L.product.inferredTag);
     }
     function lockedCode(key) {
       return h('span', { class: 'pd-code-lock', title: page.general.codeLocked }, h('strong', { class: 'pd-code' }, key), C.icon('lock'),
@@ -265,17 +344,32 @@
       // KPI 6 ใบ (นับจากสินค้าตามตัวกรองอื่น ยกเว้นการกด KPI)
       var base = products.filter(function (p) { return matches(p, true); });
       function count(fn) { return base.filter(fn).length; }
-      var planned = count(function (p) { return statusOf(p) === 'planned'; });
-      var launched = count(function (p) { return statusOf(p) === 'new'; });
+      // CR-35 ข้อ 10.1: ทั้งหมด = ไม่นับ Delete · Active + Discontinued n · NPD = Request + Planned + NPD (บรรทัดย่อยกดแยกได้) · ยังไม่เปิดใน TRCLOUD = Request
+      function st(s) { return count(function (p) { return statusOf(p) === s; }); }
+      var nReq = st('request'), planned = st('planned'), launched = st('new');
       var kpis = [
-        { key: '', label: P.all, n: base.length },
-        { key: 'active', label: P.active, n: count(function (p) { return statusOf(p) === 'active'; }) },
-        { key: 'npd', label: P.npd, n: planned + launched, sub: fill(P.npdSub, { a: F.number(planned), b: F.number(launched) }) },
+        { key: '', label: P.all, n: count(function (p) { return statusOf(p) !== 'delete'; }) },
+        { key: 'active', label: P.active, n: st('active'), sub: fill(P.activeSub, { n: F.number(st('discontinued')) }) },
+        { key: 'npd', label: P.npd, n: nReq + planned + launched, subs: [['request', nReq], ['planned', planned], ['new', launched]] },
         { key: 'required', label: P.required, n: count(function (p) { return completeness(p).level === 'required'; }), cls: 'is-danger' },
         { key: 'recommended', label: P.recommended, n: count(function (p) { return completeness(p).level === 'recommended'; }), cls: 'is-warn' },
-        { key: 'notInTrcloud', label: P.notInTrcloud, n: count(function (p) { return !CAT.inTrcloud(p); }), cls: 'is-info' }
+        { key: 'notInTrcloud', label: P.notInTrcloud, n: count(function (p) { return !CAT.inTrcloud(p); }), cls: 'is-info', sub: P.tempCodeSub }
       ];
       root.appendChild(h('div', { class: 'pl-kpis' }, kpis.map(function (k) {
+        if (k.subs) {
+          // การ์ด NPD: กดการ์ด = ทั้งหมด · กดบรรทัดย่อย = เฉพาะ Status นั้น
+          var on = filters.kpi === k.key || filters.kpi.indexOf(k.key + ':') === 0;
+          var card = h('div', { class: 'card pl-kpi pl-kpi-' + k.key + (on ? ' is-selected' : ''), role: 'button', tabindex: '0', title: P.title, 'aria-pressed': filters.kpi === k.key ? 'true' : 'false',
+            onClick: function () { filters.kpi = filters.kpi === k.key ? '' : k.key; draw(); },
+            onKeydown: function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); filters.kpi = filters.kpi === k.key ? '' : k.key; draw(); } } },
+            h('span', { class: 'pl-kpi-label' }, k.label), h('strong', { class: 'pl-kpi-value' }, F.number(k.n)), h('span', { class: 'pl-kpi-unit' }, P.unit),
+            h('span', { class: 'pl-kpi-sub pl-kpi-subs' }, k.subs.map(function (x, i) {
+              var id = k.key + ':' + x[0];
+              return [i ? ' · ' : '', h('button', { type: 'button', class: 'link-btn pl-kpi-subbtn' + (filters.kpi === id ? ' is-active' : ''), 'aria-pressed': filters.kpi === id ? 'true' : 'false',
+                onClick: function (e) { e.stopPropagation(); filters.kpi = filters.kpi === id ? '' : id; draw(); } }, fill(P.npdSubs[x[0]], { n: F.number(x[1]) }))];
+            })));
+          return card;
+        }
         return h('button', {
           type: 'button', class: 'card pl-kpi pl-kpi-' + (k.key || 'all') + ' ' + (k.cls || '') + (filters.kpi === k.key ? ' is-selected' : ''), title: P.title,
           'aria-pressed': filters.kpi === k.key ? 'true' : 'false',
@@ -303,22 +397,14 @@
       return el;
     }
 
-    // หมวดสินค้าแบบลำดับชั้นในตัวเดียว: Category › Sub Category › Type (ค่า = id ของระดับใดก็ได้)
-    function categoryOptions() {
-      var out = [{ value: '', label: page.filters.categoryAll }];
-      SP.core.taxonomy.buildTree(tax(), 'category').forEach(function walk(t) {
-        out.push({ value: t.node.id, label: new Array(t.depth * 3 + 1).join(' ') + t.node.name });
-        t.children.forEach(walk);
-      });
-      return out;
-    }
+    // CR-36: หมวดสินค้าแบบลำดับชั้นในตัวเดียว (components.treeSelect · calc.categoryOptions: Category ตัวหนา · '- ' Sub Category · '-- ' Type · ค่า = id ของระดับใดก็ได้)
     function nodeLevel(id) { var n = SP.core.taxonomy.find(tax(), 'category', id); return n ? n.level : ''; }
 
     function toolbar() {
       var Fl = page.filters;
       var search = h('input', { type: 'search', class: 'search-input pl-search', placeholder: page.searchPlaceholder, 'aria-label': page.searchPlaceholder, value: filters.q });
       search.addEventListener('input', function () { filters.q = search.value; renderTable(); });
-      var moreOn = MORE.filter(function (k) { return filters[k]; }).length;
+      var moreOn = MORE.filter(function (k) { return hasValue(filters[k]); }).length;
       var open = !!store.get('ui.productMoreFilters');
       var picker = C.columnPicker({
         label: page.columnsButton, fixedNote: page.fixedColumns,
@@ -329,10 +415,12 @@
       });
       return h('div', { class: 'tool-row pl-toolbar' },
         search,
-        sel(Fl.status, 'status', [{ value: '', label: Fl.statusAll }].concat(['planned', 'new', 'active', 'clearance', 'discontinued'].map(function (s) { return { value: s, label: L.status[s] }; }))),
+        sel(Fl.status, 'status', [{ value: '', label: Fl.statusAll }, { value: 'all', label: Fl.statusEverything }].concat(calc.PRODUCT_STATUSES.map(function (s) { return { value: s, label: L.status[s] }; }))),
         C.seriesFilter({ options: calc.seriesList(tax(), cur().products), value: store.get('ui.seriesFilter') || [], onChange: function (v) { store.set('ui.seriesFilter', v); draw(); } }),
-        sel(Fl.category, 'node', categoryOptions(), function (v) { filters.node = v; filters.nodeLevel = v ? nodeLevel(v) : ''; draw(); }),
-        C.segmented({ label: page.viewLabel, value: view, options: ['list', 'group'].map(function (v) { return { value: v, label: page.views[v] }; }), onChange: function (v) { view = v; draw(); } }),
+        C.treeSelect({ label: Fl.category, value: filters.node, allLabel: Fl.categoryAll, options: calc.categoryOptions(tax()), className: 'pl-filter-node',
+          onChange: function (v) { filters.node = v; filters.nodeLevel = v ? nodeLevel(v) : ''; draw(); } }),
+        C.groupPicker({ value: groupBy(), className: 'pl-group-by', options: GROUP_OPTIONS.map(function (k) { return { value: k, label: L.groupBy[k] }; }),
+          onChange: function (v) { setGroupBy(v); draw(); } }),
         h('button', { type: 'button', class: 'btn btn-sm pl-more ' + (open ? 'btn-primary' : 'btn-secondary') + (moreOn ? ' has-value' : ''), title: Fl.moreTitle, 'aria-expanded': open ? 'true' : 'false',
           onClick: function () { store.set('ui.productMoreFilters', !open); draw(); } }, fill(Fl.more, { n: moreOn })),
         h('span', { class: 'tool-right' },
@@ -348,7 +436,17 @@
         sel(Fl.channel, 'channel', [{ value: '', label: Fl.channelAll }].concat(SP.data.channels.filter(function (c) { return c.active !== false; }).map(function (c) { return { value: c.id, label: c.name }; }))),
         sel(Fl.completeness, 'completeness', [{ value: '', label: Fl.completenessAll }].concat(['ok', 'required', 'recommended'].map(function (k) { return { value: k, label: Fl.completenessOptions[k] }; }))),
         sel(Fl.source, 'source', [{ value: '', label: Fl.sourceAll }].concat(['product', 'sales'].map(function (k) { return { value: k, label: Fl.sourceOptions[k] }; }))),
-        sel(Fl.trcloud, 'trcloud', [{ value: '', label: Fl.trcloudAll }].concat(['open', 'notOpen'].map(function (k) { return { value: k, label: page.trcloud[k] }; }))));
+        sel(Fl.trcloud, 'trcloud', [{ value: '', label: Fl.trcloudAll }].concat(['open', 'notOpen'].map(function (k) { return { value: k, label: page.trcloud[k] }; }))),
+        // CR-35: ประเภทรายได้ (calc.revenueTypeOf ของ Status)
+        sel(Fl.revenue, 'revenue', [{ value: '', label: Fl.revenueAll }].concat(['npd', 'existing', 'clearance'].map(function (k) { return { value: k, label: L.revenueTypes[k] }; }))),
+        // CR-36: Product Year (เลือกหลายปี + ยังไม่มี Listing)
+        C.multiSelect({ label: Fl.year, allLabel: Fl.yearAll, selected: Fl.yearSelected, clear: L.series.clear, empty: L.series.empty, value: filters.year,
+          options: yearOptions(), onChange: function (v) { filters.year = v; draw(); } }));
+    }
+    function yearOptions() {
+      var ys = {};
+      cur().products.forEach(function (p) { var y = yearOf(p); ys[y == null ? 'none' : String(y)] = true; });
+      return Object.keys(ys).filter(function (k) { return k !== 'none'; }).sort().concat(ys.none ? ['none'] : []).map(function (k) { return { value: k, label: k === 'none' ? L.groupBy.noYear : k }; });
     }
 
     // Chip ตัวกรองที่ใช้อยู่ (× เอาออกทีละรายการ · ล้างทั้งหมด) + จำนวนที่แสดง
@@ -358,9 +456,10 @@
       var Fl = page.filters;
       var items = [];
       function add(label, value, clear) { items.push({ label: fill(Fl.chip, { label: label, value: value }), onRemove: function () { clear(); draw(); } }); }
-      if (filters.kpi) items.push({ label: fill(Fl.kpiChip, { value: page.kpi[filters.kpi] }), onRemove: function () { filters.kpi = ''; draw(); } });
+      if (filters.kpi) items.push({ label: fill(Fl.kpiChip, { value: filters.kpi.indexOf('npd:') === 0 ? page.kpi.npd + ' · ' + L.status[filters.kpi.slice(4)] : page.kpi[filters.kpi] }), onRemove: function () { filters.kpi = ''; draw(); } });
       if (filters.q.trim()) items.push({ label: fill(Fl.searchChip, { value: filters.q.trim() }), onRemove: function () { filters.q = ''; draw(); } });
-      if (filters.status) add(Fl.status, L.status[filters.status], function () { filters.status = ''; });
+      if (filters.status) add(Fl.status, filters.status === 'all' ? Fl.statusEverything : L.status[filters.status], function () { filters.status = ''; });
+      if (filters.revenue) add(Fl.revenue, L.revenueTypes[filters.revenue], function () { filters.revenue = ''; });
       if (filters.node) add(Fl.category, calc.taxonomyName(T, 'category', filters.node), function () { filters.node = ''; filters.nodeLevel = ''; });
       (store.get('ui.seriesFilter') || []).forEach(function (s) {
         add(L.series.label, calc.taxonomyName(T, 'series', s) || L.series.none, function () { store.set('ui.seriesFilter', (store.get('ui.seriesFilter') || []).filter(function (x) { return x !== s; })); });
@@ -369,6 +468,7 @@
       if (filters.completeness) add(Fl.completeness, Fl.completenessOptions[filters.completeness], function () { filters.completeness = ''; });
       if (filters.source) add(Fl.source, Fl.sourceOptions[filters.source], function () { filters.source = ''; });
       if (filters.trcloud) add(Fl.trcloud, page.trcloud[filters.trcloud], function () { filters.trcloud = ''; });
+      filters.year.forEach(function (y) { add(Fl.year, y === 'none' ? L.groupBy.noYear : y, function () { filters.year = filters.year.filter(function (x) { return x !== y; }); }); });
       C.clear(chipSlot);
       chipSlot.appendChild(h('span', { class: 'pl-summary' },
         h('span', { class: 'pl-count' }, fill(page.resultCount, { n: F.number(shown), total: F.number(cur().products.length) })),
@@ -388,35 +488,31 @@
       }).concat([h('th', { scope: 'col', class: 'manage' }, page.columns.manage)]);
       var body = h('tbody');
       if (!shown.length) body.appendChild(h('tr', null, h('td', { class: 'grid-empty', colspan: String(cols.length + 1) }, page.empty)));
-      if (view === 'group') {
-        var groups = [];
-        function groupOf(p) {
-          var sid = p.seriesId || '', ssid = p.subSeriesId || '';
-          var g = groups.filter(function (x) { return x.sid === sid && x.ssid === ssid; })[0];
-          if (!g) { g = { sid: sid, ssid: ssid, items: [] }; groups.push(g); }
-          return g;
-        }
-        shown.forEach(function (p) { groupOf(p).items.push(p); });
-        var order = calc.seriesList(T, cur().products).map(function (o) { return o.value; });
-        groups.sort(function (a, b) {
-          var ia = order.indexOf(a.ssid || a.sid), ib = order.indexOf(b.ssid || b.sid);
-          return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
-        });
-        groups.forEach(function (g) {
-          var name = (calc.taxonomyName(T, 'series', g.sid) || page.noSeries) + ' → ' + (calc.taxonomyName(T, 'series', g.ssid) || page.noSubSeries);
-          var byStatus = {};
-          g.items.forEach(function (p) { var st = statusOf(p); byStatus[st] = (byStatus[st] || 0) + 1; });
-          body.appendChild(h('tr', { class: 'is-group' }, h('td', { colspan: String(cols.length + 1) },
-            h('span', { class: 'pl-group-name' }, fill(page.groupHead, { name: name, n: g.items.length })),
-            h('span', { class: 'pl-group-status' }, ['planned', 'new', 'active', 'clearance', 'discontinued'].filter(function (s) { return byStatus[s]; }).map(function (s) {
-              return C.statusBadge(s, String(byStatus[s]));
-            })))));
-          g.items.forEach(function (p) { body.appendChild(rowOf(p, cols)); });
-        });
+      var GB = L.groupBy;
+      var by = groupBy();
+      var levels = calc.productGroupLevels(by, { tax: T, statusOf: statusOf, yearOf: yearOf, labels: { none: GB.noneName, noYear: GB.noYear, status: L.status } });
+      if (levels && shown.length) {
+        (function walk(groups, parent) {
+          groups.forEach(function (g) {
+            var gid = by + parent + '/' + g.id;
+            var isOpen = !collapsed[gid];
+            var leaf = [];
+            (function all(x) { if (x.items) leaf = leaf.concat(x.items); else x.groups.forEach(all); })(g);
+            var byStatus = {};
+            leaf.forEach(function (p) { var st = statusOf(p); byStatus[st] = (byStatus[st] || 0) + 1; });
+            var name = fill(GB.head, { name: g.name, n: F.number(g.count) });
+            body.appendChild(h('tr', { class: 'is-group pl-group-d' + g.depth }, h('td', { colspan: String(cols.length + 1) },
+              h('button', { type: 'button', class: 'link-btn pl-group-toggle', 'aria-expanded': isOpen ? 'true' : 'false', title: fill(isOpen ? GB.collapse : GB.expand, { name: g.name }),
+                onClick: function () { collapsed[gid] = isOpen; renderTable(); } }, h('span', { class: 'pl-group-caret', 'aria-hidden': 'true' }, isOpen ? '▾' : '▸'), h('span', { class: 'pl-group-name' }, name)),
+              by !== 'status' ? h('span', { class: 'pl-group-status' }, calc.PRODUCT_STATUSES.filter(function (s) { return byStatus[s]; }).map(function (s) { return C.statusBadge(s, String(byStatus[s])); })) : null)));
+            if (!isOpen) return;
+            if (g.groups) walk(g.groups, gid); else g.items.forEach(function (p) { body.appendChild(rowOf(p, cols)); });
+          });
+        })(calc.groupItems(shown, levels), '');
       } else {
         shown.forEach(function (p) { body.appendChild(rowOf(p, cols)); });
       }
-      var table = h('table', { class: 'data-grid pl-table' + (view === 'group' ? ' is-grouped' : '') }, h('thead', null, h('tr', null, head)), body);
+      var table = h('table', { class: 'data-grid pl-table' + (levels ? ' is-grouped' : '') }, h('thead', null, h('tr', null, head)), body);
       C.clear(tableSlot).appendChild(h('div', { class: 'fit-scroll pl-scroll' }, table));
       renderChips(shown.length);
       highlight();
@@ -426,8 +522,9 @@
       var T = tax();
       var key = calc.productKey(p);
       var tds = cols.map(function (c) {
-        if (c.key === 'code') return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, key), salesTag(p));
-        if (c.key === 'name') return h('td', { class: 'pl-name', title: p.name }, h('span', { class: 'pl-name-text' }, calc.displayName(p)));
+        // CR-35: รหัสที่แสดง (คำขอ = รหัสชั่วคราว) · ป้าย ชื่อชั่วคราว และ จาก Sales ต่อท้ายชื่อ (ไม่ถูกตัด)
+        if (c.key === 'code') return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, calc.productCode(p)));
+        if (c.key === 'name') return h('td', { class: 'pl-name', title: p.name }, h('span', { class: 'pl-name-row' }, h('span', { class: 'pl-name-text' }, calc.displayName(p)), C.tempNameTag(p), salesTag(p)));
         if (c.key === 'image') return h('td', { class: 'pl-img' }, C.productThumb(p, T, { size: 'sm' }));
         if (c.key === 'status') {
           var segs = calc.statusSegments(p, year);
@@ -514,11 +611,13 @@
       drawerCtl.head.appendChild(h('div', { class: 'pd-head' },
         C.productThumb(p, T, { size: 'md' }),
         h('div', { class: 'pd-title' },
-          h('h2', null, p.name || '–'),
+          h('h2', null, p.name || '–', ' ', C.tempNameTag(p)),
           h('div', { class: 'pd-meta' },
-            lockedCode(key),
+            lockedCode(calc.productCode(p)), C.tempCodeTag(p),
             C.statusBadge(statusOf(p)),
             h('span', { class: 'pd-pct' }, fill(page.completenessPct, { pct: F.pct(c.pct, 0) })), C.completenessBadge(c))),
+        // CR-35: ยืนยันเป็น NPD (คำขอ · ทีม Product · มีผลทันที) · แก้ไข
+        !editing && canEdit() && calc.isRequestProduct(p) ? h('button', { type: 'button', class: 'btn btn-secondary btn-sm pd-confirm-npd', onClick: function () { confirmRequest(key); } }, L.confirmRequest.button) : null,
         !editing && canEdit() ? h('button', { type: 'button', class: 'btn btn-primary btn-sm pd-edit', onClick: function () { startEdit(); } }, page.edit) : null));
       drawerCtl.body.appendChild(C.segmented({
         label: page.title, value: tab,
@@ -532,6 +631,26 @@
       else if (tab === 'price') prices(body, p);
       else if (tab === 'listing') lifecycle(body, p);
       else history(body, p);
+    }
+
+    // CR-35: ยืนยันคำขอ NPD (Request → Planned) — บันทึกทันที (catalog.confirmRequest · Key เดิม แผน SKU และ Listing อยู่ครบ)
+    function confirmRequest(key) {
+      var m = store.master();
+      var p = calc.findProduct(m.products, key);
+      C.confirmRequestDialog(p, m).then(function (v) {
+        if (!v) return;
+        var at = new Date().toISOString(), by = byName();
+        var res = CAT.confirmRequest(m, key, v, { by: by, at: at });
+        if (!res.ok) { C.toast(L.confirmRequest.errors[res.error] || res.error); return; }
+        store.set('master.products', res.master.products);
+        store.set('master.npdPlans', res.master.npdPlans);
+        store.set('master.codeCounters', res.master.codeCounters);
+        store.appendAudit([{ entity: 'product', key: key, field: 'trCode', oldValue: res.tempCode, newValue: res.code, by: by, at: at }]);
+        saved = snapshot();
+        draft = clone(saved);
+        C.toast(fill(L.confirmRequest.done, { code: res.code, name: v.name }));
+        draw();
+      });
     }
 
     function field(label, content, cls) { return h('div', { class: 'pd-field ' + (cls || '') }, h('span', { class: 'pd-label' }, label), h('span', { class: 'pd-value' }, content)); }
@@ -568,23 +687,28 @@
       var key = calc.productKey(p);
       var tx = calc.productTaxonomy(T, p);
       if (!editing) {
-        body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.codes),
-          field(PF.trCode, lockedCode(key)), field(PF.barcode, dval(p.barcode)), trcloudField(p)));
-        body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.names), field(PF.name, dval(p.name)), field(PF.shortName, dval(p.shortName)), field(PF.nameEn, dval(p.nameEn))));
+        // CR-36: รูปสินค้าอยู่ขวาของส่วนรหัสและชื่อ
+        body.appendChild(h('div', { class: 'pd-top' }, h('div', { class: 'pd-top-main' },
+          h('section', { class: 'pd-section' }, h('h3', null, G.codes),
+            field(PF.trCode, [lockedCode(calc.productCode(p)), ' ', C.tempCodeTag(p)]), p.tempCode ? field(L.tempCode.tag, fill(L.tempCode.old, { code: p.tempCode })) : null,
+            field(PF.barcode, dval(p.barcode)), trcloudField(p)),
+          h('section', { class: 'pd-section' }, h('h3', null, G.names), field(PF.name, dval(p.name)), field(PF.shortName, dval(p.shortName)), field(PF.nameEn, dval(p.nameEn)))),
+          h('section', { class: 'pd-section pd-top-image' }, h('h3', null, G.image), h('div', { class: 'pd-image' }, C.productThumb(p, T, { size: 'lg' })))));
         body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.category, inferredTag(p)),
           field(PF.categoryId, dval(tx.category)), field(PF.subCategoryId, dval(tx.subCategory)), field(PF.typeId, dval(tx.type))));
         body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.series), field(PF.seriesId, dval(tx.series)), field(PF.subSeriesId, dval(tx.subSeries))));
         body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.other),
           field(PF.packSize, dval(packText(p))), p.note ? field(G.note, p.note) : null));
-        body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.image), h('div', { class: 'pd-image' }, C.productThumb(p, T, { size: 'lg' }))));
         return;
       }
-      body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.codes),
-        field(PF.trCode, lockedCode(key)),
-        field(PF.barcode, textInput(p, 'barcode', PF.barcode)),
-        trcloudField(p)));
-      body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.names),
-        field(PF.name, textInput(p, 'name', PF.name)), field(PF.shortName, textInput(p, 'shortName', PF.shortName)), field(PF.nameEn, textInput(p, 'nameEn', PF.nameEn))));
+      body.appendChild(h('div', { class: 'pd-top' }, h('div', { class: 'pd-top-main' },
+        h('section', { class: 'pd-section' }, h('h3', null, G.codes),
+          field(PF.trCode, [lockedCode(calc.productCode(p)), ' ', C.tempCodeTag(p)]), p.tempCode ? field(L.tempCode.tag, fill(L.tempCode.old, { code: p.tempCode })) : null,
+          field(PF.barcode, textInput(p, 'barcode', PF.barcode)),
+          trcloudField(p)),
+        h('section', { class: 'pd-section' }, h('h3', null, G.names),
+          field(PF.name, textInput(p, 'name', PF.name)), field(PF.shortName, textInput(p, 'shortName', PF.shortName)), field(PF.nameEn, textInput(p, 'nameEn', PF.nameEn)))),
+        imageEditor(p, 'pd-top-image')));
       // เลือกหมวดสินค้าเอง = ยืนยันแล้ว (ล้างเครื่องหมาย "ระบบกำหนด") · CR-30 Product Code ไม่เปลี่ยนตาม Type ที่แก้ภายหลัง
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.category, inferredTag(p)),
         C.cascadeSelect({ tax: T, kind: 'category', value: p, labels: [PF.categoryId, PF.subCategoryId, PF.typeId], placeholder: G.placeholder,
@@ -599,10 +723,9 @@
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.other),
         field(PF.packSize, h('span', { class: 'pd-inline pd-pack' }, textInput(p, 'packSize', PF.packSize, { type: 'number', min: '0', step: 'any', cls: 'pd-pack-num' }), uomSel)),
         field(G.note, textInput(p, 'note', G.note))));
-      body.appendChild(imageEditor(p));
     }
 
-    function imageEditor(p) {
+    function imageEditor(p, cls) {
       var T = tax();
       var G = page.general;
       var file = h('input', { type: 'file', accept: 'image/*', class: 'pd-file', 'aria-label': G.imageUpload });
@@ -612,7 +735,7 @@
         if (!f) return;
         C.resizeImage(f, SP.data.settings.IMAGE_MAX_PX).then(function (url) { p.image = url; refresh(); }, function () { msg.className = 'pm-msg is-error'; msg.textContent = G.imageError; });
       });
-      return h('section', { class: 'pd-section' + (isDirty(p, 'image') ? ' is-dirty-cell' : '') }, h('h3', null, G.image),
+      return h('section', { class: 'pd-section' + (cls ? ' ' + cls : '') + (isDirty(p, 'image') ? ' is-dirty-cell' : '') }, h('h3', null, G.image),
         h('div', { class: 'pd-image' }, C.productThumb(p, T, { size: 'lg' }),
           h('div', { class: 'pd-image-actions' },
             h('label', { class: 'btn btn-secondary btn-sm pd-upload' }, G.imageUpload, file),
@@ -677,7 +800,9 @@
       body.appendChild(h('section', { class: 'pd-section' },
         field(Li.launch, editing ? launchInput(p) : (p.launchDate ? F.date(p.launchDate.slice(0, 7)) : p.launchQuarter ? p.launchQuarter.replace(/^(\d{4})-(Q\d)$/, '$2 $1') : '–')),
         field(Li.discontinue, editing ? textInput(p, 'discontinueMonth', Li.discontinue, { type: 'month' }) : (p.discontinueMonth ? F.date(p.discontinueMonth) : Li.discontinueNone)),
-        field(Li.clearance, cl ? fill(Li.clearanceText, { from: F.date(cl.fromMonth), to: F.date(cl.toMonth), stock: F.units(cl.stockQty) }) : Li.clearanceNone),
+        field(Li.clearance, cl ? fill(Li.clearanceText, { from: F.date(cl.fromMonth), to: cl.toMonth ? F.date(cl.toMonth) : Li.clearanceUntilSold, stock: F.units(cl.stockQty) }) : Li.clearanceNone),
+        // CR-35: Status Delete ตั้งแต่เดือน (เลิกขายแล้ว ไม่ผลิต ไม่ขาย)
+        field(Li.deleted, editing ? h('span', { title: Li.deletedTip }, textInput(p, 'deletedFrom', Li.deleted, { type: 'month' })) : (p.deletedFrom ? h('span', { title: Li.deletedTip }, F.date(p.deletedFrom), ' ', C.statusBadge('delete')) : Li.deletedNone)),
         // CR-17: ปิด npdApproval = ไม่แสดงสถานะอนุมัติของแผน NPD
         npd ? field(NP.title, SP.core.features.isOn('npdApproval')
           ? fill(Li.npdLink, { stage: NP.stages[calc.npdStage(npd, month)], status: L.workflow.status[(npd.workflow || {}).status || 'draft'] })
@@ -685,7 +810,7 @@
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, fill(Li.timelineTitle, { year: year })), C.statusStrip(calc.statusSegments(p, year), year)));
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, fill(Li.listedTitle, { n: units.length })),
         units.length ? h('ul', { class: 'pd-list' }, Object.keys(byChannel).map(function (ch) { return h('li', null, h('strong', null, ch + ': '), byChannel[ch].join(', ')); })) : h('p', { class: 'muted' }, Li.listedEmpty),
-        h('a', { href: SP.core.paths.to(SP.core.registry.byId('productMaster').path) }, Li.listingLink)));
+        h('a', { href: SP.core.paths.to(SP.core.registry.byId('launchListing').path) + '#listing', onClick: function () { store.set('ui.listingFocus', key); } }, Li.listingLink)));
     }
 
     function history(body, p) {
@@ -847,6 +972,837 @@
     }
 
     draw();
+  }
+
+
+  // ---------- แท็บ Product Level (โค้ดเดิมของหน้า Category & Series · ctx.openProducts = กดจำนวนสินค้าแล้วเปิดแท็บสินค้าที่กรองแล้ว) ----------
+  var renderLevel = (function () {
+
+    var C = SP.core.components;
+    var calc = SP.core.calc;
+    var CAT = SP.core.catalog;
+    var store = SP.core.store;
+    var h = C.h;
+    var fill = C.fill;
+
+    var TABS = ['category', 'series', 'cross'];
+    var DEFAULT_FILTERS = { category: [], subCategory: [], series: [], subSeries: [], status: 'active', data: 'all', showZero: false };
+    var ID_PREFIX = { CATEGORY: 'cat-', SUB_CATEGORY: 'sub-', TYPE: 'type-', SERIES: 'ser-', SUB_SERIES: 'subser-' };
+
+    function clone(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+    function byId(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+
+    function render(root, ctx) {
+      var page = ctx.page;
+      var L = SP.data.content.labels;
+      var X = L.taxonomy;
+      var T = SP.core.taxonomy;
+      var today = store.today();
+      var saved = { tax: store.get('master.taxonomy'), products: store.get('master.products') };
+      var draft = null;
+      var editing = false;
+      var sel = normalizeSel(store.get('ui.taxonomySelection'));
+      var filters = normalizeFilters(store.get('ui.taxonomyFilters'));
+      // ui ชั่วคราวของหน้า: แถวที่กำลังเปลี่ยนชื่อ / แถวใหม่ / ข้อความผิดพลาดของช่องกรอก / ค้นหา / Drawer / รายการที่ต้องโฟกัส / ตารางไขว้ที่กาง / ลาก
+      var ui = { rename: null, adding: null, error: null, q: '', detailOpen: false, focus: null, open: { rows: {}, cols: {} }, drag: null };
+
+      function normalizeSel(s) {
+        s = s || {};
+        return { tab: TABS.indexOf(s.tab) >= 0 ? s.tab : 'category', category: (s.category || []).slice(), series: (s.series || []).slice() };
+      }
+      function normalizeFilters(f) {
+        var out = clone(DEFAULT_FILTERS);
+        Object.keys(out).forEach(function (k) { if (f && f[k] != null) out[k] = clone(f[k]); });
+        out.subCategory = []; out.subSeries = [];   // CR-30: ตัดตัวกรอง Sub Category / Sub Series (ซ้ำกับคอลัมน์)
+        if (['all', 'noSku', 'dupParent', 'expired', 'noPrefix'].indexOf(out.data) < 0) out.data = 'all';
+        return out;
+      }
+      function persistSel() { store.set('ui.taxonomySelection', sel); }
+      function persistFilters() { store.set('ui.taxonomyFilters', filters); }
+      function cur() { return editing ? draft : saved; }
+      function tabKind() { return sel.tab === 'series' ? 'series' : 'category'; }
+      function levelName(level) { return X.levels[level]; }
+      // CR-30: แท็บหมวดสินค้าใช้ตัวกรอง Series · แท็บ Series ใช้ตัวกรองหมวดสินค้า · ตารางไขว้ใช้ทั้งสอง
+      function useCat() { return sel.tab !== 'category'; }
+      function useSer() { return sel.tab !== 'series'; }
+      function filterArgs() { return { category: useCat() ? filters.category : [], subCategory: [], series: useSer() ? filters.series : [], subSeries: [], status: filters.status, data: filters.data, showZero: filters.showZero }; }
+      function anyFilter() {
+        return (useCat() && filters.category.length) || (useSer() && filters.series.length) || filters.status !== 'active' || filters.data !== 'all';
+      }
+
+      // ---------- สิ่งที่ยังไม่บันทึก ----------
+      function nodeDirty(kind, id) {
+        if (!editing) return false;
+        var a = byId(draft.tax[kind], id), b = byId(saved.tax[kind], id);
+        return !b || JSON.stringify(a) !== JSON.stringify(b);
+      }
+      function diffCount() {
+        if (!editing) return 0;
+        var n = 0;
+        ['category', 'series'].forEach(function (k) {
+          draft.tax[k].forEach(function (d) { if (nodeDirty(k, d.id)) n++; });
+          n += saved.tax[k].filter(function (o) { return !byId(draft.tax[k], o.id); }).length;
+        });
+        draft.products.forEach(function (p) {
+          var o = calc.findProduct(saved.products, calc.productKey(p));
+          if (o && JSON.stringify(o) !== JSON.stringify(p)) n++;
+        });
+        return n;
+      }
+      C.guardUnsaved(diffCount);
+
+      var bar = C.workflowBar({
+        simple: true, modules: ['taxonomy'],   // CR-36: สิทธิ์ส่วนของหน้า Product Level (key เดิม taxonomy)
+        editing: function () { return editing; },
+        onEdit: function () { editing = true; draft = clone(saved); ui.rename = ui.adding = ui.error = null; draw(); },
+        onSave: save,
+        onCancel: function () { editing = false; draft = null; ui.rename = ui.adding = ui.error = null; draw(); }
+      });
+      if (ctx.intro) ctx.intro.appendChild(bar);
+
+      function save() {
+        var by = C.roleName(store.role()), at = new Date().toISOString();
+        var entries = [];
+        ['category', 'series'].forEach(function (k) {
+          draft.tax[k].forEach(function (d) { if (nodeDirty(k, d.id)) entries = entries.concat(calc.auditDiff('taxonomy', d.id, byId(saved.tax[k], d.id), d, { by: by, at: at })); });
+          saved.tax[k].forEach(function (o) { if (!byId(draft.tax[k], o.id)) entries = entries.concat(calc.auditDiff('taxonomy', o.id, o, null, { by: by, at: at })); });
+        });
+        draft.products.forEach(function (p) {
+          var key = calc.productKey(p);
+          var o = calc.findProduct(saved.products, key);
+          if (!o || JSON.stringify(o) === JSON.stringify(p)) return;
+          p.updatedAt = at;
+          entries = entries.concat(calc.auditDiff('product', key, o, p, { by: by, at: at }));
+        });
+        store.set('master.taxonomy', draft.tax);
+        store.set('master.products', draft.products);
+        store.appendAudit(entries);
+        saved = clone(draft);
+        draft = null;
+        editing = false;
+        ui.rename = ui.adding = ui.error = null;
+        draw();
+      }
+
+      // ---------- เปิดหน้ารายการสินค้าที่กรองแล้ว (หน้ารายการสินค้าอ่าน ui.productFilterHandoff ครั้งเดียวแล้วลบ) ----------
+      function openProducts(handoff) {
+        if (diffCount() && !C.confirmDiscard(diffCount())) return;
+        C.guardUnsaved(null);
+        store.set('ui.productFilterHandoff', handoff);
+        if (ctx.openProducts) { ctx.openProducts(); return; }   // CR-36: แท็บสินค้าในหน้าเดียวกัน
+        location.href = SP.core.paths.to(SP.core.registry.byId('productList').path);
+      }
+
+      // =====================================================================
+      function draw() {
+        var active = document.activeElement;
+        var searchFocused = active && active.classList && active.classList.contains('tx-search');
+        C.clear(root);
+        bar.update();
+        var tax = cur().tax, products = cur().products;
+        root.appendChild(h('div', { class: 'tool-row tx-tabs' }, C.segmented({
+          label: page.tabLabel, value: sel.tab,
+          options: TABS.map(function (k) { return { value: k, label: page.tabs[k] }; }),
+          onChange: function (v) { sel.tab = v; persistSel(); ui.rename = ui.adding = ui.error = null; draw(); }
+        })));
+        if (editing) { var banner = C.editBanner(); root.appendChild(banner); banner.update(diffCount()); }
+        root.appendChild(filterBar(tax, products));
+        var chips = chipsOf(tax);
+        if (chips) root.appendChild(chips);
+        root.appendChild(h('div', { class: 'card fit-card tx-card' }, sel.tab === 'cross' ? crossView(tax, products) : columnsView(tax, products)));
+        // โฟกัสหลังวาดใหม่: ช่องกรอก (เพิ่ม / เปลี่ยนชื่อ) → รายการที่เลือก → ช่องค้นหา
+        var inp = root.querySelector('.tx-input');
+        if (inp) { inp.focus(); if (ui.rename) inp.select(); }
+        else if (ui.focus) { var el = root.querySelector('.tx-item[data-id="' + ui.focus + '"]'); if (el) el.focus(); }
+        else if (searchFocused) { var s = root.querySelector('.tx-search'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } }
+        ui.focus = null;
+      }
+
+      // ---------- แถบตัวกรอง ----------
+      function filterBar(tax, products) {
+        var catF = useCat() ? C.categoryFilter({
+          tax: tax, kind: 'category', levels: ['CATEGORY'], labels: { CATEGORY: page.dims.category }, value: { CATEGORY: filters.category },
+          onChange: function (v) { filters.category = v.CATEGORY || []; persistFilters(); draw(); }
+        }) : null;
+        var serF = useSer() ? C.categoryFilter({
+          tax: tax, kind: 'series', levels: ['SERIES'], value: { SERIES: filters.series },
+          onChange: function (v) { filters.series = v.SERIES || []; persistFilters(); draw(); }
+        }) : null;
+        function sel2(label, key, keys, texts) {
+          return h('label', { class: 'tx-sel' }, h('span', { class: 'field-label' }, label), C.select({
+            label: label, value: filters[key], className: 'tx-select',
+            options: keys.map(function (k) { return { value: k, label: texts[k] }; }),
+            onChange: function (v) { filters[key] = v; persistFilters(); draw(); }
+          }));
+        }
+        var kind = tabKind();
+        var crossActive = sel.tab !== 'cross' && (kind === 'category' ? filters.series.length : filters.category.length);
+        return h('div', { class: 'tool-row tx-filters' },
+          searchBox(tax),
+          catF, serF,
+          sel2(page.status.label, 'status', ['active', 'inactive', 'all'], page.status),
+          sel2(page.data.label, 'data', ['all', 'noSku', 'dupParent', 'expired', 'noPrefix'], page.data),
+          crossActive ? h('label', { class: 'tx-check' }, h('input', { type: 'checkbox', checked: filters.showZero, onChange: function (e) { filters.showZero = e.target.checked; persistFilters(); draw(); } }), page.showZero) : null,
+          anyFilter() ? h('button', { type: 'button', class: 'link-btn tx-clear', onClick: clearFilters }, X.filter.clearAll) : null);
+      }
+      function clearFilters() { filters = clone(DEFAULT_FILTERS); persistFilters(); draw(); }
+
+      // ค้นหาชื่อทุกระดับทั้งสองมิติ ผลลัพธ์พร้อมเส้นทาง คลิก → เลือกรายการนั้นในคอลัมน์ (เปลี่ยนแท็บตามมิติ)
+      function searchBox(tax) {
+        var input = h('input', { type: 'search', class: 'search-input tx-search', placeholder: page.searchPlaceholder, 'aria-label': page.searchPlaceholder, value: ui.q, autocomplete: 'off' });
+        var panel = h('ul', { class: 'tx-search-results', role: 'listbox', hidden: true });
+        function results() { return T.search(tax, input.value).slice(0, 40); }
+        function show() {
+          C.clear(panel);
+          if (!input.value.trim()) { panel.hidden = true; return; }
+          var res = results();
+          panel.hidden = false;
+          if (!res.length) { panel.appendChild(h('li', { class: 'tx-search-empty' }, page.searchEmpty)); return; }
+          res.forEach(function (r) {
+            panel.appendChild(h('li', { role: 'option' }, h('button', {
+              type: 'button', class: 'tx-search-item', onMousedown: function (e) { e.preventDefault(); pick(r); }
+            }, h('span', { class: 'tx-search-name' }, r.node.name), h('span', { class: 'tx-search-path' }, page.dims[r.kind] + ' · ' + r.path.join(' › ')))));
+          });
+        }
+        function pick(r) {
+          ui.q = '';
+          sel.tab = r.kind;
+          sel[r.kind] = T.pathOf(tax, r.kind, r.node.id).map(function (n) { return n.id; });
+          // รายการที่ตัวกรองซ่อนอยู่ → ล้างตัวกรองให้เห็นรายการที่ค้นพบ
+          if (!T.filterTree(tax, r.kind, filterArgs(), cur().products, today).show[r.node.id]) {
+            filters = clone(DEFAULT_FILTERS);
+            if (r.node.active === false) filters.status = 'all';
+            persistFilters();
+          }
+          persistSel();
+          ui.detailOpen = true;
+          ui.focus = r.node.id;
+          draw();
+        }
+        input.addEventListener('input', function () { ui.q = input.value; show(); });
+        input.addEventListener('focus', show);
+        input.addEventListener('blur', function () { setTimeout(function () { panel.hidden = true; }, 150); });
+        input.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') { input.value = ''; ui.q = ''; panel.hidden = true; }
+          if (e.key === 'Enter') { var res = results(); if (res.length) pick(res[0]); }
+        });
+        if (ui.q) setTimeout(show, 0);
+        return h('div', { class: 'tx-search-wrap' }, input, panel);
+      }
+
+      // Chip ของตัวกรองที่ใช้อยู่ (กด × เอาออก) + ล้างตัวกรอง
+      function chipsOf(tax) {
+        var items = [];
+        function add(key, kind, level) {
+          filters[key].forEach(function (id) {
+            var n = T.find(tax, kind, id);
+            items.push({ label: levelName(level) + ': ' + (n ? n.name : id), onRemove: function () { filters[key] = filters[key].filter(function (x) { return x !== id; }); persistFilters(); draw(); } });
+          });
+        }
+        if (useCat()) add('category', 'category', 'CATEGORY');
+        if (useSer()) add('series', 'series', 'SERIES');
+        if (filters.status !== 'active') items.push({ label: fill(page.chipStatus, { v: page.status[filters.status] }), onRemove: function () { filters.status = 'active'; persistFilters(); draw(); } });
+        if (filters.data !== 'all') items.push({ label: fill(page.chipData, { v: page.data[filters.data] }), onRemove: function () { filters.data = 'all'; persistFilters(); draw(); } });
+        return C.filterChips(items, clearFilters);
+      }
+
+      // =====================================================================
+      // มุมมองแบบคอลัมน์ (หมวดสินค้า 3 ระดับ | Series 2 ระดับ) + แผงรายละเอียด
+      // =====================================================================
+      function columnsView(tax, products) {
+        var kind = tabKind();
+        var levels = T.LEVELS[kind];
+        var ft = T.filterTree(tax, kind, filterArgs(), products, today);
+        // เส้นทางที่เลือก: ตัดรายการที่ไม่มีแล้ว ไม่แสดงตามตัวกรอง หรือไม่ต่อเนื่องออก
+        var path = [];
+        (sel[kind] || []).some(function (id, i) {
+          var n = T.find(tax, kind, id);
+          if (!n || !ft.show[id] || (n.parentId || null) !== (i ? path[i - 1] : null)) return true;
+          path.push(id);
+          return false;
+        });
+        sel[kind] = path;
+        var note = ft.cross ? crossNote(kind, tax) : null;
+        var wrap = h('div', { class: 'tx-browser tx-' + kind });
+        levels.forEach(function (level, i) { wrap.appendChild(column(kind, level, i, path, tax, products, ft, i === 0 ? note : null)); });
+        wrap.appendChild(detailPanel(kind, path[path.length - 1] || null, tax, products, ft));
+        return wrap;
+      }
+
+      function crossNote(kind, tax) {
+        var other = kind === 'category' ? 'series' : 'category';
+        var ids = other === 'series' ? filters.series.concat(filters.subSeries) : filters.category.concat(filters.subCategory);
+        var names = ids.map(function (id) { var n = T.find(tax, other, id); return n ? n.name : null; }).filter(Boolean);
+        return fill(page.crossNote, { dim: page.dims[other], names: names.join(', ') });
+      }
+
+      function select(kind, i, id, path) {
+        sel[kind] = path.slice(0, i).concat([id]);
+        persistSel();
+        ui.detailOpen = true;
+        ui.focus = id;
+        if (ui.rename && ui.rename.id !== id) ui.rename = null;
+        draw();
+      }
+
+      function column(kind, level, i, path, tax, products, ft, note) {
+        var levels = T.LEVELS[kind];
+        var parentId = i ? path[i - 1] || null : null;
+        var needParent = i > 0 && !parentId;
+        var items = needParent ? [] : T.children(tax, kind, parentId).filter(function (n) { return ft.show[n.id]; });
+        var hasNext = i < levels.length - 1;
+        var ul = h('ul', { class: 'tx-list', role: 'listbox', 'aria-label': levelName(level) });
+        items.forEach(function (n) { ul.appendChild(item(kind, n, i, path, tax, products, ft, hasNext, items)); });
+        var adding = editing && ui.adding && ui.adding.kind === kind && ui.adding.i === i;
+        if (adding) ul.appendChild(inputRow(kind, level, '', function (v) { return commitAdd(kind, level, i, parentId, path, v); }));
+        if (!items.length && !adding) {
+          ul.appendChild(h('li', { class: 'tx-empty' }, needParent ? fill(page.pickParent, { level: levelName(levels[i - 1]) })
+            : anyFilter() ? page.emptyFiltered : page.emptyColumn));
+        }
+        ul.addEventListener('keydown', function (e) { keyNav(e, kind, i, path, tax, ft, items); });
+        var foot = editing ? h('div', { class: 'tx-col-foot' }, h('button', {
+          type: 'button', class: 'btn btn-ghost btn-sm tx-add', dataset: { level: level }, disabled: needParent,
+          title: needParent ? fill(page.addDisabled, { level: levelName(levels[i - 1]) }) : null,
+          onClick: function () { ui.adding = { kind: kind, i: i }; ui.rename = null; ui.error = null; draw(); }
+        }, fill(page.add, { level: levelName(level) }))) : null;
+        return h('section', { class: 'tx-col', dataset: { level: level } },
+          h('div', { class: 'tx-col-head' },
+            h('span', { class: 'tx-col-title' }, fill(page.columnHead, { level: levelName(level), n: items.length })),
+            note ? h('span', { class: 'tx-col-note', title: note }, note) : null),
+          h('div', { class: 'tx-col-scroll' }, ul),
+          foot);
+      }
+
+      function warningsOf(kind, n, tax, count) {
+        var out = [];
+        var parent = n.parentId ? T.find(tax, kind, n.parentId) : null;
+        if (parent && T.norm(parent.name) === T.norm(n.name)) out.push(fill(page.warn.dupParent, { parent: parent.name }));
+        if (!count.total) out.push(page.warn.noSku);
+        if (kind === 'series' && T.seriesEnded(n, today)) out.push(fill(page.warn.expired, { date: SP.core.format.date(n.endDate) }));
+        if (n.level === 'TYPE' && !CAT.typePrefix(tax, n.id)) out.push(page.warn.noPrefix);
+        return out;
+      }
+
+      function item(kind, n, i, path, tax, products, ft, hasNext, siblings) {
+        if (editing && ui.rename && ui.rename.kind === kind && ui.rename.id === n.id) {
+          return inputRow(kind, n.level, n.name, function (v) { return commitRename(kind, n, v); });
+        }
+        var c = ft.count[n.id];
+        var kids = T.children(tax, kind, n.id).length;
+        var warns = warningsOf(kind, n, tax, c).filter(function (w) { return w.indexOf(page.warn.expired.split(' (')[0]) < 0; });
+        var here = path[i] === n.id;
+        var last = here && path.length === i + 1;
+        var li = h('li', {
+          class: 'tx-item' + (here ? (last ? ' is-selected' : ' is-path') : '') + (n.active === false ? ' is-inactive' : '') + (ft.match[n.id] ? '' : ' is-context'),
+          role: 'option', 'aria-selected': last ? 'true' : 'false', tabindex: here || (!path[i] && siblings[0] === n) ? '0' : '-1', dataset: { id: n.id },
+          title: editing ? page.renameTip : null, draggable: editing ? 'true' : null
+        },
+          editing ? h('span', { class: 'tx-drag', title: page.dragTip, 'aria-hidden': 'true' }, '⋮⋮') : null,
+          h('span', { class: 'tx-name' }, n.name),
+          nodeDirty(kind, n.id) ? h('span', { class: 'tx-dirty', title: page.dirtyTip, 'aria-label': page.dirtyTip }) : null,
+          warns.length ? h('span', { class: 'tx-warn', title: warns.join(' · '), 'aria-label': warns.join(' · ') }, '⚠') : null,
+          n.active === false ? h('span', { class: 'badge tag-muted tx-tag' }, page.inactiveTag) : null,
+          kind === 'series' && T.seriesEnded(n, today) ? h('span', { class: 'badge tag-warn tx-tag' }, page.endedTag) : null,
+          h('span', { class: 'tx-count', title: ft.cross ? fill(page.countTip, { x: c.filtered, y: c.total }) : fill(page.countTipAll, { n: c.total }) },
+            ft.cross ? c.filtered + ' / ' + c.total : String(c.total)),
+          hasNext ? h('span', { class: 'tx-chev', 'aria-hidden': 'true' }, kids ? '›' : '') : null);
+        li.addEventListener('click', function () { select(kind, i, n.id, path); });
+        if (editing) {
+          li.addEventListener('dblclick', function () { startRename(kind, n.id); });
+          // ลากจัดลำดับ: วางได้เฉพาะรายการที่มีรายการแม่เดียวกัน (core/taxonomy.reorderNode ไม่ยอมรับข้ามรายการแม่)
+          li.addEventListener('dragstart', function (e) { ui.drag = { kind: kind, id: n.id, parentId: n.parentId || null }; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', n.id); } catch (x) { /* ignore */ } });
+          li.addEventListener('dragend', function () { ui.drag = null; clearDrop(); });
+          li.addEventListener('dragover', function (e) {
+            var d = ui.drag;
+            if (!d || d.kind !== kind || d.id === n.id || d.parentId !== (n.parentId || null)) return;
+            e.preventDefault();
+            var r = li.getBoundingClientRect();
+            clearDrop();
+            li.classList.add(e.clientY > r.top + r.height / 2 ? 'drop-after' : 'drop-before');
+          });
+          li.addEventListener('dragleave', function () { li.classList.remove('drop-before', 'drop-after'); });
+          li.addEventListener('drop', function (e) {
+            var d = ui.drag;
+            if (!d) return;
+            e.preventDefault();
+            var after = li.classList.contains('drop-after');
+            var res = T.reorderNode(draft.tax, kind, d.id, n.id, after);
+            ui.drag = null;
+            if (res.ok) { draft.tax = res.taxonomy; ui.focus = d.id; }
+            draw();
+          });
+        }
+        return li;
+      }
+      function clearDrop() { Array.prototype.forEach.call(root.querySelectorAll('.drop-before, .drop-after'), function (x) { x.classList.remove('drop-before', 'drop-after'); }); }
+
+      // แถวช่องกรอก (เพิ่ม / เปลี่ยนชื่อ): Enter = บันทึก · Esc = ยกเลิก · ไม่มีชื่อตั้งต้น (Placeholder = ชื่อระดับ)
+      function inputRow(kind, level, value, commit) {
+        var input = h('input', { type: 'text', class: 'tx-input', value: value, placeholder: fill(page.placeholder, { level: levelName(level) }), 'aria-label': fill(page.placeholder, { level: levelName(level) }) });
+        function cancel() { ui.adding = null; ui.rename = null; ui.error = null; draw(); }
+        input.addEventListener('keydown', function (e) {
+          e.stopPropagation();
+          if (e.key === 'Enter') { e.preventDefault(); commit(input.value); }
+          else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+        });
+        input.addEventListener('blur', function () {
+          setTimeout(function () {
+            if (!input.isConnected) return;
+            if (!input.value.trim() || input.value.trim() === value) cancel();
+          }, 120);
+        });
+        return h('li', { class: 'tx-item is-input' }, h('span', { class: 'tx-input-wrap' }, input,
+          ui.error ? h('span', { class: 'tx-input-error', role: 'alert' }, ui.error) : null));
+      }
+      function startRename(kind, id) { if (!editing) return; ui.rename = { kind: kind, id: id }; ui.adding = null; ui.error = null; draw(); }
+      function commitRename(kind, n, v) {
+        if (v.trim() === n.name) { ui.rename = null; ui.error = null; draw(); return; }
+        var res = T.renameNode(draft.tax, kind, n.id, v);
+        if (!res.ok) { ui.error = page.nameErrors[res.error] || res.error; draw(); return; }
+        draft.tax = res.taxonomy;
+        ui.rename = null; ui.error = null; ui.focus = n.id;
+        draw();
+      }
+      function commitAdd(kind, level, i, parentId, path, v) {
+        var id = ID_PREFIX[level] + Date.now().toString(36);
+        var res = T.addNode(draft.tax, kind, parentId, v, id);
+        if (!res.ok) { ui.error = page.nameErrors[res.error] || res.error; draw(); return; }
+        draft.tax = res.taxonomy;
+        ui.adding = null; ui.error = null;
+        sel[kind] = path.slice(0, i).concat([id]);
+        persistSel();
+        ui.focus = id;
+        draw();
+      }
+
+      // คีย์บอร์ด: ↑↓ เลื่อนในคอลัมน์ · → เข้าคอลัมน์ย่อย · ← กลับคอลัมน์แม่ · F2 เปลี่ยนชื่อ (โหมดแก้ไข)
+      function keyNav(e, kind, i, path, tax, ft, items) {
+        var li = e.target.closest ? e.target.closest('.tx-item[data-id]') : null;
+        if (!li) return;
+        var id = li.dataset.id;
+        var idx = items.map(function (n) { return n.id; }).indexOf(id);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          var next = items[idx + (e.key === 'ArrowDown' ? 1 : -1)];
+          if (next) select(kind, i, next.id, path);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          var kids = T.children(tax, kind, id).filter(function (n) { return ft.show[n.id]; });
+          if (kids.length) select(kind, i + 1, kids[0].id, path.slice(0, i).concat([id]));
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (i > 0) { sel[kind] = path.slice(0, i); persistSel(); ui.focus = path[i - 1]; draw(); }
+        } else if (e.key === 'F2' && editing) {
+          e.preventDefault();
+          startRename(kind, id);
+        } else if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          select(kind, i, id, path);
+        }
+      }
+
+      // ---------- แผงรายละเอียด ----------
+      function detailPanel(kind, id, tax, products, ft) {
+        var D2 = page.detail;
+        var n = id ? T.find(tax, kind, id) : null;
+        var panel = h('aside', { class: 'tx-detail' + (ui.detailOpen && n ? ' is-open' : ''), 'aria-label': D2.label });
+        if (!n) { panel.appendChild(h('p', { class: 'tx-detail-empty' }, D2.empty)); return panel; }
+        var path = T.pathOf(tax, kind, id);
+        var c = ft.count[id] || T.countSkus(n, products, ft.cross);
+        var own = T.productsOf(n, products);
+        var list = ft.cross ? own.filter(function (p) { return T.matches(p, ft.cross); }) : own;
+        var max = SP.data.settings.TAXONOMY_SKU_LIST_MAX || 10;
+        var warns = warningsOf(kind, n, tax, c);
+        var kids = T.descendants(tax, kind, id);
+        var ended = kind === 'series' && T.seriesEnded(n, today);
+
+        panel.appendChild(h('button', { type: 'button', class: 'icon-btn tx-detail-close', title: D2.close, 'aria-label': D2.close, onClick: function () { ui.detailOpen = false; draw(); } }, '×'));
+        panel.appendChild(h('div', { class: 'tx-detail-head' },
+          h('h2', { class: 'tx-detail-name' }, n.name, nodeDirty(kind, id) ? h('span', { class: 'tx-dirty', title: page.dirtyTip }) : null),
+          h('p', { class: 'tx-detail-path' }, path.length > 1 ? fill(D2.pathIn, { level: levelName(n.level), path: path.slice(0, -1).map(function (a) { return a.name; }).join(' › ') }) : levelName(n.level)),
+          warns.length ? h('ul', { class: 'tx-detail-warn' }, warns.map(function (w) { return h('li', null, '⚠ ', w); })) : null));
+        if (n.level === 'TYPE') panel.appendChild(prefixBlock(n, tax, products));
+
+        // สถานะใช้งาน (โหมดแก้ไข = สวิตช์)
+        var statusText = n.active === false ? D2.inactive : D2.active;
+        panel.appendChild(h('div', { class: 'tx-detail-row' }, h('span', { class: 'field-label' }, D2.status),
+          editing ? h('label', { class: 'tx-switch', title: D2.switchTip },
+            h('input', { type: 'checkbox', role: 'switch', checked: n.active !== false, 'aria-label': D2.switchTip, onChange: function (e) { toggleActive(kind, n, e.target.checked); } }),
+            h('span', { class: 'tx-switch-track', 'aria-hidden': 'true' }), h('span', null, statusText))
+            : h('span', { class: 'badge ' + (n.active === false ? 'tag-muted' : 'tag-ok') }, statusText),
+          ended ? h('span', { class: 'badge tag-warn' }, page.endedTag) : null));
+
+        // วันเริ่ม / วันสิ้นสุดของ Series (ไม่บังคับ)
+        if (n.level === 'SERIES') panel.appendChild(periodBlock(n));
+
+        // SKU
+        var skuBox = h('div', { class: 'tx-detail-skus' },
+          h('div', { class: 'tx-detail-row' }, h('strong', null, fill(D2.skuCount, { n: c.total })),
+            ft.cross ? h('span', { class: 'tx-detail-sub' }, fill(D2.skuFiltered, { n: c.filtered })) : null));
+        if (list.length) {
+          skuBox.appendChild(h('ul', { class: 'tx-sku-list' }, list.slice(0, max).map(function (p) {
+            return h('li', null, h('span', { class: 'tx-sku-name', title: p.name }, calc.displayName(p)), h('span', { class: 'tx-sku-code' }, calc.productKey(p)));
+          })));
+          if (list.length > max) skuBox.appendChild(h('p', { class: 'tx-detail-sub' }, fill(D2.skuMore, { n: list.length - max })));
+          skuBox.appendChild(h('button', {
+            type: 'button', class: 'link-btn tx-open-products',
+            onClick: function () {
+              openProducts(kind === 'category'
+                ? { node: n.id, level: n.level, series: ft.cross ? filters.series.concat(filters.subSeries) : null }
+                : { series: [n.id], node: ft.cross ? crossNodeOf(tax) : null, level: ft.cross ? crossLevelOf(tax) : null });
+            }
+          }, D2.openProducts));
+        } else {
+          skuBox.appendChild(h('p', { class: 'tx-detail-sub' }, D2.noSku));
+        }
+        panel.appendChild(skuBox);
+
+        if (editing) panel.appendChild(actionsBlock(kind, n, tax, products, own, kids));
+        return panel;
+      }
+      // ตัวกรองหมวดสินค้าที่ส่งต่อไปหน้ารายการสินค้า (แท็บ Series + กรองหมวดสินค้า 1 รายการ)
+      function crossNodeOf(tax) {
+        var ids = filters.subCategory.length ? filters.subCategory : filters.category;
+        return ids.length === 1 ? ids[0] : null;
+      }
+      function crossLevelOf(tax) {
+        var id = crossNodeOf(tax);
+        var n = id ? T.find(tax, 'category', id) : null;
+        return n ? n.level : null;
+      }
+
+      function prefixBlock(n, tax, products) {
+        var D2 = page.detail;
+        var pre = CAT.typePrefix(tax, n.id);
+        var next = CAT.nextCode(products, tax, n.id, store.get('master.codeCounters'));
+        var nextText = next.ok ? fill(D2.nextCode, { code: next.code }) : D2.nextCodeErrors[next.error] || '';
+        var body;
+        if (editing) {
+          var err = h('span', { class: 'tx-prefix-error', role: 'alert' });
+          var input = h('input', { type: 'text', class: 'tx-prefix-input', inputmode: 'numeric', maxlength: '2', value: pre || '', 'aria-label': D2.prefix, placeholder: D2.prefixPlaceholder });
+          input.addEventListener('change', function () {
+            var v = input.value.trim();
+            var e = CAT.prefixError(draft.tax, n.id, v);
+            if (e) { err.textContent = D2.prefixErrors[e]; input.classList.add('is-invalid'); return; }
+            var node = T.find(draft.tax, 'category', n.id);
+            if (v) node.codePrefix = v; else delete node.codePrefix;
+            draw();
+          });
+          body = h('span', { class: 'tx-prefix-edit' }, input, err);
+        } else {
+          body = h('span', { class: 'tx-prefix-value' + (pre ? '' : ' muted') }, pre || D2.noPrefix);
+        }
+        return h('div', { class: 'tx-detail-row tx-detail-prefix' }, h('span', { class: 'field-label', title: D2.prefixTip }, D2.prefix), body,
+          h('span', { class: 'tx-detail-sub tx-next-code' }, nextText));
+      }
+
+      function periodBlock(n) {
+        var D2 = page.detail;
+        function field(key, label) {
+          var v = n[key] || '';
+          return h('label', { class: 'tx-date' }, h('span', { class: 'field-label' }, label),
+            editing ? h('input', {
+              type: 'date', class: 'tx-date-input', value: v, 'aria-label': label,
+              onChange: function (e) { var node = T.find(draft.tax, 'series', n.id); node[key] = e.target.value || null; draw(); }
+            }) : h('span', { class: 'tx-date-value' }, v ? SP.core.format.date(v) : D2.noDate));
+        }
+        return h('div', { class: 'tx-detail-period' }, h('span', { class: 'field-label' }, D2.period),
+          h('div', { class: 'tx-date-row' }, field('startDate', D2.start), field('endDate', D2.end)),
+          editing ? h('span', { class: 'tx-detail-sub' }, D2.periodNote) : null);
+      }
+
+      function toggleActive(kind, n, on) {
+        var kids = T.descendants(draft.tax, kind, n.id).filter(function (d) { return d.active !== false; });
+        if (on || !kids.length) { draft.tax = T.setActive(draft.tax, kind, n.id, on, false); draw(); return; }
+        var Dg = page.dialogs.deactivate;
+        C.choiceDialog({
+          title: fill(Dg.title, { name: n.name }), lines: [fill(Dg.lines[0], { n: kids.length })],
+          choices: [{ value: 'only', label: Dg.only }, { value: 'all', label: Dg.all, primary: true }]
+        }).then(function (v) {
+          if (v) draft.tax = T.setActive(draft.tax, kind, n.id, false, v === 'all');
+          draw();
+        });
+      }
+
+      // ---------- การดำเนินการ (โหมดแก้ไข) ----------
+      function actionsBlock(kind, n, tax, products, own, kids) {
+        var A = page.actions, AT = page.actionTips;
+        var levels = T.LEVELS[kind];
+        var li = levels.indexOf(n.level);
+        function btn(label, cls, disabledTip, onClick, danger) {
+          return h('button', { type: 'button', class: 'btn btn-sm ' + (danger ? 'btn-danger' : 'btn-secondary') + ' ' + cls, disabled: !!disabledTip, title: disabledTip || null, onClick: onClick }, label);
+        }
+        var sameLevel = T.LEVELS[kind] && cur().tax[kind].filter(function (x) { return x.level === n.level && x.id !== n.id && x.active !== false; });
+        var parents = li > 0 ? cur().tax[kind].filter(function (x) { return x.level === levels[li - 1] && x.id !== n.parentId; }) : [];
+        var directKids = T.children(tax, kind, n.id).length;
+        var removeTip = own.length ? fill(AT.removeHasSku, { n: own.length }) : directKids ? fill(AT.removeHasChildren, { n: directKids }) : null;
+        return h('div', { class: 'tx-actions' },
+          btn(A.rename, 'tx-act-rename', null, function () { startRename(kind, n.id); }),
+          btn(A.move, 'tx-act-move', li === 0 ? AT.moveTop : !parents.length ? AT.noTargets : null, function () { moveDialog(kind, n, parents); }),
+          btn(A.moveSkus, 'tx-act-skus', !own.length ? AT.noSkus : !sameLevel.length ? AT.noTargets : null, function () { moveSkusDialog(kind, n, own, sameLevel); }),
+          btn(A.merge, 'tx-act-merge', !sameLevel.length ? AT.noTargets : null, function () { mergeDialog(kind, n, own, sameLevel); }),
+          btn(A.remove, 'tx-act-remove', removeTip, function () { removeNode(kind, n); }, true));
+      }
+
+      function pathText(kind, id) { return T.pathOf(cur().tax, kind, id).map(function (a) { return a.name; }).join(' › '); }
+      function targetSelect(kind, list, value, onChange, disabledOf) {
+        return C.select({
+          label: page.dialogs.target, value: value, className: 'tx-target',
+          options: list.map(function (x) {
+            var dis = disabledOf ? disabledOf(x) : false;
+            return { value: x.id, label: dis ? fill(page.dialogs.dupTarget, { path: pathText(kind, x.id), name: dis }) : pathText(kind, x.id), disabled: !!dis };
+          }),
+          onChange: onChange
+        });
+      }
+      // ระดับย่อยของ SKU ที่ย้ายจะว่างเมื่อปลายทางมีรายการย่อยที่ใช้งานอยู่ไม่เท่ากับ 1 (core/taxonomy.moveSkus)
+      function unassignedNote(kind, targetId) {
+        var t = T.find(cur().tax, kind, targetId);
+        var levels = T.LEVELS[kind];
+        var next = levels[levels.indexOf(t.level) + 1];
+        if (!next) return null;
+        return T.children(cur().tax, kind, t.id, true).length === 1 ? null : fill(page.dialogs.unassigned, { level: levelName(next) });
+      }
+
+      function moveDialog(kind, n, parents) {
+        var Dg = page.dialogs.move;
+        var ok = parents.filter(function (p) { return T.validateName(n.name, T.children(cur().tax, kind, p.id)).ok; });
+        var target = ok.length ? ok[0].id : null;
+        var body = h('label', { class: 'tx-dlg-field' }, h('span', { class: 'field-label' }, page.dialogs.target),
+          targetSelect(kind, parents, target, function (v) { target = v; }, function (p) { return T.validateName(n.name, T.children(cur().tax, kind, p.id)).ok ? false : n.name; }));
+        var skuCount = T.productsOf(n, draft.products).length;
+        C.dialog({ title: fill(Dg.title, { name: n.name }), lines: [Dg.lines[0], fill(Dg.lines[1], { n: skuCount })], body: body, confirmLabel: Dg.confirm })
+          .then(function (r) {
+            if (!r.ok || !target) return;
+            var res = T.moveNode(draft.tax, kind, n.id, target, draft.products);
+            if (!res.ok) { alertError(res.error, n.name); return; }
+            draft.tax = res.taxonomy;
+            draft.products = res.products;
+            sel[kind] = T.pathOf(draft.tax, kind, n.id).map(function (a) { return a.id; });
+            persistSel();
+            ui.focus = n.id;
+            draw();
+          });
+      }
+
+      function moveSkusDialog(kind, n, own, targets) {
+        var Dg = page.dialogs.moveSkus;
+        var target = targets[0].id;
+        var picked = {};
+        own.forEach(function (p) { picked[calc.productKey(p)] = true; });
+        var summary = h('p', { class: 'tx-dlg-summary' });
+        var note = h('p', { class: 'tx-dlg-note' });
+        function refresh() {
+          var n2 = Object.keys(picked).filter(function (k) { return picked[k]; }).length;
+          summary.textContent = n2 ? fill(Dg.summary, { n: n2 }) : Dg.none;
+          var u = unassignedNote(kind, target);
+          note.textContent = u || '';
+          note.hidden = !u;
+        }
+        var all = h('input', { type: 'checkbox', checked: true, onChange: function (e) {
+          own.forEach(function (p) { picked[calc.productKey(p)] = e.target.checked; });
+          Array.prototype.forEach.call(listEl.querySelectorAll('input'), function (b) { b.checked = e.target.checked; });
+          refresh();
+        } });
+        var listEl = h('ul', { class: 'tx-dlg-skus' }, own.map(function (p) {
+          var key = calc.productKey(p);
+          return h('li', null, h('label', null, h('input', { type: 'checkbox', checked: true, onChange: function (e) { picked[key] = e.target.checked; refresh(); } }),
+            h('span', { class: 'tx-sku-name' }, calc.displayName(p)), h('span', { class: 'tx-sku-code' }, key)));
+        }));
+        var body = h('div', { class: 'tx-dlg' },
+          h('label', { class: 'tx-dlg-field' }, h('span', { class: 'field-label' }, page.dialogs.target), targetSelect(kind, targets, target, function (v) { target = v; refresh(); })),
+          h('div', { class: 'tx-dlg-pick' }, h('span', { class: 'field-label' }, Dg.pick), h('label', { class: 'tx-dlg-all' }, all, Dg.all)),
+          listEl, summary, note);
+        refresh();
+        C.dialog({ title: fill(Dg.title, { name: n.name }), body: body, confirmLabel: Dg.confirm, wide: true })
+          .then(function (r) {
+            if (!r.ok) return;
+            var keys = Object.keys(picked).filter(function (k) { return picked[k]; });
+            if (!keys.length) return;
+            var res = T.moveSkus(draft.products, n.id, target, keys, draft.tax);
+            if (!res.ok) { alertError(res.error, n.name); return; }
+            draft.products = res.products;
+            draw();
+          });
+      }
+
+      function mergeDialog(kind, n, own, targets) {
+        var Dg = page.dialogs.merge;
+        var target = targets[0].id;
+        var note = h('p', { class: 'tx-dlg-note' });
+        function refresh() { var u = unassignedNote(kind, target); note.textContent = u || ''; note.hidden = !u; }
+        var body = h('div', { class: 'tx-dlg' }, h('label', { class: 'tx-dlg-field' }, h('span', { class: 'field-label' }, page.dialogs.target),
+          targetSelect(kind, targets, target, function (v) { target = v; refresh(); })), note);
+        refresh();
+        C.dialog({ title: fill(Dg.title, { name: n.name }), lines: [fill(Dg.lines[0], { n: own.length }), fill(Dg.lines[1], { name: n.name })], body: body, confirmLabel: Dg.confirm })
+          .then(function (r) {
+            if (!r.ok) return;
+            var res = T.mergeNodes(draft.tax, draft.products, n.id, target);
+            if (!res.ok) { alertError(res.error, n.name); return; }
+            draft.tax = res.taxonomy;
+            draft.products = res.products;
+            sel[kind] = T.pathOf(draft.tax, kind, target).map(function (a) { return a.id; });
+            persistSel();
+            ui.focus = target;
+            draw();
+          });
+      }
+
+      function removeNode(kind, n) {
+        var Dg = page.dialogs.remove;
+        if (!T.canDelete(n, draft.products, draft.tax)) return;
+        C.dialog({ title: fill(Dg.title, { name: n.name }), lines: Dg.lines, confirmLabel: Dg.confirm, danger: true }).then(function (r) {
+          if (!r.ok) return;
+          draft.tax = clone(draft.tax);
+          draft.tax[kind] = draft.tax[kind].filter(function (x) { return x.id !== n.id; });
+          sel[kind] = (sel[kind] || []).filter(function (x) { return x !== n.id; });
+          persistSel();
+          draw();
+        });
+      }
+
+      function alertError(code, name) {
+        var E = page.dialogs.errors;
+        C.dialog({ title: fill(E[code] || code, { name: name }), confirmLabel: L.dialog.close });
+      }
+
+      // =====================================================================
+      // ตารางไขว้ Series × หมวดสินค้า (อ่านอย่างเดียว) — กางเป็น Sub Series / Sub Category ได้ / กดช่อง = รายการสินค้าที่กรองแล้ว
+      // =====================================================================
+      function crossView(tax, products) {
+        var Q = page.cross;
+        var args = filterArgs();
+        var fc = T.filterTree(tax, 'category', args, products, today);
+        var fs = T.filterTree(tax, 'series', args, products, today);
+        var catX = T.crossFilterOf(tax, 'category', filters.category.concat(filters.subCategory));
+        var serX = T.crossFilterOf(tax, 'series', filters.series.concat(filters.subSeries));
+        var prods = products.filter(function (p) {
+          return T.matches(p, catX) && T.matches(p, serX) && fc.show[p.categoryId] && fs.show[p.seriesId];
+        });
+        var tabs = {};
+        function tab(rowDim, colDim) { var k = rowDim + '|' + colDim; return tabs[k] || (tabs[k] = T.crossTab(prods, rowDim, colDim, tax)); }
+        var cols = [];
+        T.children(tax, 'category', null).filter(function (n) { return fc.show[n.id]; }).forEach(function (c) {
+          var subs = T.children(tax, 'category', c.id).filter(function (n) { return fc.show[n.id]; });
+          cols.push({ node: c, dim: 'category', subs: subs.length });
+          if (ui.open.cols[c.id]) subs.forEach(function (s) { cols.push({ node: s, dim: 'subCategory', parentId: c.id }); });
+        });
+        var rows = [];
+        T.children(tax, 'series', null).filter(function (n) { return fs.show[n.id]; }).forEach(function (s) {
+          var subs = T.children(tax, 'series', s.id).filter(function (n) { return fs.show[n.id]; });
+          rows.push({ node: s, dim: 'series', subs: subs.length });
+          if (ui.open.rows[s.id]) subs.forEach(function (x) { rows.push({ node: x, dim: 'subSeries', parentId: s.id }); });
+        });
+        function cell(r, c) { var t = tab(r.dim, c.dim); var row = byId(t.rows, r.node.id); return row ? row.cells[c.node.id] || 0 : 0; }
+        var max = 0;
+        rows.forEach(function (r) { cols.forEach(function (c) { max = Math.max(max, cell(r, c)); }); });
+        function toggle(kind2, id) { ui.open[kind2][id] = !ui.open[kind2][id]; draw(); }
+        function head(label, item2, kind2) {
+          var open = ui.open[kind2][item2.node.id];
+          return item2.subs ? h('button', {
+            type: 'button', class: 'tx-x-toggle', 'aria-expanded': open ? 'true' : 'false', title: fill(open ? Q.collapse : Q.expand, { name: item2.node.name }),
+            onClick: function () { toggle(kind2, item2.node.id); }
+          }, (open ? '▾ ' : '▸ ') + label) : h('span', null, label);
+        }
+        var base = tab('series', 'category');
+        var thead = h('thead', null, h('tr', null,
+          h('th', { scope: 'col', class: 'tx-x-corner' }, Q.corner),
+          cols.map(function (c) {
+            return h('th', { scope: 'col', class: 'num tx-x-col' + (c.dim === 'subCategory' ? ' is-sub' : '') }, c.dim === 'subCategory' ? c.node.name : head(c.node.name, c, 'cols'));
+          }),
+          h('th', { scope: 'col', class: 'num tx-x-total' }, Q.total)));
+        var tbody = h('tbody', null, rows.map(function (r) {
+          var rowTotal = (byId(tab(r.dim, 'category').rows, r.node.id) || {}).total || 0;
+          return h('tr', { class: r.dim === 'subSeries' ? 'is-sub' : null },
+            h('th', { scope: 'row', class: 'tx-x-row' }, r.dim === 'subSeries' ? r.node.name : head(r.node.name, r, 'rows')),
+            cols.map(function (c) {
+              var n = cell(r, c);
+              if (!n) return h('td', { class: 'num tx-x-cell is-zero' });
+              // ความเข้มสีตามจำนวน (สีเดียว) ส่งเป็นร้อยละของสีหลัก 8–60% ให้ CSS ผสมกับพื้น
+              var k = max ? n / max : 0;
+              return h('td', { class: 'num tx-x-cell' + (c.dim === 'subCategory' ? ' is-sub' : '') + (k >= 0.6 ? ' is-strong' : ''), style: { '--k': Math.round(8 + k * 52) + '%' } },
+                h('button', {
+                  type: 'button', class: 'tx-x-btn', title: fill(Q.cellTip, { row: r.node.name, col: c.node.name, n: n }),
+                  onClick: function () { openProducts({ node: c.node.id, level: c.node.level, series: [r.node.id] }); }
+                }, String(n)));
+            }),
+            h('td', { class: 'num tx-x-total' }, rowTotal ? String(rowTotal) : ''));
+        }));
+        var tfoot = h('tfoot', null, h('tr', null,
+          h('th', { scope: 'row', class: 'tx-x-row' }, Q.total),
+          cols.map(function (c) { var col = byId(tab('series', c.dim).cols, c.node.id); return h('td', { class: 'num tx-x-total' }, col && col.total ? String(col.total) : ''); }),
+          h('td', { class: 'num tx-x-total tx-x-grand' }, String(base.total))));
+        return h('div', { class: 'tx-cross' },
+          h('p', { class: 'tx-cross-note' }, Q.note),
+          rows.length && cols.length ? h('div', { class: 'fit-scroll tx-cross-scroll' }, h('table', { class: 'data-grid tx-x-table' }, thead, tbody, tfoot))
+            : h('p', { class: 'tx-detail-empty' }, Q.empty));
+      }
+
+      draw();
+    }
+
+    return render;
+  })();
+
+  // ---------- หน้า Product List: แท็บ สินค้า | Product Level ----------
+  var TABS = ['items', 'level'];
+  function render(root, ctx) {
+    var Perm = SP.core.permissions;
+    var page = ctx.page;
+    var PG = SP.data.content.pages;
+    var canLevel = Perm.level(Perm.user(), 'taxonomy') !== 'NONE';
+    var tabs = canLevel ? TABS : ['items'];
+    var hash = (location.hash || '').replace('#', '');
+    var tab = tabs.indexOf(hash) >= 0 ? hash : (tabs.indexOf(store.get('ui.productListTab')) >= 0 ? store.get('ui.productListTab') : 'items');
+    var introSlot = h('span', { class: 'pl-intro' });   // ปุ่มแก้ไข · ส่งออกของแท็บ (workflowBar ของแต่ละแท็บ)
+    if (ctx.intro) ctx.intro.appendChild(introSlot);
+    var tabSlot = h('div', { class: 'tool-row pl-page-tabs no-print' });
+    var body = h('div', { class: 'pl-body' });
+    root.appendChild(tabSlot);
+    root.appendChild(body);
+    var helpAdded = {};
+    function subCtx(t) {
+      return {
+        entry: ctx.entry, page: t === 'level' ? PG.taxonomy : page, content: ctx.content, year: ctx.year, intro: introSlot, refreshMenu: ctx.refreshMenu,
+        addHelp: function (label, build) { if (helpAdded[label] || !ctx.addHelp) return; helpAdded[label] = true; ctx.addHelp(label, build); },
+        // ป้าย ระบบกำหนด ใน Drawer → แท็บ Product Level ที่เลือก Type ของสินค้านั้น
+        openLevel: canLevel ? function (p) {
+          var tx = store.get('master.taxonomy');
+          var id = p.typeId || p.subCategoryId || p.categoryId;
+          var s = store.get('ui.taxonomySelection') || {};
+          store.set('ui.taxonomySelection', { tab: 'category', category: SP.core.taxonomy.pathOf(tx, 'category', id).map(function (n) { return n.id; }), series: (s.series || []).slice() });
+          show('level', true);
+        } : null,
+        openProducts: function () { show('items', true); }
+      };
+    }
+    function clearTab() {
+      C.clear(body);
+      C.clear(introSlot);
+      // Drawer / Popover ของแท็บเดิม (ต่อท้าย body ของเอกสาร) นำออกก่อนวาดแท็บใหม่
+      Array.prototype.forEach.call(document.querySelectorAll('aside.drawer, .drawer-backdrop, .popover'), function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
+    }
+    function drawTabs() {
+      C.clear(tabSlot);
+      if (tabs.length < 2) return;
+      tabSlot.appendChild(C.segmented({ label: page.pageTabLabel, value: tab, className: 'pl-page-seg',
+        options: tabs.map(function (t) { return { value: t, label: page.pageTabs[t] }; }), onChange: function (v) { show(v); } }));
+    }
+    function show(t, force) {
+      if (t === tab && !force) return;
+      if (!C.confirmDiscard(C.unsavedCount())) { drawTabs(); return; }
+      tab = t;
+      store.set('ui.productListTab', t);
+      if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + t);
+      paint();
+    }
+    function paint() {
+      clearTab();
+      drawTabs();
+      document.title = page.title + (tab === 'level' ? ' · ' + page.pageTabs.level : '') + ' · ' + SP.data.content.site.name;
+      (tab === 'level' ? renderLevel : renderItems)(body, subCtx(tab));
+    }
+    paint();
   }
 
   SP.modules.productList = { render: render };

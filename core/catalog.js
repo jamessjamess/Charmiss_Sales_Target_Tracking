@@ -118,7 +118,60 @@
   }
 
   // ---------------------------------------------------------------------
+  // CR-35: คำขอ NPD จาก Sales — ID ภายใน REQ-nnn + ลำดับคำขอ (codeCounters.request · ไม่ใช้ซ้ำ ไม่รีเซ็ต) · รหัสชั่วคราวที่แสดง = calc.requestCodeOf
+  //   confirmRequest(master, key, input { name, typeId }, meta) = ทีม Product ยืนยัน (Request → Planned): Product Code 5 หลักจาก nextCode ·
+  //   tempCode = รหัสชั่วคราวตอนยืนยัน · Key (id) คงเดิม แผน SKU / Listing / ราคาจึงอยู่ครบ → { ok, master, code, tempCode, error: 'notRequest' | 'name' | 'type' | 'prefix' | 'full' }
+  // ---------------------------------------------------------------------
+  function requestId(seq) { var s = String(seq); while (s.length < 3) s = '0' + s; return 'REQ-' + s; }
+  function nextRequestSeq(products, counters) {
+    var max = Number((counters || {}).request || 0);
+    (products || []).forEach(function (p) { if (p.requestSeq > max) max = Number(p.requestSeq); });
+    return max + 1;
+  }
+  function takeRequestSeq(counters, seq) { var out = copy(counters || {}); out.request = Math.max(Number(out.request || 0), Number(seq)); return out; }
+  function previewConfirmCode(master, typeId) { return nextCode(master.products, master.taxonomy, typeId, master.codeCounters); }
+  function confirmRequest(master, key, input, meta) {
+    meta = meta || {};
+    input = input || {};
+    var p = calc.findProduct(master.products, key);
+    if (!calc.isRequestProduct(p)) return { ok: false, error: 'notRequest', master: master };
+    var name = String(input.name == null ? p.name : input.name).trim();
+    if (!name) return { ok: false, error: 'name', master: master };
+    var typeId = input.typeId || p.typeId;
+    var coded = nextCode(master.products, master.taxonomy, typeId, master.codeCounters);
+    if (!coded.ok) return { ok: false, error: coded.error, master: master };
+    var out = copy(master);
+    var temp = calc.requestCodeOf(p);
+    var chain = SP.core.taxonomy && SP.core.taxonomy.find ? SP.core.taxonomy.find(master.taxonomy, 'category', typeId) : null;
+    out.products = out.products.map(function (x) {
+      if (calc.productKey(x) !== key) return x;
+      x.trCode = coded.code;
+      x.tempCode = temp;
+      x.name = name;
+      if (typeId !== x.typeId) {
+        x.typeId = typeId;
+        var sub = chain && chain.parentId ? SP.core.taxonomy.find(master.taxonomy, 'category', chain.parentId) : null;
+        if (sub) { x.subCategoryId = sub.id; x.categoryId = sub.parentId || x.categoryId; }
+        x.inferred = false;
+      }
+      x.confirmedAt = meta.at || '';
+      x.confirmedBy = meta.by || '';
+      x.updatedAt = meta.at || x.updatedAt;
+      return x;
+    });
+    out.npdPlans = (out.npdPlans || []).map(function (n) {
+      if (n.productKey !== key) return n;
+      n.confirmedAt = meta.at || '';
+      n.confirmedBy = meta.by || '';
+      return n;
+    });
+    out.codeCounters = takeCode(master.codeCounters, coded.code);
+    return { ok: true, master: out, code: coded.code, tempCode: temp, error: null };
+  }
+
+  // ---------------------------------------------------------------------
   // แปลงรหัสชั่วคราวของข้อมูลตั้งต้นเป็นรหัสระบบ (ครั้งเดียวตอนโหลด · core/seed.js)
+  //   CR-35: คำขอ NPD จาก Sales (source SALES_REQUEST) ไม่ออก Product Code — ได้ ID ภายใน REQ-nnn + requestSeq ตามลำดับในไฟล์ (ย้ายการอ้างอิงเหมือนกัน)
   //   data = { products, listings, basePrices, promoPrices, npdPlans, taxonomy, actuals, planSeeds }
   //   ย้ายการอ้างอิงด้วย calc.bindTrCode (สินค้า Listing ราคา แผน NPD) + ยอดขายจริงและค่าตั้งต้นแผน SKU ราย productKey
   //   → { data (ชุดใหม่), map: { <รหัสเดิม>: <รหัสใหม่> }, counters }
@@ -130,7 +183,17 @@
       promoPrices: copy(out.promoPrices || []), npdPlans: copy(out.npdPlans || []) };
     var counters = initialCounters(master.products);
     var map = {};
-    master.products.filter(function (p) { return !p.trCode && p.tempCode; }).map(function (p) { return p.tempCode; }).forEach(function (temp) {
+    master.products.filter(function (p) { return !p.trCode && p.tempCode && p.source === 'SALES_REQUEST'; }).forEach(function (p) {
+      var temp = p.tempCode;
+      var seq = nextRequestSeq(master.products, counters);
+      var id = requestId(seq);
+      p.id = id;
+      p.requestSeq = seq;
+      counters = takeRequestSeq(counters, seq);
+      ['listings', 'basePrices', 'promoPrices', 'npdPlans'].forEach(function (k) { (master[k] || []).forEach(function (r) { if (r.productKey === temp) r.productKey = id; }); });
+      map[temp] = id;
+    });
+    master.products.filter(function (p) { return !p.trCode && p.tempCode && p.source !== 'SALES_REQUEST'; }).map(function (p) { return p.tempCode; }).forEach(function (temp) {
       var p = master.products.filter(function (x) { return x.tempCode === temp; })[0];
       var res = nextCode(master.products, out.taxonomy, p.typeId, counters);
       if (!res.ok) return;
@@ -140,7 +203,7 @@
       counters = takeCode(counters, res.code);
       map[temp] = res.code;
     });
-    master.products.forEach(function (p) { delete p.tempCode; delete p.tempCodeHistory; });
+    master.products.forEach(function (p) { delete p.tempCode; delete p.tempCodeHistory; delete p.trCodeHold; });
     function rekeyUnits(byUnit) {
       if (!byUnit) return byUnit;
       var o = copy(byUnit);
@@ -163,7 +226,8 @@
   // ใน TRCLOUD
   // ---------------------------------------------------------------------
 
-  function inTrcloud(p) { return !!(p && p.inTrcloud !== false); }
+  // CR-35: ยังไม่เปิดใน TRCLOUD = คำขอ NPD (Status Request · ยังไม่มี Product Code 5 หลัก) · มี Product Code แล้ว = เลขเดียวกับ TRCLOUD
+  function inTrcloud(p) { return !!p && !calc.isRequestProduct(p); }
 
   // สถานะ ใน TRCLOUD ที่ต่างจากผลเปรียบเทียบ (มีรหัสใน ERP = เปิดแล้ว) → [{ key, from, to }]
   function trcloudChanges(products, erp) {
@@ -315,6 +379,7 @@
   }
 
   SP.core.catalog = {
+    requestId: requestId, nextRequestSeq: nextRequestSeq, takeRequestSeq: takeRequestSeq, previewConfirmCode: previewConfirmCode, confirmRequest: confirmRequest,
     prefixOf: prefixOf,
     typePrefixDefaults: typePrefixDefaults,
     applyPrefixDefaults: applyPrefixDefaults,

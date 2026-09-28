@@ -1,4 +1,24 @@
-# หมวดสินค้าและ Series (`modules/taxonomy`, id `taxonomy`)
+# Product List · แท็บ Product Level (เดิมหน้า Category & Series `modules/taxonomy`, id `taxonomy`)
+
+CR-36 ย้ายเป็นแท็บ `Product Level` ของ [products.md](products.md) (โค้ดเดิมทั้งหมด · `renderLevel` ใน `modules/products/products.js`) · เมนู Product Master เหลือ 3 หน้า ·
+หน้าเดิม `modules/taxonomy` = ทางผ่าน (`location.replace` → `products/index.html#level` · registry `visible: false` · `perm: 'productList'`) ·
+สิทธิ์ = ส่วนของหน้า Product List key เดิม `taxonomy` (ค่าเดิมคงไว้ · workflowBar ของแท็บ `modules: ['taxonomy']`) · กดจำนวนสินค้า = แท็บสินค้าที่กรองแล้ว (`ui.productFilterHandoff` เดิม)
+
+## CR-36 ตารางเทียบฟีเจอร์ (ไม่มีอะไรหาย)
+
+| หน้า Category & Series เดิม | ในแท็บ Product Level |
+|---|---|
+| แท็บ หมวดสินค้า · Series · ตารางไขว้ (`ui.taxonomySelection`) | เหมือนเดิม (แท็บย่อยในแท็บ Product Level) |
+| มุมมองคอลัมน์ Category · Sub Category · Type / Series · Sub Series + แผงรายละเอียด · คีย์บอร์ด | เหมือนเดิม |
+| ⚠ ชื่อซ้ำ · ไม่มี SKU · Type ไม่มีเลขนำหน้า | เหมือนเดิม |
+| เลขนำหน้า Product Code ของ Type + รหัสถัดไป | เหมือนเดิม |
+| โหมดแก้ไข: เพิ่ม · เปลี่ยนชื่อ · ลากจัดลำดับ · ย้ายไปอยู่ใต้ · ย้าย SKU · รวม · ปิด / เปิด · ลบ | เหมือนเดิม (สิทธิ์ `taxonomy`) |
+| ตัวกรองแถวเดียว (ค้นหา · Series / หมวดสินค้า · สถานะ · ข้อมูลที่ต้องตรวจ · Chip) | เหมือนเดิม |
+| ตารางไขว้ → คลิกช่องเปิดรายการสินค้าที่กรองแล้ว | เปิดแท็บสินค้าในหน้าเดียวกัน (`ctx.openProducts`) |
+| บันทึก `master.taxonomy` + `master.products` + Audit | เหมือนเดิม |
+| ปุ่ม `?` ของหน้า | ขั้นตอนของ Product Level อยู่ในปุ่ม `?` ของ Product List |
+| เมนู `C` Category & Series · Route เดิม | ตัดเมนู · Route เดิมพาไปแท็บ Product Level |
+| — (ใหม่) | ป้าย `ระบบกำหนด` ใน Drawer สินค้า → แท็บนี้ที่เลือก Type ของสินค้านั้น |
 
 Product Master · fit · ผู้แก้ไขตั้งต้น: ทีม Product · กฎทั้งหมดอยู่ใน `core/taxonomy.js`
 

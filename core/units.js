@@ -27,19 +27,21 @@
  *          moveCustomers(d, ids, toUnitId | null, fromMonth, opts) — กลไกช่วงเดือนเดียวกับร้านค้า TT (stores.moveStores) ทุก Channel
  *            → { ok, storeAssignments, customerAssignments, moved, move (ร้าน TT → storeMoves) } | { ok: false, error: 'past' | 'range' | 'channel' | 'unit' }
  *          checks(d, month) → { groups: [{ key, items: [{ kind: 'customer' | 'unit', id, channelId, unitId, suggested }] }], total, byChannel }
- *            เกณฑ์ (ประเมิน ณ เดือนที่เลือก · Channel ที่ใช้งาน): unassigned · noOwner (calc.ownerGaps) · prefix · noProvince · duplicate (เกณฑ์เดิมของเขต
+ *            เกณฑ์ (ประเมิน ณ เดือนที่เลือก · Channel ที่ใช้งาน): unassigned · noOwner (calc.ownerGaps) · prefix · noProvince (CR-35 ตัด duplicate · เกณฑ์เดิมของเขต
  *            master.territoryChecks) · noCustomers
  *          customerChanges(before, after) → [customerId ที่ช่วงเปลี่ยน] · auditCustomerAssignments(before, after, meta)
  *   รอบ 3: personChecks(d, from, to) → ข้อมูลที่ต้องตรวจของ Sales Person Management (ช่วง from – to = เดือนปัจจุบัน – สุดแผน · ทั้ง 2 แท็บตัวเลขเดียวกัน)
  *            vacant (หน่วยขายใช้งานที่ไม่มีผู้รับผิดชอบบางเดือน) · handover (ผู้รับผิดชอบจะสิ้นสุดแต่เดือนถัดไปไม่มีคนรับช่วง · ไม่นับซ้ำใน vacant) ·
  *            idleOfficer (Sales Officer บุคคลที่ใช้งานแต่ไม่ได้รับผิดชอบหน่วยขายใดในช่วงนี้ · ไม่นับ Sales Manager และทีม) ·
- *            endedUser (บุคลากรที่สิ้นสุดแล้วแต่บัญชีผู้ใช้ที่ผูกยังใช้งาน) — vacant / handover ใช้ calc.ownerGaps เดียวกับหน้า Sales Unit & Customer
- *   CR-33: แก้ไขรายรายการ (หน้า Sales Unit & Customer ไม่มีโหมดแก้ไขทั้งหน้า) — ทุกคำสั่งตรวจสิทธิ์ในฟังก์ชัน (ผู้ไม่มีสิทธิ์ = { ok: false, error: 'permission' })
+ *            endedUser (บุคลากรที่สิ้นสุดแล้วแต่บัญชีผู้ใช้ที่ผูกยังใช้งาน) — vacant / handover ใช้ calc.ownerGaps เดียวกับหน้า Account Master
+ *   CR-33: แก้ไขรายรายการ (หน้า Account Master ไม่มีโหมดแก้ไขทั้งหน้า) — ทุกคำสั่งตรวจสิทธิ์ในฟังก์ชัน (ผู้ไม่มีสิทธิ์ = { ok: false, error: 'permission' })
  *          → { ok, changes: { <key ของ master>: ค่าใหม่ } } · หน้าจอเขียน changes ลง store + Audit log แล้วแสดง Toast
  *          canEdit(user, 'unit' | 'gp' | 'channels') · commandMove · commandSuggest · commandStatus · commandSaveUnit · commandAddUnit · commandRemoveUnit ·
  *          commandChannels · commandImport · withChanges(d, changes)
  *          unitCounts(d, month, status) → { byUnit, byChannel, unassigned } (จำนวนในแผงหน่วยขาย = จำนวนแถวของตารางเมื่อเลือกหน่วยขายนั้น)
  *          columnPresetFor(d, channelId | null) → 'standard' | 'single' (คู่ค้าประเภทเดียว) | 'territory' (id ของ settings.SALES_UNIT_COLUMN_PRESETS)
+ *   CR-35: รหัสคู่ค้า (trcloudId) ห้ามซ้ำทั้งระบบ ทุก Channel ทุกสถานะ — codeConflicts(stores, customers) → [{ code, names }] ·
+ *          firstCodeConflict(stores, customers, prev) → { code, name (เจ้าของรหัสเดิมใน prev) } | null (ใช้ทั้งคำสั่งนำเข้าและ core/store.js) · commandImport error 'duplicateCode'
  * store: ไม่อ่าน ไม่เขียน
  */
 (function (SP) {
@@ -143,7 +145,7 @@
       id: s.id, trcloudId: s.systemId || s.id, name: s.name, masked: !!s.masked, legalName: null, taxId: null, trcloudType: s.storeType || null,
       kind: 'store', channelId: storeChannelOf(d, s.id), province: s.province || null, priceType: s.priceType || null,
       isExport: !!s.hasExport, isOnline: !!s.hasOnline, active: s.active !== false, refL12M: Number(s.salesRef) || 0,
-      storeType: s.storeType || null, duplicates: s.duplicates || 1, warehouse: false, isSample: false, source: 'store'
+      storeType: s.storeType || null, warehouse: false, isSample: false, source: 'store'
     };
   }
   function customers(d) {
@@ -266,7 +268,7 @@
     units.forEach(function (u) { unitById[u.id] = u; });
     var mem = membership(d, month);
     var cust = customers(d).filter(function (x) { return x.active && chOn[x.channelId]; });
-    var groups = { unassigned: [], noOwner: [], prefix: [], noProvince: [], duplicate: [], noCustomers: [] };
+    var groups = { unassigned: [], noOwner: [], prefix: [], noProvince: [], noCustomers: [] };
     var perUnit = {};
     cust.forEach(function (x) {
       var u = mem[x.id];
@@ -286,13 +288,9 @@
       var chOf = {};
       cust.forEach(function (x) { chOf[x.id] = x.channelId; });
       tc.noProvince.forEach(function (id) { if (chOf[id]) groups.noProvince.push({ kind: 'customer', id: id, channelId: chOf[id], unitId: mem[id] || null }); });
-      tc.duplicate.forEach(function (sid) {
-        var s = (d.stores || []).filter(function (x) { return x.systemId === sid; })[0];
-        if (s && chOf[s.id]) groups.duplicate.push({ kind: 'customer', id: s.id, channelId: chOf[s.id], unitId: mem[s.id] || null });
-      });
     }
     active.forEach(function (u) { if (!perUnit[u.id]) groups.noCustomers.push({ kind: 'unit', id: u.id, channelId: u.channelId }); });
-    var keys = ['unassigned', 'noOwner', 'prefix', 'noProvince', 'duplicate', 'noCustomers'];
+    var keys = ['unassigned', 'noOwner', 'prefix', 'noProvince', 'noCustomers'];
     var byChannel = {};
     var total = 0;
     keys.forEach(function (k) { groups[k].forEach(function (x) { byChannel[x.channelId] = (byChannel[x.channelId] || 0) + 1; total++; }); });
@@ -502,10 +500,27 @@
     if (ids.some(function (id, i) { return !id || ids.indexOf(id) !== i; })) return { ok: false, error: 'channelId' };
     return { ok: true, changes: { channels: copyOf(channels) } };
   }
-  // นำเข้าร้านค้าจากไฟล์ (master.importDiff → master.applyImport)
+  // CR-35: รหัสคู่ค้าซ้ำ (ร้านค้า TT = System ID · คู่ค้าอื่น = trcloudId) → [{ code, names }] · ไม่สนสถานะ
+  function codeConflicts(stores, customers) {
+    var seen = {}, order = [];
+    function add(code, name) { code = String(code); if (!seen[code]) { seen[code] = []; order.push(code); } seen[code].push(name); }
+    (stores || []).forEach(function (s) { add(s.systemId || s.id, s.name); });
+    (customers || []).forEach(function (c) { add(c.trcloudId || c.id, c.name); });
+    return order.filter(function (k) { return seen[k].length > 1; }).map(function (k) { return { code: k, names: seen[k] }; });
+  }
+  // prev = { stores, customers } ก่อนแก้ → ชื่อในข้อความ = เจ้าของรหัสเดิม (ไม่มี = รายการแรกที่ใช้รหัสนี้)
+  function firstCodeConflict(stores, customers, prev) {
+    var c = codeConflicts(stores, customers)[0];
+    if (!c) return null;
+    var old = prev ? (prev.stores || []).filter(function (s) { return String(s.systemId || s.id) === c.code; }).concat((prev.customers || []).filter(function (x) { return String(x.trcloudId || x.id) === c.code; }))[0] : null;
+    return { code: c.code, name: old ? old.name : c.names[0] };
+  }
+  // นำเข้าร้านค้าจากไฟล์ (master.importDiff → master.applyImport) · CR-35 ผลที่ทำให้รหัสซ้ำ = ปฏิเสธ
   function commandImport(d, user, diff, pick, fromMonth, stamp) {
     if (!canEdit(user)) return denied();
     var res = SP.core.master.applyImport(d, diff, pick, fromMonth, stamp);
+    var dup = firstCodeConflict(res.stores, d.customers, { stores: d.stores, customers: d.customers });
+    if (dup) return { ok: false, error: 'duplicateCode', code: dup.code, name: dup.name };
     return { ok: true, changes: { stores: res.stores, storeAssignments: res.storeAssignments, storeMoves: (d.storeMoves || []).concat(res.moves || []) } };
   }
 
@@ -567,6 +582,8 @@
     commandRemoveUnit: commandRemoveUnit,
     commandChannels: commandChannels,
     commandImport: commandImport,
+    codeConflicts: codeConflicts,
+    firstCodeConflict: firstCodeConflict,
     unitCounts: unitCounts,
     columnPresetFor: columnPresetFor
   };

@@ -36,15 +36,18 @@
   var ALIASES = {
     topDownTotal: 'annualTarget', topDownUnits: 'unitTargets', 'topdown.channel': 'annualTarget', 'topdown.unit': 'unitTargets', phasing: 'unitTargets',
     npdFromSku: 'skuPlan.createNpd', clearance: 'listing.clearance',
-    // CR-32: หน้า Account & Platform / เขตและร้านค้า (TT) เดิม → Sales Unit & Customer
-    accounts: 'salesUnits', territories: 'salesUnits', 'accounts.gp': 'salesUnits.gp', 'accounts.channelSettings': 'salesUnits.channelSettings'
+    // CR-32: หน้า Account & Platform / เขตและร้านค้า (TT) เดิม → Account Master
+    accounts: 'salesUnits', territories: 'salesUnits', 'accounts.gp': 'salesUnits.gp', 'accounts.channelSettings': 'salesUnits.channelSettings',
+    // CR-35: หน้าแผน NPD / Listing เดิม → Launch & Listing
+    npdPlan: 'launchListing', listing: 'launchListing'
   };
   var STEPS = { topDown: ['annualTarget'], phasing: ['unitTargets'], sku: ['skuPlan'], forecast: ['skuPlan'] };
   // CR-23: Key เดิมของสิทธิ์ที่รวมเป็น resource ใหม่
   // CR-29: people (หน้าบุคลากรและทีม) รวมหน้าผู้รับผิดชอบ + ทีมขายเดิม (ระดับสูงสุดของสองค่า)
   // CR-32: salesUnits = ระดับสูงสุดของ accounts + territories · สิทธิ์ย่อย GP / ตั้งค่า Channel ย้ายค่าเดิม
   var LEGACY = { annualTarget: ['topdown.channel'], unitTargets: ['topdown.unit', 'phasing'], people: ['salespeople', 'salesTeam'], prices: ['promotionPrice', 'accountPrices'],
-    salesUnits: ['accounts', 'territories'], 'salesUnits.gp': ['accounts.gp'], 'salesUnits.channelSettings': ['accounts.channelSettings'] };
+    salesUnits: ['accounts', 'territories'], 'salesUnits.gp': ['accounts.gp'], 'salesUnits.channelSettings': ['accounts.channelSettings'],
+    launchListing: ['npdPlan', 'listing'] };   // CR-35: Launch & Listing = ระดับสูงสุดของแผน NPD + Listing เดิม
 
   function copy(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
   function store() { return SP.core.store; }
@@ -260,6 +263,8 @@
     var target = permPage(S, pageId);
     var list = resources(S.list).filter(function (r) { return r.pageId === target && !r.action; });
     if (!list.length) list = [lookupRes(S, target)];
+    // CR-35: entry.alsoPerms = สิทธิ์ย่อยของหน้าอื่นที่ทำให้หน้านี้มองเห็นด้วย (Supply Chain เปิด Price & Promotion แท็บ Clearance ได้)
+    if (entry && entry.alsoPerms) list = list.concat(entry.alsoPerms.map(function (id) { return lookupRes(S, resolveId(id)); }));
     var best = 'NONE';
     list.forEach(function (r) { var lv = access(u, r.id, S).level; if (rank(lv) > rank(best)) best = lv; });
     return best;

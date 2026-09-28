@@ -1,0 +1,24 @@
+/* modules/launch-listing/launch-listing.css — Launch & Listing (CR-35 · แท็บ NPD | Listing) · สไตล์ของแต่ละแท็บอยู่ที่ npd-plan.css / product-master.css เดิม */
+.ll-tabs { margin-bottom: var(--sp-2); }
+.ll-body { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+.ll-intro { display: contents; }
+/* CR-36: แท็บ NPD — การ์ด KPI 3 ใบ (รูปแบบเดียวกับ Product List) · Chip · หัวกลุ่ม · ปุ่ม ยังไม่อยู่ในแผน */
+.ll-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); }
+.card.ll-kpi { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); padding: var(--sp-2) var(--sp-3); text-align: left; cursor: pointer; font: inherit; color: inherit; border: 1px solid var(--c-border); border-top: 3px solid var(--c-border-strong); background: var(--c-surface); }
+.card.ll-kpi:hover { background: var(--c-surface-2); }
+.card.ll-kpi.is-selected { border-color: var(--c-primary); box-shadow: 0 0 0 2px var(--c-primary-soft); }
+.card.ll-kpi-request { border-top-color: var(--c-warn-bd); }
+.ll-kpi .pl-kpi-label { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--c-text-muted); flex: 1 1 auto; }
+.ll-kpi .pl-kpi-value { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.ll-kpi .pl-kpi-unit { font-size: var(--fs-xs); color: var(--c-text-muted); }
+.ll-chips:empty { display: none; }
+.npd-notplanned { margin-left: var(--sp-1); font-size: var(--fs-xs); color: var(--status-short-fg); white-space: nowrap; }
+.npd-used-np { display: block; }
+.npd-row.npd-group { display: block; background: var(--c-surface-2); border-bottom: 1px solid var(--c-border); }
+.npd-group-cell { padding: 4px var(--sp-2); }
+.npd-group-d1 .npd-group-cell, tr.npd-group-d1 > td { padding-left: calc(var(--sp-2) + 1.4em); }
+.npd-group-d2 .npd-group-cell, tr.npd-group-d2 > td { padding-left: calc(var(--sp-2) + 2.8em); }
+.npd-group-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--c-text); font-weight: var(--fw-bold); text-decoration: none; }
+@media (max-width: 600px) { .ll-kpis { grid-template-columns: minmax(0, 1fr); } }
+.npd-view-listing { margin-left: var(--sp-2); font-size: var(--fs-xs); white-space: nowrap; }
+@media (min-width: 1024px) { .page-launchListing .module-body > .ll-body { flex: 1 1 auto; min-height: 0; } }

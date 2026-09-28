@@ -125,10 +125,23 @@
 /* CR-27: ที่มาของการเติบโต : สัดส่วน Channel = 55 : 45 */
 .rp-row2.rp-growth-row { grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); }
 .rp-share .ssc { margin-top: var(--sp-2); }
-.rp-mix-grid { display: grid; gap: var(--sp-4); }
-.rp-mix-status .ssc-label { display: none; }
-.rp-mix-status .ssc-row { grid-template-columns: minmax(0, 1fr); }
-.rp-mix-status .ssc-bar { height: 30px; }
+/* CR-34: สัดส่วนแผนตามกลุ่มสินค้า 2 คอลัมน์ 50 : 50 (ตามประเภทแผน | ตามกลุ่มสินค้า) · Legend ประเภทที่หัวการ์ด · คอลัมน์ขวาเลื่อนภายใน */
+.rp-mix-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-4); align-items: start; }
+@media screen and (max-width: 1099.98px) { .rp-mix-grid { grid-template-columns: minmax(0, 1fr); } }
+.rp-mix-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-1) var(--sp-3); }
+.rp-mix-top h2 { margin-bottom: 0; }
+.rp-mix-legend { font-size: var(--fs-xs); }
+.rp-mix-type h3 { margin-bottom: var(--sp-2); }
+.rp-mix-type .hbars { gap: var(--sp-2); }
+.rp-mix-summary { margin: var(--sp-3) 0 0; padding-top: var(--sp-2); border-top: 1px solid var(--c-border); font-size: var(--fs-sm); font-weight: var(--fw-medium); }
+.rp-mix-gap { color: var(--status-short-fg); }
+.rp-mix-scroll { max-height: 17rem; overflow-y: auto; padding-right: 2px; }
+/* CR-34: หัวกราฟรายเดือน = ชื่อ + สรุปทั้งปี (สีตามสถานะ) */
+.rp-monthly-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--sp-1) var(--sp-3); }
+.rp-monthly-head h2 { margin-bottom: 0; }
+.rp-monthly-annual { font-size: var(--fs-sm); font-weight: var(--fw-bold); font-variant-numeric: tabular-nums; }
+.barline-tip tr.is-part td { opacity: 0.8; font-size: 0.95em; }
+.barline-tip tr.is-part td:first-child { padding-left: var(--sp-3); }
 .rp-people-table .rp-tp { min-width: 220px; }
 /* CR-29: ผลงาน YTD */
 .rp-people-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); }

@@ -16,6 +16,7 @@
  *   fit     = true → หน้าสูงเท่าจอ (จอกว้างตั้งแต่ 1024px) ตาราง/กราฟเลื่อนภายในพื้นที่ของตัวเอง (body.fit-screen)
  *   perm    = (CR-25) id ของหน้าที่ใช้สิทธิ์ร่วม — หน้านี้ไม่มีแถวของตัวเองในเมทริกซ์สิทธิ์ (Roles · Users ใช้สิทธิ์ของ Permissions = roleManagement)
  *   open    = (CR-25) true → ทุกบทบาทเห็นเสมอ ไม่อยู่ในเมทริกซ์สิทธิ์ (เกี่ยวกับ Prototype)
+ *   alsoPerms = (CR-35) สิทธิ์ย่อยของหน้าอื่นที่ทำให้หน้านี้มองเห็นด้วย (Price & Promotion แท็บ Clearance ใช้ listing.clearance ของ Launch & Listing)
  *   CR-23: ชื่อ 4 ขั้นของ Sales Planning เป็นภาษาอังกฤษ (Annual Target · Sub-channel Allocation · SKU Planning · Plan Summary) id คงเดิม
  * CR-25: เลขขั้น "ขั้นที่ x/n" คงที่ (x = tour · n = จำนวนขั้นทั้งหมด) แม้บางขั้นมองไม่เห็น / ปุ่มก่อนหน้า/ถัดไปข้ามขั้นที่มองไม่เห็น (step)
  * index.html ที่ Root พาไปหน้าเริ่มต้นของบทบาท (core/permissions.js homePage)
@@ -30,16 +31,20 @@
     { id: 'phasing',       title: 'Sub-channel Allocation',      short: 'Sub-channel Allocation', path: 'modules/phasing/index.html',          group: 'sales-planning', tour: 2,    visible: true, fit: true, year: true },
     { id: 'skuPlanning',   title: 'SKU Planning',                short: 'SKU Planning',           path: 'modules/sku-planning/index.html',     group: 'sales-planning', tour: 3,    visible: true, fit: true, year: true },
     { id: 'summary',       title: 'Plan Summary',                short: 'Plan Summary',           path: 'modules/summary/index.html',          group: 'sales-planning', tour: 4,    visible: true, year: true },
-    { id: 'productList',   title: 'รายการสินค้า',                short: 'รายการสินค้า',           icon: 'P', path: 'modules/products/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
-    { id: 'npdPlan',       title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)', short: 'แผน NPD',             icon: 'N', path: 'modules/npd-plan/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
-    { id: 'promotionPrice', title: 'ราคาและ Promotion',          short: 'ราคาและ Promotion',         icon: '%', path: 'modules/promotions/index.html',     group: 'product-master', tour: null, visible: true, fit: true, year: true },
-    { id: 'productMaster', title: 'Listing',      short: 'Listing', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: true, fit: true },
-    { id: 'taxonomy',      title: 'หมวดสินค้าและ Series',        short: 'หมวดสินค้าและ Series',   icon: 'C', path: 'modules/taxonomy/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
+    { id: 'productList',   title: 'Product List',                short: 'Product List',           icon: 'P', path: 'modules/products/index.html',       group: 'product-master', tour: null, visible: true, fit: true },
+    // CR-35: แผน NPD + Listing รวมเป็น Launch & Listing (แท็บ NPD | Listing) · หน้าเดิมซ่อน ลิงก์เดิมพาไปแท็บที่ตรงกัน (ใช้สิทธิ์ launchListing)
+    { id: 'launchListing', title: 'Launch & Listing',            short: 'Launch & Listing',        icon: 'L', path: 'modules/launch-listing/index.html', group: 'product-master', tour: null, visible: true, fit: true },
+    { id: 'npdPlan',       title: 'Launch & Listing · NPD',      short: 'Launch & Listing · NPD',  icon: 'L', path: 'modules/npd-plan/index.html',       group: 'product-master', tour: null, visible: false, perm: 'launchListing' },
+    { id: 'promotionPrice', title: 'Price & Promotion',          short: 'Price & Promotion',         icon: '%', path: 'modules/promotions/index.html',     group: 'product-master', tour: null, visible: true, fit: true, year: true, alsoPerms: ['listing.clearance'] },
+    { id: 'productMaster', title: 'Launch & Listing · Listing', short: 'Launch & Listing · Listing', icon: 'L', path: 'modules/product-master/index.html', group: 'product-master', tour: null, visible: false, perm: 'launchListing' },
+    // CR-36: Category & Series ย้ายเป็นแท็บ Product Level ของ Product List · หน้าเดิมซ่อน ลิงก์เดิมพาไปแท็บ (สิทธิ์ส่วนของหน้า taxonomy ใต้ productList)
+    { id: 'taxonomy',      title: 'Product List · Product Level', short: 'Product Level',   icon: 'C', path: 'modules/taxonomy/index.html',       group: 'product-master', tour: null, visible: false, perm: 'productList', fit: true },
     // CR-29: Account Master 3 หน้าตามสิ่งที่จัดการ — Account & Platform · เขตและร้านค้า (TT) · บุคลากรและทีม (ใหม่)
     //   หน้าผู้รับผิดชอบ / ทีมขายเดิม ซ่อน (visible: false · ใช้สิทธิ์ของ people) ลิงก์เดิมพาไปแท็บที่ตรงกันของหน้าบุคลากรและทีม
-    // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น Sales Unit & Customer (salesUnits) · หน้าเดิมซ่อน (ใช้สิทธิ์ของ salesUnits)
+    // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น Account Master (salesUnits) · หน้าเดิมซ่อน (ใช้สิทธิ์ของ salesUnits)
     //   ลิงก์เดิมพาไปหน้าใหม่ (หน้าเขตเดิม → แท็บ Channel ที่แบ่งเป้าตามเขต)
-    { id: 'salesUnits',    title: 'Sales Unit & Customer',       short: 'Sales Unit & Customer', icon: 'A', path: 'modules/sales-units/index.html',    group: 'account-master', tour: null, visible: true, fit: true },
+    // CR-36: ชื่อหน้า Partner List (เดิม Account Master · id / สิทธิ์ / Route คงเดิม)
+    { id: 'salesUnits',    title: 'Partner List',         short: 'Partner List',   icon: 'A', path: 'modules/sales-units/index.html',    group: 'account-master', tour: null, visible: true, fit: true },
     { id: 'accounts',      title: 'Account & Platform',          short: 'Account & Platform',    icon: 'A', path: 'modules/accounts/index.html',       group: 'account-master', tour: null, visible: false, perm: 'salesUnits' },
     { id: 'territories',   title: 'เขตและร้านค้า (TT)',           short: 'เขตและร้านค้า ({territoryChannels})', icon: 'T', path: 'modules/territories/index.html', group: 'account-master', tour: null, visible: false, perm: 'salesUnits' },
     // CR-32: บุคลากรและทีม → Sales Person Management (id / Path / สิทธิ์ people เดิม)

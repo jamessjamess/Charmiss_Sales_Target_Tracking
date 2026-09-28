@@ -143,12 +143,15 @@
 .card > .td-chart-title { margin: 0; font-size: var(--fs-sm); font-weight: var(--fw-bold); }
 /* CR-27: Waterfall ชิดบนของการ์ด (การ์ดสูงเท่าการ์ดซ้าย) · จอเตี้ยแถวบางลง */
 .td-chart-growth .wfc { align-content: start; flex: 1 1 auto; min-height: 0; }
+/* CR-36: Waterfall แนวตั้งเต็มการ์ด (การ์ดสูงเท่าการ์ดยอดขายและเป้าหมายราย Channel · grid stretch) */
+.td-chart-growth .wfv { min-height: 0; }
 @media (max-height: 700px) {
   .page-topDown .module-body > .td-charts { min-height: 170px; }
   .td-chart-growth .wfc { gap: 1px var(--sp-2); font-size: 12px; }
   .td-chart-growth .wfc-track { height: 15px; }
   .td-chart-growth .wfc-axis-track { height: 17px; }
   .page-topDown .scol { min-height: 120px; }
+  .page-topDown .wfv { min-height: 120px; }
 }
 .td-ch-row.is-hl > * { background: var(--c-primary-soft); }
 .td-l12m .prior-label { display: inline; }

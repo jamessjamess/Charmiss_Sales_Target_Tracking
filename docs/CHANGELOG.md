@@ -2,6 +2,56 @@
 
 ประวัติการเปลี่ยนแปลงของ Prototype (ใหม่สุดอยู่บน) · CR ที่ทำเสร็จแล้วลบต้นฉบับออกจาก `docs/change-requests/` เหลือสรุปที่นี่
 
+## CR-36 — 2026-09-28 · กราฟการเติบโตแนวตั้ง · Product List (หมวดลำดับชั้น · จัดกลุ่ม · Product Year · แท็บ Product Level · Drawer 50%) · KPI Launch & Listing · แผน Clearance · Partner List · คู่มือตัด UAT
+
+(ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · ผู้ใช้เลือก: ข้อมูลตัวอย่างในไฟล์ข้อมูลปกติ · ข้อความคู่มือคงที่ data/guide.js · ตัด UAT รวมโค้ด)
+ไฟล์นอกรายการของ CR: `core/charts.js` (+ waterfallColumns · dots) · `core/components.js` (+ treeSelect · groupPicker · dataCheck action · flowDiagram lines · pageHelp เติมชื่อหน้า) ·
+`core/guide.js` (ตัด uat* · + textVars · textIssues) · `core/layout.js` (ตัดแถบลอย UAT · resetData) · `core/seed.js` (samplePatches) · `core/registry.js` · `core/loader.js` (หมายเหตุ) ·
+`data/products.js` · `data/permissions.js` · `data/settings.js` (คอลัมน์ Sub Series) · `data/guide.js` · `styles/*` · `tests/*` · `docs/*` · `CLAUDE.md` (แถวคู่มือ)
+
+- รอบ 1 (ส่วน 1 · 2 · 5): Waterfall แนวตั้งเต็มการ์ด (`charts.waterfallColumns`) · หมวดสินค้า `treeSelect` (`calc.categoryOptions`) · `groupPicker` + `calc.productGroupLevels` / `groupItems` / `groupTotal` ·
+  `calc.productYear` (ตัวกรอง · คอลัมน์ · จัดกลุ่ม) · Sub Series ค่าเริ่มต้น · `ไม่รวม Delete` · Drawer 50% 2 คอลัมน์ · แท็บ Product Level (โค้ด taxonomy เดิม) + ระบบกำหนด → Product Level · ชื่อ Partner List
+- รอบ 2 (ส่วน 3 · 4): แท็บ NPD การ์ด 3 ใบ · จัดกลุ่ม · `calc.listedNotPlanned` (Chip · Popover · SKU Planning เปิด เพิ่มสินค้าในแผน) · แผน Clearance (`calc.clearanceMonths` · `clearanceUnitIds` · `clearanceQty` ·
+  `clearancePlanned` · `clearanceStockState` · `clearanceDistribute` · `clearancePlanMonthly` · `clearanceLockedRows` · `clearClearanceCells`) · แท็บ Clearance คอลัมน์ + แถวขยาย · SKU Planning ล็อกเดือน Clearance ·
+  Plan Summary ส่วนลายจุด · ตัวอย่าง 32090
+- รอบ 3 (ส่วน 6 · docs): คู่มือ 2 แท็บ · ข้อมูลที่ต้องมีก่อนแยกผู้แก้ไขตามหน้า · คำศัพท์ 5 กลุ่ม · สูตร Clearance · สีคงเหลือสต็อก · `{page_<id>}` · ตัด UAT ทั้งหมด
+- Test: `tests/cr36.test.js` 13 ข้อ (2 ข้อในเบราว์เซอร์) · ปรับค่าคาดหวัง: เมนู Product Master 3 หน้า (cr25-6 · cr25-9 · cr31-6) · SKU Grid Clearance (calc) · cr35-13 (116) · ตัด cr28-4..7 · cr28-8 · cr32-24 · cr33-3
+
+## CR-35 — 2026-09-28 · Account Master และ Sales Person Management Polish · Product Master: ชื่อหน้าภาษาอังกฤษ · วงจรสถานะ 7 แบบ · รหัสชั่วคราวคำขอ NPD · Launch & Listing · แท็บ Clearance
+
+(ทำ 4 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · ผู้ใช้เลือก ID ภายในตาม CR · Discontinued ไม่อยู่ในแผนตั้งต้น)
+ไฟล์นอกรายการของ CR: `core/stores.js` · `core/master.js` · `core/units.js` · `core/catalog.js` · `core/seed.js` · `core/plan-edits.js` · `core/components.js` · `core/permissions.js` · `core/registry.js` ·
+`modules/people` · `modules/summary` · `modules/products` · `modules/promotions` · `modules/sku-planning` · `modules/npd-plan` · `modules/product-master` · `modules/sales-units` · `modules/accounts` / `territories` (หมายเหตุ) ·
+`modules/launch-listing` (ใหม่) · `data/products.js` · `data/permissions.js` · `data/settings.js` (หมายเหตุ) · `data/content.js` · `data/guide.js` · `styles/*` · `tests/*` · `docs/*`
+
+- รอบ 1 (ส่วน 1–3): ชื่อหน้า Account Master ทุกจุด · `viewOnlyNote` `ดูอย่างเดียว · แก้ไขได้โดย {บทบาท}` · ปุ่ม แก้ไข ของแถวหน่วยขายแสดงตลอด · รหัสคู่ค้าห้ามซ้ำ (store · นำเข้า · commandImport) ·
+  รวมรหัสซ้ำของร้าน TT ตอนโหลด 8 รหัส (ร้าน 211 · ยอดอ้างอิงรวมเท่าเดิม) · ตัดป้าย / ตัวกรอง / เกณฑ์ ID ซ้ำ · `DATA_VERSION` 15
+- รอบ 2 (ส่วน 4–6): สัญญาณโหมดแก้ไขทั้ง 2 แท็บของ Sales Person Management (คอลัมน์แก้ไข · แถบบอกวิธี · ช่องยึด + ป้าย เริ่ม · Esc / คลิกนอกยกเลิก) · `components.yearPicker` ·
+  `calc.ownerYears` · `yearKind` · มุมมองตามบุคคลเป็นพันบาท + `allOwners` (ทีม KAM กลาง)
+- รอบ 3 (ส่วน 7–10): ชื่อหน้าภาษาอังกฤษ + `helpLead` ในปุ่ม ? · Status 7 แบบ (`PRODUCT_STATUSES` · `productStatus` / `dateStatus` · `revenueTypeOf` · Delete · Discontinued เฉพาะหน่วยที่เคยขาย) ·
+  คำขอ NPD `REQ-nnn` + รหัสชั่วคราว `NPD-YYMM-NNN` + `catalog.confirmRequest` (ปุ่ม ยืนยันเป็น NPD) · ป้ายชื่อชั่วคราว / จาก Sales · การ์ดและตัวกรอง Product List · ตัวอย่าง Delete 33490
+- รอบ 4 (ส่วน 11–12 · คู่มือ · docs): หน้า Launch & Listing (แท็บ NPD | Listing · ดู Listing · เฉพาะสินค้าใหม่ · หน้าเดิมเป็นทางผ่าน · สิทธิ์ `launchListing`) ·
+  Price & Promotion แท็บ Clearance (ราคา · ส่วนลด · ช่วงเดือนสิ้นสุดว่างได้ · หน่วยขาย · วันหมดอายุ · หมายเหตุ · + เพิ่ม Clearance + ยืนยัน Status) · ราคา Clearance ลำดับแรก ·
+  registry `alsoPerms` · คำศัพท์ 4 คำ + UAT S12 S13 · docs แยก data-model-products.md / open-items-assumptions.md
+- Test: `tests/cr35.test.js` 13 ข้อ · ปรับค่าคาดหวังจากร้าน 211 · สิทธิ์ launchListing (เมนู Product Master 4 หน้า · cr25-9 Supply Chain เห็น 4 แก้ 2) · คำขอ REQ-nnn · สถานการณ์ทดสอบ 13 ข้อ
+
+## CR-34 — 2026-09-28 · ประเภทสินค้าในแผน SKU · เดือนเริ่มขายในคอลัมน์ช่วงเวลาขาย · + เพิ่มสินค้าในแผน · กราฟ Plan Summary
+
+(ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ผู้ใช้เลือก Status จากวันที่ + สถานะคำขอแยก และข้อมูลตัวอย่างในไฟล์ข้อมูลปกติ · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git)
+ไฟล์นอกรายการของ CR: `core/plan-edits.js` (ใหม่) · `core/loader.js` · `core/calc.js` (+ ฟังก์ชันใหม่ + planType ในแถว Grid / skuPlanItems · addSalesListings ใส่ source) ·
+`core/seed.js` (ข้อมูลตัวอย่าง CR-34 · Listing ของคำขอ) · `core/charts.js` (+ planTargetBars · partBars) · `core/components.js` (+ planTypeBadge · planTypeSwatch) ·
+`data/products.js` · `data/npd.js` · `data/listings.js` · `data/plan-seeds.js` · `data/content.js` · `data/guide.js` · `styles/*` · `tests/*` · `docs/*` · `CLAUDE.md` (ตารางไฟล์)
+
+- รอบ 1 (ส่วน 1 · 2.1–2.3 · 2.6): `calc.planTypeOf` 5 ประเภท + `labels.planTypes` + Token `--c-type-*` · จัดกลุ่ม Series | ประเภท | ไม่จัดกลุ่ม ·
+  ป้ายประเภทแทน Chip Status · บรรทัดใต้ชื่อเหลือ รหัส · Series · คอลัมน์ช่วงเวลาขายเลือกเดือนเริ่ม (NPD ยืนยันแล้วก่อนเปิดตัวเลือกไม่ได้ · ยืนยันก่อนล้างค่า) ·
+  Listing จาก SKU Planning (`source: 'skuPlanning'`) · ข้อมูลตัวอย่าง คำขอ NPD 33490 Watsons มิ.ย. · 16500 Shopee ก.ค. 2027 + Listing ใหม่ 53021 Watsons · 22010 TT เขต 1
+- รอบ 2 (ส่วน 2.4–2.5 · 5): ปุ่มเดียว `+ เพิ่มสินค้าในแผน` (แถบแก้ไข · แถวคงเหลือ) → Drawer 3 แท็บ (สินค้าเดิมที่ยังไม่เคยขาย · NPD ยืนยันแล้ว · ขอ NPD เพิ่ม + เหตุผล) ·
+  ตัด + เพิ่ม SKU / + เพิ่มสินค้าใหม่ / + สร้าง NPD · นำออกจากแผนลบ Listing จาก SKU Planning + ถามยกเลิกคำขอ · ข้อความแจ้ง NPD มีลิงก์เปิดแท็บ ·
+  หน้าแผน NPD: ที่มา `Sales · ชื่อ` + เหตุผล · `ใช้ในแผน` · Chip `คำขอจาก Sales (n)` · ยืนยันคำขอใน Drawer · ข้อมูลที่ต้องตรวจ `มีแผนสินค้า Clearance` (SKU Planning · Plan Summary)
+- รอบ 3 (ส่วน 3–4 · คู่มือ · docs): กราฟรายเดือนแท่งซ้อนตามประเภท + ขีดเป้าหมาย Top-down + เส้นประยอดอ้างอิง (ซ่อนได้) + แถวส่วนต่าง + สรุปทั้งปีหัวกราฟ ·
+  สัดส่วนแผน 50 : 50 ตามประเภทแผน | ตามกลุ่มสินค้าซ้อนตามประเภท (ตัดแท่ง ตาม Status) · คำศัพท์ 5 คำ + UAT S11 · `docs/spec/ui-charts.md` แยกจาก ui-standards
+- Test: `tests/cr34.test.js` 9 ข้อ · ปรับค่าคาดหวังจากสินค้าตัวอย่างเพิ่ม 2 รายการ (calc · taxonomy) และสถานการณ์ทดสอบ 11 ข้อ (cr28)
+
 ## CR-33 — 2026-09-27 · Sales Unit & Customer แก้ไขรายรายการ · คอลัมน์ตาม Channel · SKU Planning แยกคอลัมน์ช่วงเวลาขาย / อายุ
 
 (ทำ 2 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · แทนที่ CR-32 ข้อ 3.2 · 3.4 · 3.5 และคอลัมน์ ช่วงเวลาขาย · อายุ ของ CR-27)

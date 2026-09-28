@@ -77,7 +77,7 @@
         var d = data();
         var mem = S().membership(d, NOW);
         var a = d.stores.filter(function (s) { return s.active !== false && mem[s.id] === 'TT-01' && !s.masked; })[0];
-        var b = d.stores.filter(function (s) { return s.active !== false && s.id !== a.id && mem[s.id] && !s.masked && s.duplicates === 1; })[0];
+        var b = d.stores.filter(function (s) { return s.active !== false && s.id !== a.id && mem[s.id] && !s.masked; })[0];
         var table = [['ข้อมูล ณ เดือน', 'ก.ย. 2026'], [], ['System ID', 'ชื่อร้าน', 'ประเภทร้าน', 'ประเภทราคา', 'จังหวัด', 'Export', 'Online', 'สถานะ', 'ยอดอ้างอิง (บาท)', 'เขตการขาย'],
           [a.systemId, a.name, 'Wholesale', a.priceType || '', a.province || '', a.hasExport ? 'ใช่' : '', a.hasOnline ? 'ใช่' : '', 'ใช้งาน', '', 'TT เขต 2'],
           [b.systemId, b.name, b.storeType || '', b.priceType || '', b.province || '', b.hasExport ? 'ใช่' : '', b.hasOnline ? 'ใช่' : '', 'ใช้งาน', '', S().storeTerritories(d).filter(function (t) { return t.id === mem[b.id]; })[0].name],

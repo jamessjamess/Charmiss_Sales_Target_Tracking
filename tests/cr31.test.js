@@ -75,7 +75,7 @@
     },
     {
       name: 'cr31-6. หน้า Users Module = Product Master → คอลัมน์เป็น 5 หน้าของ Product Master · ผู้ใช้ 2 บทบาท (ดูรายงาน + ทีม Product) ได้สิทธิ์สูงสุด และบอกบทบาทต้นทาง',
-      expected: [['productList', 'npdPlan', 'promotionPrice', 'productMaster', 'taxonomy'], ['EDIT', ['product']], ['VIEW', ['product', 'viewer']], ['EDIT', ['product']]],
+      expected: [['productList', 'launchListing', 'promotionPrice'], ['EDIT', ['product']], ['VIEW', ['product', 'viewer']], ['EDIT', ['product']]],
       actual: function () {
         var list = SP.core.registry.list;
         var pages = [];

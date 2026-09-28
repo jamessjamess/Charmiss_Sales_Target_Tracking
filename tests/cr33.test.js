@@ -1,5 +1,5 @@
 /*
- * tests/cr33.test.js — Test ของ CR-33 (Sales Unit & Customer แก้ไขรายรายการ · SKU Planning แยกคอลัมน์ช่วงเวลาขาย / อายุ)
+ * tests/cr33.test.js — Test ของ CR-33 (Account Master แก้ไขรายรายการ · SKU Planning แยกคอลัมน์ช่วงเวลาขาย / อายุ)
  *
  * รันด้วย Node: node tests/run.js cr33 / ในเบราว์เซอร์: tests/calc.test.html รวม Test ชุดนี้ด้วย
  *   cr33-1..2 = calc.skuAgeGroup (แหล่งเดียวของตัวกรองอายุและคอลัมน์อายุ) · cr33-3 = ข้อความ (content.js · guide.js)
@@ -65,12 +65,12 @@
         var P = D().content.pages;
         var AG = P.skuPlanning.age;
         return [n('รหัส TRCLOUD'), n('อายุนาน'), P.salesUnits.columns.trcloudId, P.salesUnits.search,
-          D().guide.glossary.some(function (g) { return g.term === 'รหัสคู่ค้า' && /TRCLOUD/.test(g.meaning); }), Object.keys(AG.groups).sort(), 'filters' in AG];
+          D().guide.glossaryGroups.some(function (grp) { return grp.terms.some(function (g) { return g.term === 'รหัสคู่ค้า' && /TRCLOUD/.test(g.meaning); }); }), Object.keys(AG.groups).sort(), 'filters' in AG];
       }
     },
     {
-      name: 'cr33-4. จำนวนคู่ค้าต่อหน่วยขาย (units.unitCounts) = จำนวนคู่ค้าที่อยู่ในหน่วยขายนั้น ณ เดือน และผ่านตัวกรองสถานะเดียวกัน (ใช้งาน · ปิดใช้งาน · ทั้งหมด) ทุกหน่วยขาย · 7-Eleven 4 · Beautrium 10 · TT เขต 1 = 43',
-      expected: [0, [4, 10, 43]],
+      name: 'cr33-4. จำนวนคู่ค้าต่อหน่วยขาย (units.unitCounts) = จำนวนคู่ค้าที่อยู่ในหน่วยขายนั้น ณ เดือน และผ่านตัวกรองสถานะเดียวกัน (ใช้งาน · ปิดใช้งาน · ทั้งหมด) ทุกหน่วยขาย · 7-Eleven 4 · Beautrium 10 · TT เขต 1 = 42 (CR-35 รวมรหัสซ้ำ 687)',
+      expected: [0, [4, 10, 42]],
       actual: function () {
         var d = data();
         var mem = U().membership(d, MONTH), all = U().customers(d);

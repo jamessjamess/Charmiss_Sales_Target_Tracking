@@ -12,12 +12,15 @@
  *   รายงานสรุปแผน (ประกาศและหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้เฉพาะแท็บนี้):
  *     หัวรายงาน: เลขฉบับ {ปี}-BL-{nn} | {ปี}-DRAFT · สถานะ · จัดสรรเป้าหมายประจำปี · พิมพ์เมื่อ · หมายเหตุที่มาของตัวเลข
  *     ยังไม่ล็อก = ลายน้ำ "ฉบับร่าง · ยังไม่ได้รับอนุมัติ" ทุกหน้า (บนจอและตอนพิมพ์) / ล็อกแล้ว = ตัวเลขทั้งหมดจาก Snapshot ของ Baseline
- *     Filter Channel · KPI 4 ใบ · กราฟรายเดือน (charts.barLine) : ที่มาของการเติบโต (charts.waterfall + stackedShare) = 60 : 40
+ *     Filter Channel · ข้อมูลที่ต้องตรวจ (CR-34 แผนสินค้า Clearance · calc.planClearanceItems) · KPI 4 ใบ · ที่มาของการเติบโต (charts.waterfall) : สัดส่วน Channel
+ *     CR-34 เป้าหมายเทียบแผนรายเดือน (charts.planTargetBars · calc.planByTypeMonthly): แท่งซ้อนตามประเภท · ขีดเป้าหมาย Top-down · เส้นประยอดขายอ้างอิง
+ *       (กด Legend ซ่อน/แสดง) · แถวส่วนต่าง (calc.planDiff) · สรุปทั้งปีหัวกราฟ
  *     ตาราง Channel → หน่วยขาย (ยอดขายปีก่อน · เป้าหมาย · % ของ Total · เป้าหมายเทียบปีก่อน · แผน · ส่วนต่าง · สถานะอนุมัติ 2 ไอคอน · ผู้รับผิดชอบ)
  *     CR-26: แผนตามสินค้าและช่องทาง (report.pivotPlan) — แถว Series / Category / Status › SKU (Tree พับได้) × คอลัมน์ Channel / หน่วยขาย /
  *       เดือน / ไตรมาส · ค่า Net Sales / Sale Amount / จำนวนชิ้น · แสดงเป็นค่า / % ของแถว / % ของคอลัมน์ · ตัวกรอง · สีพื้นไล่ความเข้มต่อระดับแถว ·
  *       คลิกช่อง SKU × หน่วยขาย = SKU Planning ของหน่วยนั้น (ui.selection + ui.skuSearchHandoff) · ส่งออกแบบแบน · ตัวเลือกจำที่ ui.summaryPivot
- *     สัดส่วนแผนตามกลุ่มสินค้า · เป้าหมายรายผู้รับผิดชอบ / การอนุมัติ: ยังไม่ล็อก = บรรทัด "อนุมัติครบแล้ว x/y หน่วยขาย" ใต้หัวรายงาน ·
+ *     CR-34 สัดส่วนแผนตามกลุ่มสินค้า 50 : 50 = ตามประเภทแผน (calc.planTypeMix · charts.partBars) | ตามกลุ่มสินค้าซ้อนตามประเภท (calc.planGroupByType)
+ *     เป้าหมายรายผู้รับผิดชอบ / การอนุมัติ: ยังไม่ล็อก = บรรทัด "อนุมัติครบแล้ว x/y หน่วยขาย" ใต้หัวรายงาน ·
  *     ล็อกแล้ว = ตารางย่อ 1 แถวต่อหน่วยขาย (ผู้อนุมัติ · วันที่ ของเป้าหมายรายเดือนและแผน SKU) + ช่องลงนาม
  *     ตัวเลขเป็นล้านบาท 2 ตำแหน่ง (KPI บาทเต็ม) / พิมพ์ A4 แนวนอน
  * อ่านจาก data/:  settings, content (pages.summary, pages.<ขั้น>.title, labels) — ตัวเลขทั้งหมดของรายงานมาจาก core/report.js
@@ -47,15 +50,15 @@
   var mixBy = 'series';     // รายงาน: กราฟกลุ่มสินค้าที่ 2 'series' | 'category'
   var ytdMode = 'plan';     // CR-29 เป้าหมายรายผู้รับผิดชอบ: ผลงาน YTD ของ 'plan' ปีแผน | 'current' ปีปัจจุบัน (Actual อย่างเดียว)
   var act = { channel: '', owner: '' };   // ติดตามสถานะ: ตัวกรอง (owner '_none' = ยังไม่มีผู้รับผิดชอบ) · แท็บตัวกรองจำที่ ui.statusFilter (CR-28)
-  // สีแท่งตาม Status ของ SKU (ชื่อ Token)
-  var STATUS_TOKENS = { planned: '--c-st-planned-fg', 'new': '--c-st-new-fg', active: '--c-st-active-fg', clearance: '--c-st-clearance-fg', discontinued: '--c-st-discontinued-fg' };
   var AP_STATES = ['draft', 'submitted', 'approved', 'returned', 'review'];
-  var MIX_STATUSES = ['active', 'new', 'clearance'];   // CR-27: แท่ง Status ในสัดส่วนแผน
+  // CR-36: ส่วน Clearance ของแท่ง = แผน Clearance (calc.clearancePlanMonthly · ไม่นับในเป้าหมาย) แทนจำนวนในแผน SKU (ค่าเดิมในเดือน Clearance รวมในสินค้าเดิม)
+  var CHART_TYPES = ['existing', 'npdConfirmed', 'npdRequest'];   // CR-34: ลำดับส่วนของแท่ง (ล่าง → บน) · สินค้าเดิมรวม Listing ใหม่
   // CR-26: ตาราง Pivot — ค่าตั้งต้น (ตัวเลือกจำที่ ui.summaryPivot) · แถวที่กางไว้ (path ของ node → true) ไม่เก็บ
   var PIVOT_DEFAULT = { rows: 'series', cols: 'channel', value: 'net', show: 'value', filters: { series: [], channels: [], units: [], statuses: [], q: '' } };
   var pivotOpen = {};
 
   function mb(v) { return F.millionPlain(v, 2); }
+  function m1(v) { return F.millionPlain(v, 1); }   // CR-34: สรุปหัวกราฟ · แถวส่วนต่าง (ล้านบาท ทศนิยม 1 ตำแหน่ง)
   // ป้ายแกนเป็นล้านบาท (charts.millionTick)
   function axisText(v, step) { return SP.core.charts.millionTick(v, step); }
 
@@ -158,7 +161,7 @@
         return h('li', null, fill(Y.storesMovedItem, { name: m.name, id: m.systemId, from: zone(m.from), to: zone(m.to), month: F.date(m.fromMonth), amount: F.baht(m.salesRef) }));
       });
       if (moved.length > MAX) items.push(h('li', { class: 'muted' }, fill(Y.storesMovedMore, { n: moved.length - MAX })));
-      items.push(h('li', null, link('territories', fill(Y.storesMovedLink, { page: pageTitle('salesUnits') }))));   // CR-32: หน้าเดิมพาไป Sales Unit & Customer แท็บเขต
+      items.push(h('li', null, link('territories', fill(Y.storesMovedLink, { page: pageTitle('salesUnits') }))));   // CR-32: หน้าเดิมพาไป Account Master แท็บเขต
       return {
         tag: 'tag-warn', title: Y.storesMovedTip,
         text: fill(Y.storesMoved, { n: F.number(moved.length), amount: F.baht(amount) }),
@@ -356,7 +359,7 @@
       var wrap = h('div', { class: 'rp-report' + (ver.draft ? ' is-draft' : '') });
       if (ver.draft) wrap.appendChild(watermark());
       wrap.appendChild(docHead(M, states, locked, ver, cur.fromSnapshot));
-      wrap.appendChild(toolbar(M.rep));
+      wrap.appendChild(toolbar(M));
       // CR-27 ลำดับ: KPI → ที่มาของการเติบโต : สัดส่วน Channel (55 : 45) → ตาราง Channel และหน่วยขาย → เป้าหมายเทียบแผนรายเดือน (เต็มความกว้าง)
       //   → สัดส่วนแผนตามกลุ่มสินค้า → แผนตามสินค้าและช่องทาง → เป้าหมายรายผู้รับผิดชอบ · พิมพ์ขึ้นหน้าใหม่ก่อน ตาราง · กลุ่มสินค้า · รายผู้รับผิดชอบ
       wrap.appendChild(kpis(M, locked));
@@ -421,7 +424,8 @@
     }
 
     // ---------- แถบบน: Filter Channel · พิมพ์ ----------
-    function toolbar(rep) {
+    function toolbar(M) {
+      var rep = M.rep;
       var filter = C.multiSelect({
         label: page.channelFilter, allLabel: page.channelAll, selected: page.channelSelected, clear: page.channelClear, empty: page.channelEmpty,
         options: rep.channels.map(function (c) { return { value: c.id, label: c.name + ' · ' + c.fullName }; }),
@@ -429,7 +433,21 @@
         onChange: function (v) { channelFilter = v; draw(); }
       });
       var print = h('button', { type: 'button', class: 'btn btn-secondary rp-print', onClick: function () { window.print(); } }, page.print);
-      return h('div', { class: 'rp-toolbar no-print' }, filter, print);
+      return h('div', { class: 'rp-toolbar no-print' }, filter, dataCheck(M), print);
+    }
+    // CR-34 ส่วน 5: ข้อมูลที่ต้องตรวจ = แผนสินค้า Clearance (SKU × หน่วยขายที่มีจำนวน > 0) → ไปที่ SKU Planning ของหน่วยนั้นและค้นหา SKU
+    function dataCheck(M) {
+      var CK = page.checks;
+      var names = {};
+      M.units.forEach(function (u) { names[u.id] = u.name; });
+      var items = calc.planClearanceItems(M.rep.skuItems || [], M.units.map(function (u) { return u.id; })).map(function (it) {
+        return { text: fill(CK.item, { sku: calc.codeOf(store.master().products, it.key), name: it.name, unit: names[it.unitId] || it.unitId }), go: function () {
+          store.set('ui.selection', { channel: it.channelId, unit: it.unitId });
+          store.set('ui.skuSearchHandoff', it.key);
+          location.href = SP.core.paths.to(reg.byId('skuPlanning').path);
+        } };
+      });
+      return C.dataCheck({ title: CK.title, criteria: CK.criteria, groups: [{ key: 'clearance', label: CK.types.clearance, items: items }] });
     }
 
     // ---------- KPI ----------
@@ -454,22 +472,43 @@
     }
 
     // ---------- กราฟเป้าหมายเทียบแผน รายเดือน ----------
+    // CR-34: แท่งซ้อนแผนตามประเภท (สินค้าเดิม → NPD ยืนยันแล้ว → ขอ NPD → Clearance ถ้ามี) · ขีดเป้าหมาย Top-down · เส้นประยอดขายอ้างอิง · แถวส่วนต่าง · สรุปทั้งปีหัวกราฟ
     function monthly(M) {
-      var bars = calc.addMonthly(M.units.map(function (u) { return u.targetM; }));
-      var line = calc.addMonthly(M.units.map(function (u) { return u.planM; }));
-      var dashed = calc.addMonthly(M.units.map(function (u) { return u.priorM; }));
+      var PT = L.planTypes;
       var T = page.monthlyTip;
-      var prior = year - 1;
-      return h('section', { class: 'card rp-section rp-monthly' }, h('h2', null, page.monthlyTitle),
-        SP.core.charts.barLine({
-          bars: bars, line: line, dashed: dashed, months: F.MONTHS,
-          labels: {
-            bar: page.monthlyLegend.bar, line: page.monthlyLegend.line, dashed: fill(page.monthlyLegend.dashed, { year: prior }),
-            lineEnd: page.monthlyEnd.line, dashedEnd: fill(page.monthlyEnd.dashed, { year: prior })
-          },
-          tick: axisText, endText: mb,
+      var G = page.monthlyLegend;
+      var rows = calc.planByTypeMonthly({ units: M.units, items: M.rep.skuItems });
+      function typeValue(r, t) { return t === 'existing' ? r.existing + r.newListing + r.clearance : r[t]; }
+      var stacks = CHART_TYPES.map(function (t) {
+        return { id: t, label: PT[t].label, colorToken: PT[t].token, borderToken: PT[t].borderToken || null, hatch: PT[t].pattern === 'hatch', legend: true,
+          values: rows.map(function (r) { return typeValue(r, t); }) };
+      });
+      // CR-36: แผน Clearance (ไม่นับในเป้าหมาย) = ส่วนสีเทาลายจุดบนสุด · แถวส่วนต่างและสรุปทั้งปีไม่นับส่วนนี้
+      var clp = calc.clearancePlanMonthly(store.data(), { year: year, unitIds: M.units.map(function (u) { return u.id; }) }).map(function (x) { return x.netSales; });
+      var clTotal = calc.sum(clp);
+      if (clTotal > 0) stacks.push({ id: 'clearancePlan', label: PT.clearancePlan.label, colorToken: PT.clearancePlan.token, dots: true, legend: true, values: clp });
+      function diffText(d) { return d.status === 'ok' ? page.monthlyDiffOk : d.status === 'empty' ? '–' : (d.diff < 0 ? '−' : '+') + m1(Math.abs(d.diff)); }
+      var diffs = rows.map(function (r) { return calc.planDiff(r.target, r.plan); });
+      var target = calc.sum(rows.map(function (r) { return r.target; })), plan = calc.sum(rows.map(function (r) { return r.plan; }));
+      var rem = calc.remaining(target, plan);
+      var gap = fill(page.monthlyGap[rem.status], { amount: m1(Math.abs(rem.amount)), pct: F.pct(Math.abs(rem.pct), 1) });
+      var annual = h('span', { class: 'rp-monthly-annual text-' + rem.status }, fill(page.monthlyAnnual, { target: m1(target), plan: m1(plan), gap: gap }) + (clTotal > 0 ? fill(page.monthlyClearance, { value: m1(clTotal) }) : ''));
+      return h('section', { class: 'card rp-section rp-monthly' }, h('div', { class: 'rp-monthly-head' }, h('h2', null, page.monthlyTitle), annual),
+        SP.core.charts.planTargetBars({
+          months: F.MONTHS, stacks: stacks, target: rows.map(function (r) { return r.target; }), reference: rows.map(function (r) { return r.reference; }),
+          diff: diffs.map(function (d) { return { text: diffText(d), status: d.status }; }),
+          labels: { target: G.target, reference: G.reference, refToggle: G.refToggle, diff: G.diff },
+          tick: axisText,
           tip: function (m) {
-            return [[T.target, mb(bars[m])], [T.plan, mb(line[m])], [T.gap, C.remainingText(calc.remaining(bars[m], line[m]), mb)], [fill(T.prior, { year: prior }), mb(dashed[m])]];
+            var r = rows[m];
+            var out = [[T.target, mb(r.target)], [T.plan, mb(r.plan)]];
+            CHART_TYPES.forEach(function (t) {
+              var label = t === 'existing' && r.newListing > 0 ? fill(T.existingListing, { label: PT.existing.label, value: mb(r.newListing) }) : PT[t].label;
+              out.push([label, mb(typeValue(r, t)), 'is-part']);
+            });
+            if (clp[m] > 0) out.push([PT.clearancePlan.label, mb(clp[m]), 'is-part']);
+            out.push([T.gap, diffText(diffs[m])], [T.prior, mb(r.reference)]);
+            return out;
           }
         }));
     }
@@ -690,7 +729,8 @@
       function row(n, visible) {
         var open = !!pivotOpen[n.path];
         var isSku = n.kind === 'sku';
-        var label = isSku ? h('span', { class: 'pv-sku' }, h('span', { class: 'pv-sku-name' }, n.label), h('span', { class: 'pv-sku-code' }, n.id))
+        var prod = isSku ? calc.findProduct(store.master().products, n.id) : null;   // CR-35: รหัสที่แสดง + ป้ายชื่อชั่วคราว (คำขอ NPD)
+        var label = isSku ? h('span', { class: 'pv-sku' }, h('span', { class: 'pv-sku-name' }, n.label, ' ', C.tempNameTag(prod)), h('span', { class: 'pv-sku-code' }, prod ? calc.productCode(prod) : n.id))
           : h('button', { type: 'button', class: 'pv-toggle', 'aria-expanded': open ? 'true' : 'false', onClick: function () { pivotOpen[n.path] = !open; repaint(); } },
             h('span', { class: 'pv-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'), pivotRowLabel(cfg, n), h('span', { class: 'pv-count' }, fill(X.count, { n: countSku(n) })));
         var tr = h('tr', { class: 'pv-row pv-level-' + n.level + (isSku ? ' is-sku' : ''), hidden: !visible },
@@ -749,40 +789,47 @@
     }
 
     // ---------- สัดส่วนแผนตามกลุ่มสินค้า ----------
+    // CR-34: 2 คอลัมน์ 50 : 50 · ซ้าย = ตามประเภทแผน (calc.planTypeMix) · ขวา = ตามกลุ่มสินค้าซ้อนตามประเภท (calc.planGroupByType) · Legend ประเภทร่วมที่หัวการ์ด
     function mix(M) {
-      var total = M.plan;
-      function items(list, labelOf, tokenOf) {
-        return list.filter(function (x) { return x.value > 0.5; }).map(function (x) {
-          return { label: labelOf(x), value: x.value, colorToken: tokenOf(x.key), text: fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }) };
-        });
-      }
-      // CR-27: ตาม Status = แท่งซ้อน 100% แท่งเดียว (ตัวเลข · % ในแต่ละช่วง)
-      var statusMix = calc.mergeMix(M.units.map(function (u) { return u.mix.status; }), 'status').filter(function (x) { return x.value > 0.5; });
-      var statusBar = SP.core.charts.stackedShare({
-        rows: [{ label: '', parts: statusMix.map(function (x) {
-          return { id: x.key, value: total ? x.value / total : 0, colorToken: STATUS_TOKENS[x.key] || '--c-bar', text: fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }),
-            title: (L.status[x.key] || x.key) + ' · ' + fill(page.mixText, { value: mb(x.value), pct: total ? F.pct(x.value / total, 1) : '–' }) };
-        }) }],
-        // Legend แสดง Active · New · Clearance เสมอ (Status ที่ไม่มีแผน = "{Status} · 0%") + Status อื่นที่มีแผน
-        legend: MIX_STATUSES.concat(statusMix.map(function (x) { return x.key; }).filter(function (k) { return MIX_STATUSES.indexOf(k) < 0; })).map(function (k) {
-          var has = statusMix.some(function (x) { return x.key === k; });
-          return { id: k, label: has ? L.status[k] || k : fill(page.mixStatusZero, { status: L.status[k] || k }), colorToken: STATUS_TOKENS[k] || '--c-bar' };
-        }),
-        minLabel: 0.1
+      var PT = L.planTypes;
+      var ids = M.units.map(function (u) { return u.id; });
+      var skuItems = M.rep.skuItems || [];
+      var tm = calc.planTypeMix(skuItems, ids, M.target);
+      var total = tm.total;
+      function share(v) { return fill(page.mixText, { value: mb(v), pct: total ? F.pct(v / total, 1) : '–' }); }
+      function part(t, v) { return { id: t, colorToken: PT[t].token, borderToken: PT[t].borderToken || null, hatch: PT[t].pattern === 'hatch', value: v }; }
+      var clMix = calc.clearancePlanMonthly(store.data(), { year: year, unitIds: ids });
+      var clValue = calc.sum(clMix.map(function (x) { return x.netSales; }));
+      var clSkus = store.master().products.filter(function (p) { return p.clearance && calc.sum(calc.clearancePlanMonthly(store.data(), { year: year, unitIds: ids, productKey: calc.productKey(p) }).map(function (x) { return x.units; })) > 0; }).length;
+      var typeRows = tm.rows.filter(function (r) { return r.type !== 'clearance'; }).map(function (r) {
+        var sub = r.type === 'existing' && tm.listing.skus ? fill(page.mixListing, { n: r.skus, value: mb(tm.listing.value), m: tm.listing.skus }) : fill(page.mixSkus, { n: r.skus });
+        return { label: PT[r.type].label, sub: sub, note: null, parts: [part(r.type, r.value)], text: share(r.value), title: PT[r.type].tip };
       });
+      if (clValue > 0) typeRows.push({ label: PT.clearancePlan.label, sub: fill(page.mixSkus, { n: clSkus }), note: page.mixClearanceNote,
+        parts: [{ id: 'clearancePlan', colorToken: PT.clearancePlan.token, dots: true, value: clValue }], text: mb(clValue), title: PT.clearancePlan.tip });
+      var byType = SP.core.charts.partBars({ minPx: 4, rows: typeRows });
+      var summary = h('p', { class: 'rp-mix-summary', title: page.mixNewTip }, fill(page.mixNewTotal, { value: mb(tm.newTotal), pct: F.pct(tm.newPct, 1) }),
+        tm.gap > 0 ? h('span', { class: 'rp-mix-gap' }, ' · ' + fill(page.mixGap, { value: mb(tm.gap) })) : null);
       var kind = mixBy === 'category' ? 'category' : 'series';
-      var byGroup = items(calc.mergeMix(M.units.map(function (u) { return u.mix[kind]; }), kind, 8), function (x) {
-        return x.key === null ? page.mixOther : x.label || (kind === 'series' ? L.series.none : page.mixNoCategory);
-      }, function () { return '--c-bar'; });
-      return h('section', { class: 'card rp-section rp-break rp-mix' }, h('h2', null, page.mixTitle),
+      var tax = store.master().taxonomy;
+      var byGroup = SP.core.charts.partBars({ minPx: 4, rows: calc.planGroupByType(skuItems, ids, kind).map(function (g) {
+        var label = g.key ? calc.taxonomyName(tax, kind, g.key) || g.key : kind === 'series' ? L.series.none : page.mixNoCategory;
+        var parts = CHART_TYPES.map(function (t) { return part(t, t === 'existing' ? g.parts.existing + (g.parts.clearance || 0) : g.parts[t]); });
+        var detail = parts.filter(function (p) { return p.value > 0; }).map(function (p) { return PT[p.id].label + ' ' + mb(p.value); }).join(' · ');
+        return { label: label, parts: parts, text: share(g.total), title: fill(page.mixPartsTip, { label: label, parts: detail }) };
+      }) });
+      var legendTypes = CHART_TYPES.concat(clValue > 0 ? ['clearancePlan'] : []);
+      return h('section', { class: 'card rp-section rp-break rp-mix' },
+        h('div', { class: 'rp-mix-top' }, h('h2', null, page.mixTitle),
+          h('div', { class: 'legend rp-mix-legend' }, legendTypes.map(function (t) { return h('span', { class: 'legend-item' }, C.planTypeSwatch(t), PT[t].label); }))),
         h('div', { class: 'rp-mix-grid' },
-          h('div', { class: 'rp-mix-status' }, h('h3', null, page.mixByStatus), statusBar),
+          h('div', { class: 'rp-mix-type' }, h('h3', null, page.mixByType), byType, summary),
           h('div', { class: 'rp-mix-group' },
             h('div', { class: 'rp-mix-head' }, h('h3', null, page.mixGroupLabel),
               h('span', { class: 'no-print' }, C.segmented({ label: page.mixGroupLabel, value: kind, options: ['series', 'category'].map(function (v) { return { value: v, label: page.mixBy[v] }; }),
                 onChange: function (v) { mixBy = v; draw(); } })),
               h('span', { class: 'print-only' }, page.mixBy[kind])),
-            SP.core.charts.hbars({ items: byGroup }))));
+            h('div', { class: 'rp-mix-scroll' }, byGroup))));
     }
 
     // ---------- เป้าหมายรายผู้รับผิดชอบ (เฉพาะเดือนที่รับผิดชอบ) ----------

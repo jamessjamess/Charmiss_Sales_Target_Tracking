@@ -25,8 +25,8 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 | รายการหน้า เมนู กลุ่ม ลำดับขั้น | `core/registry.js` |
 | ลำดับการโหลดไฟล์ | `core/loader.js` |
 | สูตรคำนวณทั้งหมด (pure functions) | `core/calc.js` |
-| Workflow / ร้านค้าและเขต / หมวดสินค้า / รายงาน / นำเข้า seed | `core/workflow.js` · `core/stores.js` · `core/taxonomy.js` · `core/report.js` · `core/seed.js` |
-| Account Master / หน่วยขายและคู่ค้า / คู่มือและ UAT | `core/master.js` · `core/units.js` · `core/guide.js` (ข้อความคู่มือ `data/guide.js`) |
+| Workflow / ร้านค้าและเขต / หมวดสินค้า / รายงาน / นำเข้า seed / เพิ่มสินค้าในแผน SKU | `core/workflow.js` · `core/stores.js` · `core/taxonomy.js` · `core/report.js` · `core/seed.js` · `core/plan-edits.js` |
+| Account Master / หน่วยขายและคู่ค้า / คู่มือ | `core/master.js` · `core/units.js` · `core/guide.js` (ข้อความคู่มือ `data/guide.js`) |
 | Product Code · Preset คอลัมน์ · นำเข้าราคา · TRCLOUD | `core/catalog.js` |
 | UI ที่ใช้หลายหน้า · กราฟ SVG · ส่งออกไฟล์ | `core/components.js` · `core/charts.js` · `core/export.js` |
 | ส่งข้อมูลข้ามหน้า | `SP.core.store` เท่านั้น |
@@ -51,11 +51,11 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 | อ่านเมื่อ | ไฟล์ |
 |---|---|
 | แก้โครงโค้ด loader / registry / store | `docs/spec/architecture.md` |
-| แก้โครงข้อมูลหรือ Key ใน store | `docs/spec/data-model.md` |
-| แก้ UI กลาง คำศัพท์ สี Workflow Component กราฟ | `docs/spec/ui-standards.md` |
+| แก้โครงข้อมูลหรือ Key ใน store | `docs/spec/data-model.md` · สินค้า ราคา `data-model-products.md` |
+| แก้ UI กลาง คำศัพท์ สี Workflow Component · กราฟ | `docs/spec/ui-standards.md` · `docs/spec/ui-charts.md` |
 | แก้หน้าใดหน้าหนึ่ง | `docs/spec/pages/<หน้า>.md` |
 | Business Rule / สิ่งที่ห้ามทำ | `docs/spec/business-rules.md` · สินค้า ราคา Listing `docs/spec/product-rules.md` |
-| สมมติฐาน / คำถามค้าง | `docs/spec/open-items.md` |
+| สมมติฐาน / คำถามค้าง | `docs/spec/open-items.md` · `open-items-assumptions.md` |
 | วิธีทดสอบบนเบราว์เซอร์ | `docs/spec/testing.md` |
 | สารบัญและการอ้างหัวข้อเดิมของ SPEC | `docs/SPEC.md` |
 | ข้อสรุป · ประวัติการเปลี่ยนแปลง | `docs/DECISIONS.md` · `docs/CHANGELOG.md` |

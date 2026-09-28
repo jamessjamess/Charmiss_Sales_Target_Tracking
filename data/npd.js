@@ -6,7 +6,8 @@
  *     plannedLaunchDate ('YYYY-MM-01' เดือนเปิดตัวแน่นอน) | launchQuarter ('YYYY-Qn' แผนที่ยังไม่ชัด · CR-30),
  *     stageTargets: { plan, concept, production, ready: 'YYYY-MM' } (CR-30 เดือนเป้าหมายที่ขั้นนั้นควรเสร็จ ไม่บังคับ),
  *     plannedAccounts: [{ accountId, plannedStartMonth 'YYYY-MM' }], expectedRsp (ราคา RSP ที่คาด ไม่บังคับ), owner (ผู้รับผิดชอบฝั่ง Product),
- *     source: 'PRODUCT' | 'SALES' (ที่มา), note, workflow: { status, history } }
+ *     source: 'PRODUCT' | 'SALES' (ที่มา), note, workflow: { status, history },
+ *     CR-34 คำขอจาก Sales: requestedBy (ผู้ขอ) · reason (เหตุผล / แนวคิดสินค้า) · confirmedAt / confirmedBy (ทีม Product ยืนยันที่หน้าแผน NPD · ว่าง = ขอ NPD) }
  *   Phase 2: ทีม Product ส่ง → Sales Director อนุมัติ (core/workflow.js step 'npd') · Phase 1 บันทึกแล้วมีผลทันที (status approved ภายใน)
  * มีผลแล้ว = ตั้งเดือนเปิดตัวและ Listing ให้ และเดือนเริ่มขายต่อหน่วยเป็นค่าตั้งต้นในหน้าวางแผน SKU (แผนแบบไตรมาส: สินค้าเป็น Planned จนกว่าจะระบุเดือน)
  * CR-11: สินค้าใหม่ (data/products.js productImport.newProducts) seriesId = id ที่ core/seed.js สร้างจากชื่อ Series
@@ -36,6 +37,12 @@
     {"id":"npd-05","productKey":"NPD_2028Q1_01","seriesId":"ser-perfect-heart","stage":"concept","plannedLaunchDate":"2028-02-01","launchQuarter":null,
      "stageTargets":{"plan":"2026-08","concept":"2026-10","production":"2027-08","ready":"2028-01"},
      "plannedAccounts":[{"accountId":"shopee","plannedStartMonth":"2028-02"},{"accountId":"lazada","plannedStartMonth":"2028-02"}],"expectedRsp":259,"owner":"ชนิดา พรหมมา","source":"PRODUCT",
-     "note":"เปิดตัวที่ ECOM ก่อน","workflow":{"status":"approved","history":[{"action":"apply","by":"ทีม Product","at":"2026-09-10T10:00:00","note":""}]}}
+     "note":"เปิดตัวที่ ECOM ก่อน","workflow":{"status":"approved","history":[{"action":"apply","by":"ทีม Product","at":"2026-09-10T10:00:00","note":""}]}},
+    {"id":"npd-06","productKey":"NPD_2027Q2_04","seriesId":"ser-charming-lips","stage":"plan","plannedLaunchDate":"2027-06-01","launchQuarter":null,"stageTargets":{},
+     "plannedAccounts":[{"accountId":"watsons","plannedStartMonth":"2027-06"}],"expectedRsp":199,"owner":"","source":"SALES","requestedBy":"พิมพ์ลดา ใจดี",
+     "reason":"Watsons ขอสีส้มอิฐสำหรับแคมเปญหน้าร้อน · ลูกค้าถามหาสีใกล้ Tint 05","note":"","workflow":{"status":"approved","history":[{"action":"apply","by":"พิมพ์ลดา ใจดี","at":"2026-09-18T11:00:00","note":""}]}},
+    {"id":"npd-07","productKey":"NPD_2027Q3_01","seriesId":"ser-perfect-heart","stage":"plan","plannedLaunchDate":"2027-07-01","launchQuarter":null,"stageTargets":{},
+     "plannedAccounts":[{"accountId":"shopee","plannedStartMonth":"2027-07"}],"expectedRsp":259,"owner":"","source":"SALES","requestedBy":"มิลิน แก้วใส",
+     "reason":"สีชมพูพีชสำหรับ Live ขายบน Shopee (ขนาดพกพา)","note":"","workflow":{"status":"approved","history":[{"action":"apply","by":"มิลิน แก้วใส","at":"2026-09-19T15:00:00","note":""}]}}
   ];
 })(window.SP);

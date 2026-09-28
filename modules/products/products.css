@@ -1,4 +1,30 @@
 /* modules/products/products.css — รายการสินค้า: KPI · ตัวกรอง 2 แถว + Chip · ตาราง (Product Code และชื่อติดซ้าย เลื่อนภายในการ์ด) · Drawer รายละเอียด */
+/* CR-36: แท็บ สินค้า | Product Level · จัดกลุ่มพับได้ทุกชั้น · Drawer 50% (ขั้นต่ำ 720px) 2 คอลัมน์ · รูปอยู่ขวาของรหัสและชื่อ */
+.pl-page-tabs { margin-bottom: var(--sp-1); }
+.pl-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; gap: var(--sp-2); }
+.pl-intro { display: contents; }
+.pl-body > * { flex: 0 0 auto; }
+.pl-body > * + * { margin-top: 0; }
+@media (min-width: 1024px) {
+  .page-productList .module-body > .pl-body { flex: 1 1 auto; min-height: 0; }
+  .fit-screen .pl-body > .fit-card { flex: 1 1 auto; min-height: 140px; display: flex; flex-direction: column; }
+}
+.pl-table tr.is-group .pl-group-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--c-text); font-weight: var(--fw-bold); text-decoration: none; }
+.pl-group-caret { display: inline-block; width: 1em; color: var(--c-text-muted); }
+.pl-table tr.pl-group-d1 > td { padding-left: calc(var(--sp-2) + 1.4em); }
+.pl-table tr.pl-group-d2 > td { padding-left: calc(var(--sp-2) + 2.8em); background: var(--c-surface); }
+.product-drawer { width: max(720px, 50vw); max-width: 100vw; }
+.product-drawer .pd-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--sp-4); }
+.product-drawer .pd-section > :not(.pd-field) { grid-column: 1 / -1; }
+.product-drawer .pd-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--sp-4); align-items: start; }
+.product-drawer .pd-top-main > * + * { margin-top: var(--sp-3); }
+.product-drawer .pd-top .pd-section:not(.pd-top-image) { grid-template-columns: minmax(0, 1fr); }
+.product-drawer .pd-top-image { display: block; }
+.pd-inferred-link { cursor: pointer; }
+@media (max-width: 760px) {
+  .product-drawer .pd-section { grid-template-columns: minmax(0, 1fr); }
+  .product-drawer .pd-top { grid-template-columns: minmax(0, 1fr); }
+}
 .page-productList .module-body > * + * { margin-top: var(--sp-2); }
 
 /* KPI 6 ใบ (ปุ่มกรอง) */
@@ -38,8 +64,12 @@
 /* ตาราง: Product Code และชื่อสินค้าติดซ้าย */
 .pl-table { font-size: 13px; }
 .pl-table th, .pl-table td { padding: 3px var(--sp-2); }
-.pl-table .pl-code { position: sticky; left: 0; z-index: 2; width: 96px; min-width: 96px; max-width: 96px; }
-.pl-table .pl-name { position: sticky; left: 96px; z-index: 2; min-width: 13em; max-width: 18em; border-right: 1px solid var(--c-border); }
+.pl-table .pl-code { position: sticky; left: 0; z-index: 2; width: 118px; min-width: 118px; max-width: 118px; }   /* CR-35 รหัสชั่วคราว NPD-YYMM-NNN */
+.pl-table .pl-name { position: sticky; left: 118px; z-index: 2; min-width: 13em; max-width: 22em; border-right: 1px solid var(--c-border); }
+.pl-name-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pl-name-row .pl-name-text { min-width: 0; }
+.pl-kpi-subs .pl-kpi-subbtn { font-size: inherit; }
+.pl-kpi-subs .pl-kpi-subbtn.is-active { font-weight: var(--fw-bold); color: var(--c-primary); }
 .pl-table thead .pl-code, .pl-table thead .pl-name { z-index: 4; }
 .pl-name-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-table .pl-img { width: 40px; min-width: 40px; }

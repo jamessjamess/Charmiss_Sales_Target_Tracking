@@ -729,6 +729,81 @@
   }
 
   // ปุ่มไอคอนถังขยะ + Tooltip + กล่องยืนยัน opts: { label, confirmTitle, lines, onConfirm, disabled, disabledTitle }
+  // CR-34: ป้ายประเภทสินค้าในแผน (labels.planTypes · calc.planTypeOf) — สินค้าเดิม = ไม่มีป้าย · สีจาก tokens (--c-type-*) · ใช้ร่วม SKU Planning / Plan Summary
+  function planTypeBadge(type) {
+    var t = (labels().planTypes || {})[type];
+    if (!t || !t.badge) return null;
+    return h('span', { class: 'type-badge is-' + type, title: t.tip || null }, t.badge);
+  }
+  function planTypeSwatch(type) { return h('span', { class: 'type-swatch is-' + type, 'aria-hidden': 'true' }); }
+
+  // CR-35: ป้ายต่อท้ายชื่อของคำขอ NPD (Status Request) — ชื่อชั่วคราว · ใช้ทุกจุดที่แสดงชื่อ (Product List · Launch & Listing · SKU Planning · Plan Summary)
+  function tempNameTag(product) {
+    if (!SP.core.calc.isRequestProduct(product)) return null;
+    var X = labels().tempName;
+    return h('span', { class: 'temp-name-tag', title: X.tip }, X.tag);
+  }
+  function tempCodeTag(product) {
+    if (!SP.core.calc.isRequestProduct(product)) return null;
+    var X = labels().tempCode;
+    return h('span', { class: 'temp-code-tag', title: X.tip }, X.tag);
+  }
+  // CR-35: ยืนยันคำขอ NPD (Request → Planned): แก้ชื่อจริง · ตรวจ Type (เลขนำหน้า) · แสดง Product Code 5 หลักที่จะได้ (catalog.previewConfirmCode)
+  //   master = { products, taxonomy, codeCounters } → Promise<{ name, typeId } | null> (บันทึกโดยผู้เรียกผ่าน catalog.confirmRequest)
+  function confirmRequestDialog(product, master) {
+    var X = labels().confirmRequest;
+    var PF = labels().productFields;
+    var cat = SP.core.catalog, calc = SP.core.calc;
+    var val = { categoryId: product.categoryId || null, subCategoryId: product.subCategoryId || null, typeId: product.typeId || null };
+    var name = h('input', { type: 'text', class: 'pm-input pd-input cr-name', value: product.name || '', 'aria-label': X.name });
+    var code = h('strong', { class: 'cr-code' });
+    function check() { var r = cat.previewConfirmCode(master, val.typeId); code.textContent = r.ok ? r.code : '–'; return r; }
+    function row(label, node) { return h('div', { class: 'pd-field' }, h('span', { class: 'pd-label' }, label), h('span', { class: 'pd-value' }, node)); }
+    var type = cascadeSelect({ tax: master.taxonomy, kind: 'category', value: val, labels: [PF.categoryId, PF.subCategoryId, PF.typeId], placeholder: X.placeholder,
+      onChange: function (v) { Object.keys(v).forEach(function (k) { val[k] = v[k]; }); check(); } });
+    check();
+    var body = h('div', { class: 'cr-body' }, row(X.temp, h('strong', null, calc.productCode(product))), row(X.name, name), row(X.type, type), row(X.code, code), h('p', { class: 'dlg-text' }, X.note));
+    return dialog({ title: fill(X.title, { code: calc.productCode(product) }), body: body, confirmLabel: X.confirm, wide: true,
+      validate: function () { if (!name.value.trim()) return X.errors.name; var r = check(); return r.ok ? null : X.errors[r.error] || X.errors.type; } })
+      .then(function (r) { return r.ok ? { name: name.value.trim(), typeId: val.typeId } : null; });
+  }
+
+  // CR-35: ตัวเลือกปี ‹ 2027 ▾ › (มาตรฐานของหน้าใหม่ แทนปุ่มปีแบบแท็บ) · opts = { years: [ปี], value, label, onChange(ปี), tagOf(ปี) → ข้อความเทาต่อท้าย | null }
+  //   ‹ › เลื่อนทีละปี (ปิดใช้เมื่อถึงปีแรก / ปีสุดท้าย) · คลิกปี = รายการปีทั้งหมด (Popover) · ความสูงเท่าตัวกรองอื่นในแถว
+  function yearPicker(opts) {
+    var Y = labels().yearPicker;
+    var years = (opts.years || []).slice().sort(function (a, b) { return a - b; });
+    var i = years.indexOf(opts.value);
+    if (i < 0) i = years.length - 1;
+    var label = opts.label || Y.label;
+    function go(j) { if (j >= 0 && j < years.length && j !== i) opts.onChange(years[j]); }
+    var prev = h('button', { type: 'button', class: 'yp-step yp-prev', 'aria-label': Y.prev, title: Y.prev, disabled: i <= 0, onClick: function () { go(i - 1); } }, '‹');
+    var next = h('button', { type: 'button', class: 'yp-step yp-next', 'aria-label': Y.next, title: Y.next, disabled: i >= years.length - 1, onClick: function () { go(i + 1); } }, '›');
+    var value = h('button', { type: 'button', class: 'yp-value', 'aria-haspopup': 'listbox', 'aria-label': label + ' ' + years[i] },
+      h('span', { class: 'yp-year' }, String(years[i])), h('span', { class: 'yp-caret', 'aria-hidden': 'true' }, '▾'));
+    popover(value, function (close) {
+      return h('ul', { class: 'yp-list', role: 'listbox', 'aria-label': label }, years.map(function (y, j) {
+        var tag = opts.tagOf ? opts.tagOf(y) : null;
+        return h('li', null, h('button', { type: 'button', class: 'yp-option' + (j === i ? ' is-active' : ''), role: 'option', 'aria-selected': j === i ? 'true' : 'false',
+          onClick: function () { close(); go(j); } }, h('span', { class: 'yp-year' }, String(y)), tag ? h('span', { class: 'yp-tag' }, tag) : null));
+      }));
+    }, { className: 'yp-popover', label: label });
+    return h('span', { class: 'year-picker', role: 'group', 'aria-label': label }, prev, value, next);
+  }
+
+  // CR-35: ข้อความอ่านอย่างเดียวของหน้าที่แก้ไขรายรายการ (ไม่มี workflowBar) · ids = resource ของหน้า (permissions)
+  //   ผู้ใช้แก้ได้ = null · ชื่อบทบาทจากตารางสิทธิ์ (บทบาทที่แก้ได้ทุกหน้าแสดงเฉพาะเมื่อไม่มีบทบาทอื่น) → 'ดูอย่างเดียว · แก้ไขได้โดย {roles}'
+  function viewOnlyNote(ids, context) {
+    var P = SP.core.permissions;
+    var WL = labels().workflow;
+    if (!P || (ids || []).some(function (id) { return P.can(P.user(), id, context); })) return null;
+    var eds = P.editors(ids, context);
+    var named = eds.filter(function (e) { return !e.everywhere; });
+    if (named.length) eds = named;
+    var text = eds.length ? fill(WL.viewOnlyBy, { roles: eds.map(function (e) { return e.name; }).join(WL.rolesJoin) }) : WL.readOnlyNone;
+    return h('span', { class: 'view-only-note', title: text }, text);
+  }
+
   // CR-33: Toast ทันทีหลังบันทึก (รูปแบบเดียวกับ Toast หลังโหลดหน้าใน core/layout.js) · หายเองหลัง 4.5 วินาที หรือกดปิด · แสดงทีละ 1 ข้อความ
   function toast(text) {
     if (!text) return null;
@@ -767,6 +842,9 @@
       var finished = false;
       function done(ok) {
         if (finished) return;
+        // CR-35: opts.validate() → ข้อความผิดพลาด (ไม่ปิดกล่อง) | null
+        var bad = ok && opts.validate ? opts.validate() : null;
+        if (bad) { err.textContent = bad; err.hidden = false; return; }
         if (ok && opts.note && opts.note.required && !note.value.trim()) {
           err.textContent = opts.note.requiredText || '';
           err.hidden = false;
@@ -1215,10 +1293,18 @@
   // ---------------------------------------------------------------------
   // โหมดแก้ไข: แถบ "กำลังแก้ไข · ยังไม่บันทึก n ช่อง" / เตือนก่อนออกจากหน้าหรือทิ้งค่าที่ยังไม่บันทึก
   // ---------------------------------------------------------------------
-  function editBanner() {
+  // CR-35: opts.suffix = ข้อความ / Node ต่อท้าย (เช่น วิธีแก้ไขของหน้า · ปุ่มสลับมุมมอง) · ไม่ส่ง = แบบเดิม
+  function editBanner(opts) {
+    opts = opts || {};
     var W = labels().workflow;
     var el = h('div', { class: 'edit-banner no-print', role: 'status' });
-    el.update = function (n) { el.textContent = n ? fill(W.editing, { n: n }) : W.editingClean; el.classList.toggle('is-dirty', n > 0); };
+    var text = el;
+    if (opts.suffix != null) {
+      text = h('span', { class: 'edit-banner-text' });
+      el.appendChild(text);
+      el.appendChild(h('span', { class: 'edit-banner-extra' }, typeof opts.suffix === 'string' ? fill(W.editingHint, { hint: opts.suffix }) : opts.suffix));
+    }
+    el.update = function (n) { text.textContent = n ? fill(W.editing, { n: n }) : W.editingClean; el.classList.toggle('is-dirty', n > 0); };
     el.update(0);
     return el;
   }
@@ -1263,6 +1349,47 @@
   }
 
   // มีค่าที่ยังไม่บันทึก n ค่า → ถามก่อนทิ้ง (true = ไปต่อได้)
+  // ---------------------------------------------------------------------
+  // CR-36 treeSelect: ตัวเลือกค่าเดียวแบบลำดับชั้น (หมวดสินค้า) · รายการ = text ของ calc.categoryOptions (Category ตัวหนา · '- ' · '-- ' + เยื้อง)
+  //   ช่องที่เลือกแล้วแสดงชื่อ (ไม่มีเครื่องหมายนำหน้า) · opts = { label, value, allLabel, options: [{ value, name, depth, text }], onChange(value), className }
+  // ---------------------------------------------------------------------
+  function treeSelect(opts) {
+    var cur = (opts.options || []).filter(function (o) { return o.value === opts.value; })[0] || null;
+    var btn = h('button', { type: 'button', class: 'ss-button tree-select' + (cur ? ' is-active' : '') + (opts.className ? ' ' + opts.className : ''), title: opts.label, 'aria-label': opts.label + ' ' + (cur ? cur.name : opts.allLabel) },
+      h('span', { class: 'field-label' }, opts.label), h('span', { class: 'ss-label ts-value' }, cur ? cur.name : opts.allLabel), h('span', { class: 'ss-caret', 'aria-hidden': 'true' }, '▾'));
+    var pop = popover(btn, function (close) {
+      function pick(v) { close(); if (v !== (opts.value || '')) opts.onChange(v); }
+      var list = h('ul', { class: 'ts-list', role: 'listbox', 'aria-label': opts.label });
+      [{ value: '', name: opts.allLabel, depth: 0, text: opts.allLabel, all: true }].concat(opts.options || []).forEach(function (o) {
+        var on = (opts.value || '') === o.value;
+        list.appendChild(h('li', null, h('button', { type: 'button', role: 'option', 'aria-selected': on ? 'true' : 'false',
+          class: 'ts-option ts-depth-' + (o.depth || 0) + (on ? ' is-selected' : '') + (o.all ? ' is-all' : ''), onClick: function () { pick(o.value); } }, o.text)));
+      });
+      setTimeout(function () { var s = list.querySelector('.is-selected') || list.querySelector('button'); if (s) s.focus(); }, 0);
+      return [list];
+    }, { className: 'ts-popover', label: opts.label });
+    btn.pop = pop;
+    return btn;
+  }
+
+  // CR-36 groupPicker: ปุ่ม จัดกลุ่ม: <เกณฑ์> ▾ + รายการเกณฑ์ (เลือกได้ 1) · opts = { value, options: [{ value, label }], onChange(value), label }
+  function groupPicker(opts) {
+    var G = labels().groupPicker;
+    var cur = (opts.options || []).filter(function (o) { return o.value === opts.value; })[0] || (opts.options || [])[0] || { label: '' };
+    var btn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm group-picker' + (opts.className ? ' ' + opts.className : ''), title: opts.label || G.label },
+      fill(G.text, { value: cur.label }), h('span', { class: 'ss-caret', 'aria-hidden': 'true' }, ' ▾'));
+    popover(btn, function (close) {
+      return [h('ul', { class: 'ts-list gp-list', role: 'listbox', 'aria-label': opts.label || G.label }, (opts.options || []).map(function (o) {
+        var on = o.value === cur.value;
+        return h('li', null, h('button', { type: 'button', role: 'option', 'aria-selected': on ? 'true' : 'false', class: 'ts-option gp-option' + (on ? ' is-selected' : ''),
+          onClick: function () { close(); if (!on) opts.onChange(o.value); } }, o.label));
+      }))];
+    }, { className: 'ts-popover gp-popover', label: opts.label || G.label });
+    return btn;
+  }
+
+  // CR-35: จำนวนรายการที่ยังไม่บันทึกของหน้า (guardUnsaved) · ใช้ถามก่อนเปลี่ยนแท็บที่วาดใหม่ (Launch & Listing)
+  function unsavedCount() { return dirtyFn ? dirtyFn() || 0 : 0; }
   function confirmDiscard(n) {
     if (!n) return true;
     return window.confirm(fill(SP.data.content.site.discardConfirm, { n: n }));
@@ -1801,6 +1928,10 @@
       h('div', { class: 'flow-masters' },
         o.masters && o.masters.length ? [h('span', { class: 'flow-masters-label' }, o.mastersLabel),
           o.masters.map(function (m) {
+            // CR-36: m.lines = หน้าในกลุ่มพร้อมผู้แก้ไขของแต่ละหน้า [{ title, roles, href, goTip, disabledTip }]
+            if (m.lines) return h('div', { class: 'flow-master has-lines' }, h('strong', null, m.title), h('span', { class: 'flow-master-pages' }, m.lines.map(function (ln) {
+              return h('span', { class: 'flow-master-page' }, h('span', { class: 'flow-master-name' }, ln.title), h('span', { class: 'flow-master-roles' }, ln.roles), flowGo(ln, L.go, 'flow-master-go'));
+            })));
             return h('div', { class: 'flow-master' }, h('strong', null, m.title), h('span', { class: 'flow-master-roles' }, m.roles), flowGo(m, L.go, 'flow-master-go'));
           })] : null,
         o.note ? h('p', { class: 'flow-note' }, o.note) : null));
@@ -1824,10 +1955,12 @@
         var eds = SP.core.guide.pageEditors(pageId);
         var guide = SP.core.registry.byId('aboutPrototype');
         var extras = opts.extras ? opts.extras() : [];
+        var lead = ((SP.data.content.pages || {})[pageId] || {}).helpLead;   // CR-35: คำอธิบายใต้หัวข้อเดิม (Product Master) = บรรทัดแรกของหน้าต่าง ?
         append(box, [
-          h('h3', { class: 'popover-title' }, X.purpose), h('p', { class: 'page-help-text' }, G.purpose),
+          lead ? h('p', { class: 'page-help-text page-help-lead' }, lead) : null,
+          h('h3', { class: 'popover-title' }, X.purpose), h('p', { class: 'page-help-text' }, fill(G.purpose, SP.core.guide.textVars())),   // CR-36 ชื่อหน้าจากเมนู
           h('h3', { class: 'popover-title' }, X.editors), h('p', { class: 'page-help-text page-help-editors' }, eds.length ? eds.map(function (r) { return r.name; }).join(' · ') : X.viewOnly),
-          G.steps && G.steps.length ? [h('h3', { class: 'popover-title' }, X.steps), h('ol', { class: 'page-help-steps' }, G.steps.slice(0, 3).map(function (t) { return h('li', null, t); }))] : null,
+          G.steps && G.steps.length ? [h('h3', { class: 'popover-title' }, X.steps), h('ol', { class: 'page-help-steps' }, G.steps.slice(0, 3).map(function (t) { return h('li', null, fill(t, SP.core.guide.textVars())); }))] : null,
           h('div', { class: 'page-help-links' },
             extras.map(function (x) {
               return h('button', { type: 'button', class: 'link-btn page-help-extra', onClick: function () {
@@ -1871,7 +2004,9 @@
       groups.forEach(function (g) {
         body.push(h('section', { class: 'data-check-group', dataset: { key: g.key } },
           h('h4', { class: 'data-check-head' }, fill(X.group, { label: g.label, n: g.items.length }),
-            g.more ? h('button', { type: 'button', class: 'link-btn data-check-all', onClick: function () { close(); g.more(); } }, opts.moreLabel || X.go) : null),
+            g.more ? h('button', { type: 'button', class: 'link-btn data-check-all', onClick: function () { close(); g.more(); } }, opts.moreLabel || X.go) : null,
+            // CR-36: g.action = { label, onClick } ปุ่มคำสั่งของเกณฑ์ (เช่น ล้างค่า)
+            g.action ? h('button', { type: 'button', class: 'btn btn-secondary btn-sm data-check-action', onClick: function () { close(); g.action.onClick(); } }, g.action.label) : null),
           h('ul', { class: 'data-check-list' }, g.items.slice(0, limit).map(function (it) {
             return h('li', null, h('span', { class: 'data-check-text' }, it.text),
               h('button', { type: 'button', class: 'link-btn data-check-go', onClick: function () { close(); it.go(); } }, X.go));
@@ -2466,6 +2601,16 @@
     subChannelPicker: subChannelPicker,
     dialog: dialog,
     toast: toast,
+    viewOnlyNote: viewOnlyNote,
+    yearPicker: yearPicker,
+    tempNameTag: tempNameTag,
+    unsavedCount: unsavedCount,
+    treeSelect: treeSelect,
+    groupPicker: groupPicker,
+    tempCodeTag: tempCodeTag,
+    confirmRequestDialog: confirmRequestDialog,
+    planTypeBadge: planTypeBadge,
+    planTypeSwatch: planTypeSwatch,
     popover: popover,
     menuButton: menuButton,
     seriesFilter: seriesFilter,

@@ -62,7 +62,8 @@
 .pp-load-table tr.pp-l-group > th { box-shadow: inset 4px 0 0 var(--c, var(--c-border-strong)); }
 .pp-load-table tr.pp-l-person > th { font-weight: var(--fw-medium); }
 .pp-load-table td.is-sub { color: var(--c-text-muted); }
-.pp-load-table tr.pp-l-vacant > * { color: var(--status-short-fg); }
+.pp-load-table tr.pp-l-vacant.has-value > * { color: var(--status-short-fg); }
+.pp-load-table tr.pp-l-vacant:not(.has-value) > * { color: var(--c-text-muted); }
 .pp-replace-check { display: flex; gap: var(--sp-2); align-items: flex-start; margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
 .tl-table .tl-unit { width: 22%; text-align: left; font-size: var(--fs-xs); font-weight: var(--fw-medium); box-shadow: inset 4px 0 0 var(--c, var(--c-border-strong)); padding-left: var(--sp-2); cursor: help; }
 .tl-table thead .tl-unit { box-shadow: none; cursor: default; }
@@ -76,6 +77,20 @@
 .tl-table.is-editing td.tl-cell { cursor: pointer; }
 .tl-table.is-editing td.tl-cell.is-past { cursor: not-allowed; opacity: 0.55; }
 .tl-table td.tl-cell.is-picked { box-shadow: inset 0 0 0 2px var(--c-primary); }
+/* CR-35: สัญญาณโหมดแก้ไข — Hover ขอบ 2px สีหลัก · เดือนแรกค้างขอบ + ป้าย เริ่ม · ชี้ช่วง = ไฮไลต์ · แถวอื่นจาง 50% · โหมดดูไม่มี Hover */
+.tl-table.is-editing td.tl-cell:not(.is-past):hover { box-shadow: inset 0 0 0 2px var(--c-primary); }
+.tl-table td.tl-cell.is-anchor { box-shadow: inset 0 0 0 2px var(--c-primary); position: relative; }
+.tl-table td.tl-cell.is-range { box-shadow: inset 0 0 0 2px var(--c-primary); background-image: linear-gradient(var(--c-primary-soft), var(--c-primary-soft)); }
+.tl-start-tag { position: absolute; top: 1px; right: 2px; font-size: 9px; line-height: 1.2; padding: 0 3px; border-radius: 3px; background: var(--c-primary); color: #fff; }
+.tl-table.is-picking tbody tr.tl-row:not(.is-pick-row) { opacity: 0.5; }
+/* แท็บรายชื่อ: โหมดแก้ไข = ทั้งแถวคลิกได้ + ปุ่ม แก้ไข ขวาสุด */
+.pp-table.is-editing tr.pp-row { cursor: pointer; }
+.pp-table.is-editing tr.pp-row:hover > * { background: var(--c-primary-soft); }
+.pp-table .pp-edit-cell { width: 1%; text-align: right; padding-right: var(--sp-2); }
+.pp-name-link { color: inherit; text-decoration: none; }
+.pp-name-link:hover strong { text-decoration: underline; }
+/* มุมมองตามบุคคล: ทั้งปี 0 = – สีเทา · ไม่มีผู้รับผิดชอบสีแดงเฉพาะเมื่อมีค่า */
+.pp-load-table td.is-zero { color: var(--c-text-muted); }
 .tl-table td.tl-cell:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
 .sp-assign { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2) var(--sp-3); padding: var(--sp-2) var(--sp-3); background: var(--c-primary-soft); border: 1px solid var(--c-primary); border-radius: var(--radius-sm); font-size: var(--fs-sm); }
 .sp-assign .select { font-size: var(--fs-sm); padding-top: 2px; padding-bottom: 2px; min-width: 12em; }

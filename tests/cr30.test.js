@@ -49,8 +49,8 @@
       }
     },
     {
-      name: 'cr30-3. NPD_2027Q2_01 ถูกแปลงเป็นรหัสระบบ 32210 · แผน SKU ตั้งต้น (ยอดจริง / ค่าตั้งต้น) Listing ราคา และแผน NPD อ้างรหัสใหม่ครบ · ใน TRCLOUD = ยังไม่เปิด',
-      expected: ['32210', 2, true, true, 'npd-01', true, false, 0],
+      name: 'cr30-3. NPD_2027Q2_01 ถูกแปลงเป็นรหัสระบบ 32210 · แผน SKU ตั้งต้น (ยอดจริง / ค่าตั้งต้น) Listing ราคา และแผน NPD อ้างรหัสใหม่ครบ · CR-35 มี Product Code แล้ว = เปิดใน TRCLOUD (ยังไม่เปิด = เฉพาะคำขอ NPD)',
+      expected: ['32210', 2, true, true, 'npd-01', true, true, 0],
       actual: function () {
         var code = D().codeMigration.NPD_2027Q2_01;
         var p = calc().findProduct(D().products, code);
@@ -193,12 +193,13 @@
       }
     },
     {
-      name: 'cr30-14. ไม่มีคำ TR Code · Internal Code · Item Type · รหัสชั่วคราว ในข้อความหน้าจอ (content.js · guide.js) · Status New แสดงเป็น NPD · สินค้าไม่มีฟิลด์ itemType / internalCode',
+      name: 'cr30-14. ไม่มีคำ TR Code · Internal Code · Item Type ในข้อความหน้าจอ (CR-35 ใช้ รหัสชั่วคราว ของคำขอ NPD อีกครั้ง · นับเฉพาะใน labels.tempCode / confirmRequest / KPI Product List และคู่มือ) (content.js · guide.js) · Status New แสดงเป็น NPD · สินค้าไม่มีฟิลด์ itemType / internalCode',
       expected: [0, 0, 0, 0, 'NPD', 0],
       actual: function () {
         var txt = JSON.stringify(D().content) + JSON.stringify(D().guide);
         function n(t) { return txt.split(t).length - 1; }
-        return [n('TR Code'), n('Internal Code'), n('Item Type'), n('รหัสชั่วคราว'), D().content.labels.status['new'],
+        var L = D().content.labels; var allowed = (JSON.stringify(L.tempCode) + JSON.stringify(L.confirmRequest) + JSON.stringify(D().content.pages.productList.kpi) + JSON.stringify(D().guide)).split('รหัสชั่วคราว').length - 1;   // CR-35 คู่มืออธิบายรหัสชั่วคราวของคำขอ NPD
+        return [n('TR Code'), n('Internal Code'), n('Item Type'), n('รหัสชั่วคราว') - allowed, D().content.labels.status['new'],
           D().products.filter(function (p) { return 'itemType' in p || 'internalCode' in p; }).length];
       }
     }

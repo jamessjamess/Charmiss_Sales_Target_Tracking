@@ -1,4 +1,4 @@
-/* modules/sales-units/sales-units.css — Sales Unit & Customer (CR-32 · รวม Account & Platform + เขตและร้านค้า (TT) · CR-33 แก้ไขรายรายการ)
+/* modules/sales-units/sales-units.css — Account Master (CR-32 · รวม Account & Platform + เขตและร้านค้า (TT) · CR-33 แก้ไขรายรายการ)
  * หน้า fit: การ์ดสูงเท่าพื้นที่ที่เหลือ / แผงหน่วยขาย (ซ้าย ~28%) และตารางคู่ค้า (ขวา) เลื่อนภายในตัวเอง หน้าไม่เลื่อน
  * CR-33: แถวหน่วยขายบรรทัดเดียว · ปุ่ม แก้ไข / รายละเอียด แสดงเมื่อ Hover หรือแถวถูกเลือก · Drawer มีแถบ บันทึก / ยกเลิก ของตัวเอง */
 .page-salesUnits .module-body > * + * { margin-top: var(--sp-2); }
@@ -53,6 +53,8 @@
 .su-unit .su-item-count { min-width: 4.2em; text-align: right; }
 .su-unit-edit { flex: 0 0 auto; visibility: hidden; padding: 0 6px; min-height: 22px; font-size: var(--fs-xs); }
 .su-item:hover .su-unit-edit, .su-item.is-selected .su-unit-edit, .su-item:focus-within .su-unit-edit { visibility: visible; }
+/* CR-35: ผู้มีสิทธิ์แก้ = ปุ่ม แก้ไข แสดงตลอด (ผู้ดู = รายละเอียด เมื่อชี้) */
+.su-card.can-edit .su-unit-edit { visibility: visible; }
 .su-item-simple .su-item-count { font-size: var(--fs-sm); color: var(--c-text-muted); font-variant-numeric: tabular-nums; }
 .su-item-note { font-size: 11px; color: var(--c-text-muted); }
 .su-inactive { font-size: 11px; padding: 0 6px; font-weight: var(--fw-medium); }

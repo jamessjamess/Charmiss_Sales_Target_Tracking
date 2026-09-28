@@ -94,7 +94,7 @@
     },
     {
       name: 'pm-6 (CR-30). ทีม Product แก้ราคาหลักในหน้าราคาและ Promotion ได้ · แก้ Clearance ไม่ได้ · Supply Chain กลับกัน (หน้า Listing แก้ได้ทั้งคู่คนละส่วน)',
-      expected: [['prices', 'prices.base', 'prices.promo'], true, false, false, true, ['listing', 'listing.clearance'], true, true],
+      expected: [['prices', 'prices.base', 'prices.promo'], true, false, false, true, ['launchListing', 'listing.clearance'], true, true],   // CR-35 Launch & Listing
       actual: function () {
         var pr = role('product'), sc = role('supply');
         var mods = P().pageModules('promotionPrice', ctx());
@@ -199,10 +199,11 @@
       name: 'cr21-3. ตั้งหน้าแผน NPD ของทีม Product เป็น NONE → เมนู (visibleEntries) ไม่แสดงหน้านี้สำหรับทีม Product · บทบาทอื่นยังเห็น · ค่าตั้งต้นทีม Product เห็น',
       expected: [false, true, true, false],
       actual: function () {
-        var perms = P().setCell(P().defaultPerms(), 'product', 'npdPlan', { level: 'NONE' });
+        // CR-35: หน้าแผน NPD รวมเป็น Launch & Listing (launchListing)
+        var perms = P().setCell(P().setCell(P().defaultPerms(), 'product', 'launchListing', { level: 'NONE' }), 'product', 'listing.clearance', { level: 'NONE' });   // หน้าเห็นเมื่อสิทธิ์ใดของหน้าไม่ใช่ NONE
         var ids = function (u, p) { return P().visibleEntries(SP.core.registry.list, u, ctx({ perms: p })).map(function (e) { return e.id; }); };
-        return [ids(role('product'), perms).indexOf('npdPlan') >= 0, ids(role('director'), perms).indexOf('npdPlan') >= 0,
-          ids(role('product'), P().defaultPerms()).indexOf('npdPlan') >= 0, P().pageVisible(role('product'), 'npdPlan', ctx({ perms: perms }))];
+        return [ids(role('product'), perms).indexOf('launchListing') >= 0, ids(role('director'), perms).indexOf('launchListing') >= 0,
+          ids(role('product'), P().defaultPerms()).indexOf('launchListing') >= 0, P().pageVisible(role('product'), 'launchListing', ctx({ perms: perms }))];
       }
     },
     {
@@ -224,7 +225,7 @@
       actual: function () {
         var p1 = P().setCell(P().defaultPerms(), 'officer', 'skuPlan', { level: 'VIEW' });
         var r1 = P().enforceRules(p1, SP.data.roles, SP.core.registry.list);
-        var p2 = P().setCell(P().defaultPerms(), 'supply', 'listing', { level: 'NONE' });
+        var p2 = P().setCell(P().defaultPerms(), 'supply', 'launchListing', { level: 'NONE' });   // CR-35 หน้า Listing → Launch & Listing
         var r2 = P().enforceRules(p2, SP.data.roles, SP.core.registry.list);
         var r3 = P().enforceRules(P().defaultPerms(), SP.data.roles, SP.core.registry.list);
         var fmt = function (a) { return [a.roleId, a.resId, a.from.level, a.to.level]; };
@@ -259,7 +260,7 @@
       actual: function () {
         var p = P().defaultPerms();
         p = P().setCell(p, 'management', 'unitTargets', { level: 'EDIT' });
-        p = P().setCell(p, 'product', 'npdPlan', { level: 'NONE' });
+        p = P().setCell(p, 'product', 'launchListing', { level: 'NONE' });   // CR-35
         p = P().setCell(p, 'viewer', 'export', { level: 'NONE' });
         var all = P().resetMatrix(p);
         var one = P().resetMatrix(p, 'management');
@@ -282,7 +283,7 @@
     // ---------------- CR-25 ข้อ 5 ----------------
     {
       name: 'cr25-1. Sales Officer (พิมพ์ลดา): เมนู Sales Planning ขั้น 2 · 3 · 4 · Product Master 4 หน้า (ไม่มีหมวดสินค้าและ Series) · Account Master เฉพาะเขตการขายและร้านค้า · ไม่มี Role Management',
-      expected: [['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'npdPlan', 'promotionPrice', 'productMaster']],
+      expected: [['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'launchListing', 'promotionPrice']],
         ['account-master', ['salesUnits']], ['project-info', ['aboutPrototype']]],
       actual: function () { return menuIds({ userId: 'u-sp-pim' }); }
     },
@@ -319,7 +320,7 @@
     },
     {
       name: 'cr25-6. ผู้ใช้ 2 บทบาท (Sales Officer + ทีม Product) → เมนูรวมของทั้งสอง · หน้าเริ่มต้นตามบทบาทแรกตามลำดับบทบาท (Sales Officer = SKU Planning ไม่ว่าจะใส่บทบาทลำดับใด)',
-      expected: [[['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'npdPlan', 'promotionPrice', 'productMaster', 'taxonomy']],
+      expected: [[['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'launchListing', 'promotionPrice']],   /* CR-36 Product Level = แท็บของ Product List */
         ['account-master', ['salesUnits']], ['project-info', ['aboutPrototype']]], 'skuPlanning', 'skuPlanning', 'productList'],
       actual: function () {
         var two = { id: 'x', name: 'x', salesPersonId: 'sp-pim', roleIds: ['officer', 'product'], active: true };
@@ -343,7 +344,7 @@
     },
     {
       name: 'cr25-8. คืนค่าตั้งต้น → เมทริกซ์ตรงกับตาราง CR-25 ข้อ 3 ทุกช่อง (8 บทบาท × 19 รายการ (CR-32 salesUnits แทน accounts / territories) · CR-29 people + accounts.gp + accounts.channelSettings · CR-30 prices + prices.base + prices.promo แทน promotionPrice) · ค่าตั้งต้นใน data/ ตรงกับตาราง',
-      expected: [[], [], 152],
+      expected: [[], [], 144],   // CR-35 8 บทบาท × 18 รายการ (launchListing แทน npdPlan + listing)
       actual: function () {
         var p = P().defaultPerms();
         p = P().setCell(p, 'officer', 'taxonomy', { level: 'EDIT' });
@@ -369,7 +370,7 @@
     {
       name: 'cr25-9. หน้าเริ่มต้นของทุกบทบาทตามตาราง CR-25 ข้อ 3 (★) · แถวสรุป เห็น n · แก้ไข m หน้า (นับหน้าในเมนูข้าง ไม่นับเกี่ยวกับ Prototype) · หน้าเริ่มต้นที่ตั้งไว้แต่มองไม่เห็น = ขั้นแรกที่เห็น',
       expected: [['topDown', 'phasing', 'skuPlanning', 'skuPlanning', 'productList', 'productList', 'summary', 'roleManagement'],
-        [[4, 1], [10, 4], [9, 2], [8, 2], [6, 5], [4, 1], [1, 0], [13, 12]], 'phasing', 'topDown'],   // CR-29 Account Master 3 หน้า · CR-30 Promotion Price (Director / Manager / Officer แก้ไขได้) · CR-31 หน้า Roles ซ่อน
+        [[4, 1], [9, 4], [8, 2], [7, 2], [4, 3], [4, 2], [1, 0], [11, 10]], 'phasing', 'topDown'],   // CR-36 Category & Series เป็นแท็บ (ทีม Product · ผู้ดูแลระบบ −1 หน้า) ·   // CR-35 Launch & Listing = 1 หน้า (แทนแผน NPD + Listing) · Supply Chain เห็น Price & Promotion (แท็บ Clearance · alsoPerms)   // CR-29 Account Master 3 หน้า · CR-30 Promotion Price (Director / Manager / Officer แก้ไขได้) · CR-31 หน้า Roles ซ่อน
       actual: function () {
         var ids = CR25_ROLES;
         var bad = P().setRoleHome(SP.data.roles, 'officer', 'topDown');   // Sales Officer ไม่เห็น Annual Target
@@ -388,7 +389,8 @@
   var CR25 = {
     annualTarget: 'E V N N N N N E', unitTargets: 'V E V V N N N E', skuPlan: 'V V T T N N N E', 'skuPlan.createNpd': 'N N T T N N N E',
     summary: 'V V V V V V V V',
-    productList: 'N V V V E V N E', npdPlan: 'N V V V E V N E', prices: 'N V V V V N N E', 'prices.base': 'N V V V E N N E', 'prices.promo': 'N E T T V N N E', listing: 'N V V V E V N E',
+    // CR-35: npdPlan + listing → launchListing (สูงสุดของ 2 หน้าเดิม · เท่ากันทุกบทบาท)
+    productList: 'N V V V E V N E', launchListing: 'N V V V E V N E', prices: 'N V V V V N N E', 'prices.base': 'N V V V E N N E', 'prices.promo': 'N E T T V N N E',
     'listing.clearance': 'N V V V V E N E', taxonomy: 'N N N N E N N E',
     // CR-32: Account & Platform + เขตและร้านค้า (TT) → salesUnits (สิทธิ์สูงสุดของ 2 หน้าเดิม) · สิทธิ์ย่อย GP / ตั้งค่า Channel คงค่าเดิม
     salesUnits: 'N E V V N N N E', 'salesUnits.gp': 'N E V N N N N E', 'salesUnits.channelSettings': 'N E N N N N N E', people: 'N E V N N N N E',
