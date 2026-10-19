@@ -91,3 +91,16 @@ Status จากวันที่ (`calc.dateStatus` · ห้ามให้�
 
 - SKU ลบได้เมื่อไม่มี Listing · ราคา · แผน NPD
 - หมวดสินค้าลบได้เมื่อไม่มี SKU และไม่มีรายการย่อย
+
+## Bundle (CR-37 · `core/calc.js` ส่วนที่ 23 · บังคับที่ Store)
+
+- Bundle = สินค้า 1 รายการ (รหัส · ราคา · Status · Listing ของตัวเอง) ประกอบด้วย SKU เดี่ยว × จำนวน · วางแผนเป็นชุดในแถวของ Bundle · Net Sales จากราคา Bundle · ไม่แตกยอดไปที่ชิ้นส่วน
+- กติกา (`calc.bundleIssues` · `store.set('master.products')` ปฏิเสธพร้อมข้อความ `content.pages.bundle.errors`):
+  ชิ้นส่วนรวม ≥ 2 (`settings.BUNDLE.minQty`) · qty เป็นจำนวนเต็ม ≥ 1 · ชิ้นส่วนต้องเป็นสินค้าเดี่ยว (ห้าม Bundle ซ้อน Bundle) · ชิ้นส่วนต้องไม่เป็น Request / Delete (`blockedStatuses`) ·
+  skuId ซ้ำรวมเป็นบรรทัดเดียว · ตรวจเฉพาะ Bundle ที่สร้างใหม่หรือชิ้นส่วนเปลี่ยน (ชิ้นส่วนที่กลายเป็น Delete ภายหลัง = ข้อมูลที่ต้องตรวจ ไม่ทำให้บันทึกไม่ได้)
+- ชุดส่วนประกอบซ้ำกันบันทึกได้ · ขึ้นในข้อมูลที่ต้องตรวจ (`calc.duplicateBundleSets`) · เปลี่ยนส่วนประกอบของ Bundle ที่มีในแผน SKU = ถามยืนยัน (หน้าจอ)
+- รหัส: ตัวสร้างรหัสเดิม (`catalog.nextCode`) Type `Bundle` เลขนำหน้า `90` (ตัวสร้างใช้เลข 2 หลักต่อ Type) → 90000 · 90010 … · ต่อจากตัวอย่าง = 90210
+- ราคารวมชิ้นส่วน `calc.bundleComponentPrice(data, bundle, priceType, month, unitId)` = Σ ราคาชิ้นส่วน × qty ตามลำดับราคาเดิมของแต่ละชิ้นส่วน (ไม่ระบุหน่วยขาย = ราคาหลักประเภทนั้น) ·
+  ส่วนลด `calc.bundleDiscount` = 1 − ราคา Bundle ÷ ราคารวมชิ้นส่วน (ติดลบ = แพงกว่าซื้อแยก) · 90100 = 1 − 109 ÷ 118
+- ความต้องการชิ้นส่วน `calc.componentDemand(scope)` ต่อ SKU เดี่ยว × เดือน `{ direct, viaBundle, total }` (ชิ้น · จำนวนที่ใช้คำนวณของแผน SKU) · viaBundle = Σ ชุด × qty · ข้อมูลประกอบ ไม่ใช่ยอดขาย
+- Flag `bundle` (ค่าเริ่มต้น true) ปิด = `calc.bundleVisible` false: แผน SKU ไม่แสดงและไม่นับแถว Bundle · รายการเพิ่มสินค้าไม่มี Bundle · หน้าและป้ายซ่อน · หมวด Set & Bundle และ Mix Series (taxonomy `feature`) ไม่โหลด (`core/seed.js`) · ข้อมูลยังอยู่

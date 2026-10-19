@@ -121,6 +121,14 @@ Net Sales   MT   = Sale Amount ÷ 1.07 × (1 − GP)
 
 - ย้ายไปที่ [permissions.md](permissions.md) (CR-25): ระดับ · ขอบเขตทีม · สิทธิ์ย่อย · ค่าตั้งต้นต่อบทบาท · เมนูตามบทบาท · หน้าเริ่มต้นของบทบาท
 
+## Revision (CR-38 · Flag `revision`)
+
+- กฎทั้งหมดอยู่ที่ [revision.md](revision.md): รอบ R1, R2 … ต่อปีแผน · ร่าง → รอ Lock → Lock แล้ว (MD) · ห้ามแก้ย้อนหลัง 2 ระดับ บังคับที่ Store ทุกบทบาท · Snapshot ตอน Lock
+- ห้ามแก้รอบที่ Lock แล้ว · ห้ามแก้เดือนก่อนเดือนที่มีผล · ห้ามตั้งเป้าหมายต่ำกว่าส่วนที่ล็อก · ไม่มีการลบรอบหรือปลด Lock · เครื่องมือปรับทั้งหมดทำงานเฉพาะเดือนที่เปิด
+- Workflow ด้านล่าง (อนุมัติทีละขั้น · Baseline · Re-forecast) ยังอยู่หลัง Flag เดิม ไม่ใช้ร่วมกับ Revision
+- CR-39: Revision อยู่ในแท็บของ Plan Summary · ส่งขออนุมัติ → (Sales Director ยืนยัน ถ้าเปิดใช้) → MD อนุมัติและ Lock ผ่าน Module Approval ([approval.md](approval.md)) ·
+  ดำเนินการขั้นได้เฉพาะบทบาทของขั้น ผู้ดูแลระบบทำแทนไม่ได้ · คำขอที่ปิดแล้วแก้ไม่ได้ · บังคับที่ Store
+
 ## Workflow **[Phase 2]** (`core/workflow.js`)
 
 - Phase 1 ปิดด้วย Flag (`approvalWorkflow` · `baseline` · `reforecast` · `npdApproval`) ปุ่มจึงเหลือเฉพาะ แก้ไข · บันทึก · ยกเลิก

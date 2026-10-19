@@ -1,0 +1,24 @@
+/* modules/revision-compare/revision-compare.css — CR-38 Revision Compare: แถบตัวเลือก · กราฟรายเดือน · ตารางทั้งปี / รายเดือน (หน้าสูงเท่าจอ ตารางเลื่อนภายในการ์ด) */
+@media (min-width: 1024px) {
+  .page-revisionCompare .module-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; gap: var(--sp-2); }
+  .page-revisionCompare .module-body > * { flex: 0 0 auto; }
+  .page-revisionCompare .module-body > .rc-table-card { flex: 1 1 auto; min-height: 160px; display: flex; flex-direction: column; }
+}
+.page-revisionCompare .module-body > * + * { margin-top: var(--sp-2); }
+.rc-toolbar { flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; }
+.rc-pair { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); max-width: 100%; }
+.rc-pair .select, .rc-toolbar .field .select { max-width: 100%; }
+.rc-basis { margin: 0; }
+.rc-chart-card { padding: var(--sp-2) var(--sp-3); }
+.rc-chart-title { font-size: 14px; margin: 0 0 var(--sp-1); }
+.rc-chart-card .barline-plot { height: 150px; }
+.rc-table th.rc-name { text-align: left; white-space: nowrap; min-width: 160px; }
+.rc-table .rc-line { white-space: nowrap; color: var(--c-text-muted); font-size: 12px; }
+.rc-table tr.rc-m-d td { border-bottom: 2px solid var(--c-border); }
+.rc-table tr.rc-total th, .rc-table tr.rc-total td { font-weight: var(--fw-bold); background: var(--c-surface-2); }
+.rc-bars-head { min-width: 220px; }
+.rc-bars { position: relative; height: 16px; min-width: 200px; }
+.rc-bar-a, .rc-bar-b { position: absolute; left: 0; border-radius: 2px; }
+.rc-bar-a { top: 0; height: 16px; background: var(--c-border-strong); opacity: 0.6; }
+.rc-bar-b { top: 4px; height: 8px; background: var(--c-primary); }
+.rc-empty { padding: var(--sp-4); color: var(--c-text-muted); }

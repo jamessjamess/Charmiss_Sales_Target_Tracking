@@ -2,7 +2,7 @@
  * core/features.js — Feature Flags (CR-17) ที่เดียวที่อ่าน settings.FEATURES
  *
  *   isOn(name)                 → true | false (ชื่อที่ไม่รู้จัก = false)
- *                                approvalWorkflow · baseline · reforecast · sellIn · npdApproval
+ *                                approvalWorkflow · baseline · reforecast · sellIn · npdApproval · CR-37 bundle (ค่าเริ่มต้น true · calc.bundleVisible)
  *   all()                      → { <name>: bool } ค่าปัจจุบันทั้งหมด (รวมค่าที่ override)
  *   withFlags(values, fn)      → รัน fn ขณะตั้งค่า Flag ชั่วคราว แล้วคืนค่าเดิมเสมอ (ใช้ใน Test) → ผลของ fn
  *   visibleActions(actions)    → ปุ่มของ workflowBar ที่แสดงได้: ปิด approvalWorkflow = เหลือเฉพาะ edit · save · cancel

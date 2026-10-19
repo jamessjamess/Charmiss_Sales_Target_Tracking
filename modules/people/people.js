@@ -109,7 +109,7 @@
     if (ctx.intro) ctx.intro.appendChild(bar);
 
     function save() {
-      var meta = { by: C.roleName(store.role()), at: new Date().toISOString() };
+      var meta = { by: C.roleName(store.role()), at: SP.core.clock.now() };
       var strip = function (list) { return list.map(function (p) { var c = clone(p); delete c.endUndo; return c; }); };
       var entries = M.auditDiff('person', strip(saved.people), strip(draft.people), ['name', 'type', 'endMonth', 'channelId', 'userId'], meta)
         .concat(M.auditTeams(saved.teams, draft.teams, meta)).concat(M.auditAssignments(saved.assignments, draft.assignments, meta))
@@ -141,7 +141,7 @@
       bar.update();
       var c = cur();
       var d = dataOf(c);
-      var tabCtl = C.segmented({ label: page.tabLabel, value: tab, options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }),
+      var tabCtl = C.tabs({ label: page.tabLabel, value: tab, options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }),   // CR-40 แท็บขีดเส้นใต้
         onChange: function (v) { tab = v; store.set('ui.peopleTab', v); sel = null; draw(); } });
       root.appendChild(h('div', { class: 'tool-row pp-toolbar' }, tabCtl, tab === 'list' ? listFilters() : monthlyFilters(c), checksChip(c, d),
         h('span', { class: 'pp-tools-end' }, editing && tab === 'list' ? h('button', { type: 'button', class: 'btn btn-secondary btn-sm pp-add', onClick: function () { addDialog(); } }, page.add) : null)));
@@ -234,11 +234,13 @@
       if (filters.role && !s.memberships.some(function (m) { return m.role === filters.role && (!filters.channel || m.channelId === filters.channel); })) return false;
       return true;
     }
+    // CR-41: สิ้นสุดเดือนปัจจุบันของนาฬิกากลาง = จะสิ้นสุดเดือนนี้
+    function endingText(end) { return String(end).slice(0, 7) === now ? page.endingThisMonth : fill(page.endingTag, { month: F.date(end) }); }
     function statusCell(c, p) {
       var s = stateOf(c, p);
       var S = page.status;
       // CR-32: สถานะค่าเดียว ใช้งาน · จะสิ้นสุด <เดือน> · สิ้นสุด <เดือน>
-      if (s.status === 'ending') return h('span', { class: 'badge tag-warn pp-ending' }, fill(page.endingTag, { month: F.date(s.end) }));
+      if (s.status === 'ending') return h('span', { class: 'badge tag-warn pp-ending' }, endingText(s.end));
       return s.status === 'ended' ? h('span', { class: 'badge tag-muted' }, fill(S.ended, { month: F.date(s.end) }))
         : s.status === 'none' ? h('span', { class: 'badge tag-warn' }, S.none) : h('span', { class: 'badge tag-ok' }, S.active);
     }
@@ -846,7 +848,7 @@
             { key: 'teams', label: X.teams, value: function (p) { return stateOf(c, p).memberships.map(function (m) { var ch = channel(m.channelId); return (ch ? ch.name : m.channelId) + ' · ' + (page.roles[m.role] || m.role) + ' · ' + period(m.fromMonth, m.toMonth); }).join(' / '); }, width: 40 },
             { key: 'units', label: fill(X.units, { month: F.date(now) }), value: function (p) { return M.unitsAt(c.assignments, p.id, now).map(function (u) { return unitName(d, u); }).join(', '); }, width: 36 },
             { key: 'account', label: X.account, value: function (p) { var u = userOf(c, p); return u ? u.name : ''; }, width: 22 },
-            { key: 'status', label: X.status, value: function (p) { var s = stateOf(c, p); return s.status === 'ended' ? fill(page.status.ended, { month: F.date(s.end) }) : s.status === 'ending' ? page.status.active + ' · ' + fill(page.endingTag, { month: F.date(s.end) }) : page.status[s.status]; }, width: 26 }
+            { key: 'status', label: X.status, value: function (p) { var s = stateOf(c, p); return s.status === 'ended' ? fill(page.status.ended, { month: F.date(s.end) }) : s.status === 'ending' ? page.status.active + ' · ' + endingText(s.end) : page.status[s.status]; }, width: 26 }
           ],
           rows: rows
         }, {

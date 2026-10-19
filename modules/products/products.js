@@ -1,5 +1,13 @@
 /*
- * modules/products/products.js — Product Master · Product List (CR-36 แท็บ สินค้า | Product Level)
+ * modules/products/products.js — Product Master · Product List (CR-36 แท็บ สินค้า | Product Level) + CR-37 หน้า Bundle
+ *
+ * CR-37:          หน้า Bundle (registry bundle · modules/bundle/index.html โหลดไฟล์นี้ · SP.modules.bundle) แท็บ รายการ Bundle | ความต้องการชิ้นส่วน (#list / #demand)
+ *                 รายการ Bundle = renderItems โหมด bundle: KPI 4 ใบ · ตัวกรอง (ค้นหารวมชิ้นส่วน · Status ไม่รวม Delete · Series · ชิ้นส่วน) · ข้อมูลที่ต้องตรวจ ·
+ *                 ตาราง (ส่วนประกอบเป็น Chip · ราคารวมชิ้นส่วน · ส่วนลด · แผนปีแผน ชุด) · + สร้าง Bundle (โหมดแก้ไข) · สิทธิ์ของหน้า bundle
+ *                 Drawer สินค้าแบบ Bundle (ทั้งหน้า Bundle และ Product List): ส่วนประกอบแก้ได้ (− / + · เพิ่ม · นำออก · รวมบรรทัดซ้ำ) · หมวดสินค้าระบบกำหนด ·
+ *                 Series จากชิ้นส่วน (calc.bundleSeries) หรือทีม Product แก้เอง (seriesManual) · ผิดกติกา = ข้อความแดง + ปุ่มบันทึกใช้ไม่ได้ (Store ปฏิเสธซ้ำ)
+ *                 Product List: ป้าย Bundle ต่อท้ายชื่อ · ตัวกรองเพิ่มเติม ประเภทสินค้า · Drawer SKU เดี่ยว อยู่ใน Bundle: … (ลิงก์ ui.bundleFocus) · Flag bundle ปิด = ไม่มี Bundle
+ *                 แท็บความต้องการชิ้นส่วน = renderDemand (calc.componentDemand · อ่านอย่างเดียว · ไม่ใช่ยอดขาย)
  *
  * CR-36:          แท็บ สินค้า | Product Level ต่อจากหัวข้อ (ui.productListTab · #items / #level) · แท็บ Product Level = โค้ดเดิมของหน้า Category & Series ทั้งหมด
  *                 (สิทธิ์ส่วนของหน้า taxonomy · key เดิม · ไม่เห็น = ไม่มีแท็บ) · หน้าเดิม modules/taxonomy = ทางผ่าน (registry visible: false · perm productList)
@@ -70,8 +78,11 @@
   // คอลัมน์ที่เลือกได้ (Product Code และชื่อสินค้าแสดงเสมอ)
   var SELECTABLE = ['image', 'status', 'category', 'subCategory', 'type', 'series', 'subSeries', 'rsp', 'completeness', 'barcode', 'packSize',
     'launchDate', 'productYear', 'listedCount', 'sellIn', 'inTrcloud', 'source', 'updatedAt'];
-  var MORE = ['channel', 'completeness', 'source', 'trcloud', 'revenue', 'year'];
-  function emptyFilters() { return { q: '', status: '', node: '', nodeLevel: '', channel: '', completeness: '', source: '', trcloud: '', revenue: '', year: [], kpi: '' }; }
+  var MORE = ['channel', 'completeness', 'source', 'trcloud', 'revenue', 'year', 'kind'];
+  function emptyFilters() { return { q: '', status: '', node: '', nodeLevel: '', channel: '', completeness: '', source: '', trcloud: '', revenue: '', year: [], kind: '', kpi: '' }; }
+  // CR-37: ตัวกรองของหน้า Bundle (แยกจาก Product List)
+  function emptyBundleFilters() { return { q: '', status: '', series: [], component: '', kpi: '' }; }
+  var bundleFilters = emptyBundleFilters();
   function hasValue(v) { return Array.isArray(v) ? v.length > 0 : !!v; }
   var filters = emptyFilters();
   // CR-36: จัดกลุ่มเลือกเกณฑ์ได้ (components.groupPicker · จำต่อผู้ใช้ ui.groupBy.<ผู้ใช้>.productList · ค่าเริ่มต้น Series) · กลุ่มที่พับไว้
@@ -83,6 +94,11 @@
 
   function renderItems(root, ctx) {
     var page = ctx.page;
+    // CR-37: หน้า Bundle ใช้ renderItems เดียวกัน (ctx.mode = 'bundle') · page = ข้อความของ Product List (Drawer ใช้ร่วม) · BP = ข้อความของหน้า Bundle
+    var bundleMode = ctx.mode === 'bundle';
+    var BP = SP.data.content.pages.bundle;
+    var BS = SP.data.settings.BUNDLE || {};
+    var permKey = bundleMode ? 'bundle' : 'productList';
     var L = SP.data.content.labels;
     var PF = L.productFields;
     var year = store.year();
@@ -109,7 +125,7 @@
     function cur() { return editing ? draft : saved; }
     // CR-21: สิทธิ์จากตารางสิทธิ์ (หน้ารายการสินค้า) / ผู้แก้ไข = ผู้ใช้ในมุมมองปัจจุบัน
     function byName() { return C.roleName(store.role()); }
-    function canEdit() { return Perm.can(Perm.user(), 'productList'); }
+    function canEdit() { return Perm.can(Perm.user(), permKey); }
     function tax() { return store.get('master.taxonomy'); }
 
     function diffCount() {
@@ -130,12 +146,16 @@
       return draft.basePrices.filter(function (r) { return old.indexOf(JSON.stringify(r)) < 0; });
     }
 
-    var exportBtn = C.exportButton({ unsaved: dirty, build: exportSpec });
+    var exportBtn = C.exportButton({ unsaved: dirty, build: function (src) { return bundleMode ? bundleExportSpec(src) : exportSpec(src); } });
     var bar = C.workflowBar({
-      simple: true, extra: exportBtn, modules: ['productList'],   // CR-36: แท็บสินค้า = สิทธิ์ productList (Product Level = taxonomy)
+      simple: true, extra: exportBtn, modules: [permKey],   // CR-36: แท็บสินค้า = สิทธิ์ productList (Product Level = taxonomy) · CR-37 หน้า Bundle = bundle
       editing: function () { return editing; },
       onEdit: function () { startEdit(); },
-      onSave: function () { confirmDeletes().then(function (ok) { if (ok) save(); }); },
+      // CR-37: Bundle ผิดกติกา = บันทึกไม่ได้ · Bundle ที่มีในแผนแล้วเปลี่ยนส่วนประกอบ = ถามยืนยัน
+      onSave: function () {
+        if (blockedBundles().length) { C.toast(BP.saveBlocked); return; }
+        confirmDeletes().then(function (ok) { return ok && confirmBundleChanges(); }).then(function (ok) { if (ok) save(); });
+      },
       onCancel: function () { editing = false; creating = false; draft = clone(saved); notice = null; draw(); }
     });
     if (ctx.intro) ctx.intro.appendChild(bar);
@@ -164,7 +184,7 @@
     }
 
     function save() {
-      var by = byName(), at = new Date().toISOString();
+      var by = byName(), at = SP.core.clock.now();
       var entries = [];
       draft.products.forEach(function (p) {
         var key = calc.productKey(p);
@@ -181,11 +201,12 @@
         entries.push({ entity: 'price', key: r.productKey, field: 'price', oldValue: null, newValue: { priceType: r.priceType, price: r.price, effectiveMonth: r.effectiveMonth }, by: by, at: at });
       });
       // เลข Product Code ที่ออกแล้วบันทึกด้วย (ไม่นำกลับมาใช้แม้ลบ SKU)
-      store.set('master.products', draft.products);
+      // CR-37: Store ตรวจกติกาของ Bundle อีกครั้ง (ปฏิเสธ = แจ้งแล้วอยู่ในโหมดแก้ไขต่อ)
+      try { store.set('master.products', draft.products); } catch (e) { C.toast(e.message); return; }
       store.set('master.basePrices', draft.basePrices);
       store.set('master.codeCounters', draft.codeCounters);
       store.appendAudit(entries);
-      saved = clone(draft);
+      saved = snapshot();
       editing = false;
       creating = false;
       notice = null;
@@ -223,6 +244,8 @@
         page.filters.fromSales);
     }
     function matches(p, skipKpi) {
+      if (!calc.bundleVisible(p)) return false;   // CR-37: Flag bundle ปิด = ไม่มี Bundle
+      if (filters.kind && calc.productKind(p) !== filters.kind) return false;
       var q = filters.q.trim().toLowerCase();
       if (q) {
         // CR-35: ค้นหาด้วยรหัสชั่วคราวได้ (รหัสที่แสดง · รหัสชั่วคราวเดิม · ID ภายใน)
@@ -338,6 +361,8 @@
     function draw() {
       C.clear(root);
       bar.update();
+      syncSave();
+      if (bundleMode) { drawBundles(); return; }   // CR-37
       var products = cur().products;
       var P = page.kpi;
 
@@ -441,7 +466,9 @@
         sel(Fl.revenue, 'revenue', [{ value: '', label: Fl.revenueAll }].concat(['npd', 'existing', 'clearance'].map(function (k) { return { value: k, label: L.revenueTypes[k] }; }))),
         // CR-36: Product Year (เลือกหลายปี + ยังไม่มี Listing)
         C.multiSelect({ label: Fl.year, allLabel: Fl.yearAll, selected: Fl.yearSelected, clear: L.series.clear, empty: L.series.empty, value: filters.year,
-          options: yearOptions(), onChange: function (v) { filters.year = v; draw(); } }));
+          options: yearOptions(), onChange: function (v) { filters.year = v; draw(); } }),
+        // CR-37: ประเภทสินค้า (สินค้าเดี่ยว / Bundle) · Flag bundle ปิด = ไม่แสดง
+        calc.bundleOn() ? sel(Fl.kind, 'kind', [{ value: '', label: Fl.kindAll }].concat(['single', 'bundle'].map(function (k) { return { value: k, label: Fl.kindOptions[k] }; }))) : null);
     }
     function yearOptions() {
       var ys = {};
@@ -469,6 +496,7 @@
       if (filters.source) add(Fl.source, Fl.sourceOptions[filters.source], function () { filters.source = ''; });
       if (filters.trcloud) add(Fl.trcloud, page.trcloud[filters.trcloud], function () { filters.trcloud = ''; });
       filters.year.forEach(function (y) { add(Fl.year, y === 'none' ? L.groupBy.noYear : y, function () { filters.year = filters.year.filter(function (x) { return x !== y; }); }); });
+      if (filters.kind) add(Fl.kind, Fl.kindOptions[filters.kind], function () { filters.kind = ''; });
       C.clear(chipSlot);
       chipSlot.appendChild(h('span', { class: 'pl-summary' },
         h('span', { class: 'pl-count' }, fill(page.resultCount, { n: F.number(shown), total: F.number(cur().products.length) })),
@@ -479,6 +507,7 @@
 
     // ------------------------------------------------------------------ ตาราง
     function renderTable() {
+      if (bundleMode) { renderBundleTable(); return; }   // CR-37
       if (!tableSlot) return;
       var T = tax();
       var cols = columns();
@@ -524,7 +553,7 @@
       var tds = cols.map(function (c) {
         // CR-35: รหัสที่แสดง (คำขอ = รหัสชั่วคราว) · ป้าย ชื่อชั่วคราว และ จาก Sales ต่อท้ายชื่อ (ไม่ถูกตัด)
         if (c.key === 'code') return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, calc.productCode(p)));
-        if (c.key === 'name') return h('td', { class: 'pl-name', title: p.name }, h('span', { class: 'pl-name-row' }, h('span', { class: 'pl-name-text' }, calc.displayName(p)), C.tempNameTag(p), salesTag(p)));
+        if (c.key === 'name') return h('td', { class: 'pl-name', title: p.name }, h('span', { class: 'pl-name-row' }, h('span', { class: 'pl-name-text' }, calc.displayName(p)), C.tempNameTag(p), C.bundleTag(p, cur().products), salesTag(p)));
         if (c.key === 'image') return h('td', { class: 'pl-img' }, C.productThumb(p, T, { size: 'sm' }));
         if (c.key === 'status') {
           var segs = calc.statusSegments(p, year);
@@ -591,7 +620,9 @@
 
     function openCreate() {
       if (!editing) return;
-      creating = true;
+      creating = bundleMode ? 'bundle' : true;   // CR-37: หน้า Bundle = สร้าง Bundle
+      createDraft = null;
+      createRsp = null;
       selected = null;
       renderDrawer();
       drawerCtl.open();
@@ -602,7 +633,7 @@
     function renderDrawer() {
       C.clear(drawerCtl.head);
       C.clear(drawerCtl.body);
-      if (creating) { renderCreate(); return; }
+      if (creating) { if (creating === 'bundle') renderCreateBundle(); else renderCreate(); return; }
       var p = product();
       if (!p) { drawerCtl.close(); return; }
       var T = tax();
@@ -611,7 +642,7 @@
       drawerCtl.head.appendChild(h('div', { class: 'pd-head' },
         C.productThumb(p, T, { size: 'md' }),
         h('div', { class: 'pd-title' },
-          h('h2', null, p.name || '–', ' ', C.tempNameTag(p)),
+          h('h2', null, p.name || '–', ' ', C.tempNameTag(p), C.bundleTag(p, cur().products)),
           h('div', { class: 'pd-meta' },
             lockedCode(calc.productCode(p)), C.tempCodeTag(p),
             C.statusBadge(statusOf(p)),
@@ -639,7 +670,7 @@
       var p = calc.findProduct(m.products, key);
       C.confirmRequestDialog(p, m).then(function (v) {
         if (!v) return;
-        var at = new Date().toISOString(), by = byName();
+        var at = SP.core.clock.now(), by = byName();
         var res = CAT.confirmRequest(m, key, v, { by: by, at: at });
         if (!res.ok) { C.toast(L.confirmRequest.errors[res.error] || res.error); return; }
         store.set('master.products', res.master.products);
@@ -656,7 +687,7 @@
     function field(label, content, cls) { return h('div', { class: 'pd-field ' + (cls || '') }, h('span', { class: 'pd-label' }, label), h('span', { class: 'pd-value' }, content)); }
     function dval(v) { return v == null || v === '' ? '–' : v; }
 
-    function refresh() { renderDrawer(); renderTable(); var b = root.querySelector('.edit-banner'); if (b) b.update(dirty()); }
+    function refresh() { renderDrawer(); renderTable(); var b = root.querySelector('.edit-banner'); if (b) b.update(dirty()); syncSave(); }
 
     function original(key) { return calc.findProduct(saved.products, key); }
     function isDirty(p, f) { var o = original(calc.productKey(p)); return editing && (!o || JSON.stringify(o[f]) !== JSON.stringify(p[f])); }
@@ -694,6 +725,10 @@
             field(PF.barcode, dval(p.barcode)), trcloudField(p)),
           h('section', { class: 'pd-section' }, h('h3', null, G.names), field(PF.name, dval(p.name)), field(PF.shortName, dval(p.shortName)), field(PF.nameEn, dval(p.nameEn)))),
           h('section', { class: 'pd-section pd-top-image' }, h('h3', null, G.image), h('div', { class: 'pd-image' }, C.productThumb(p, T, { size: 'lg' })))));
+        // CR-37: Bundle = ส่วนประกอบ · หมวดสินค้าระบบกำหนด · Series / SKU เดี่ยว = อยู่ใน Bundle
+        if (calc.isBundle(p)) { bundleSections(body, p); return; }
+        var inB = inBundlesField(p);
+        if (inB) body.appendChild(inB);
         body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.category, inferredTag(p)),
           field(PF.categoryId, dval(tx.category)), field(PF.subCategoryId, dval(tx.subCategory)), field(PF.typeId, dval(tx.type))));
         body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.series), field(PF.seriesId, dval(tx.series)), field(PF.subSeriesId, dval(tx.subSeries))));
@@ -709,6 +744,9 @@
         h('section', { class: 'pd-section' }, h('h3', null, G.names),
           field(PF.name, textInput(p, 'name', PF.name)), field(PF.shortName, textInput(p, 'shortName', PF.shortName)), field(PF.nameEn, textInput(p, 'nameEn', PF.nameEn)))),
         imageEditor(p, 'pd-top-image')));
+        if (calc.isBundle(p)) { bundleSections(body, p); return; }   // CR-37
+        var inBe = inBundlesField(p);
+        if (inBe) body.appendChild(inBe);
       // เลือกหมวดสินค้าเอง = ยืนยันแล้ว (ล้างเครื่องหมาย "ระบบกำหนด") · CR-30 Product Code ไม่เปลี่ยนตาม Type ที่แก้ภายหลัง
       body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.category, inferredTag(p)),
         C.cascadeSelect({ tax: T, kind: 'category', value: p, labels: [PF.categoryId, PF.subCategoryId, PF.typeId], placeholder: G.placeholder,
@@ -824,6 +862,10 @@
         if (f === 'price' && typeof v === 'object') return (L.priceTypes[v.priceType] || v.priceType || '') + ' ' + F.baht(v.price, 2) + ' · ' + F.date(v.effectiveMonth || v.effectiveFrom);
         if (f === 'clearance' && typeof v === 'object') return F.date(v.fromMonth) + '–' + F.date(v.toMonth) + ' · ' + F.units(v.stockQty);
         if (/Id$/.test(f)) { var T = tax(); return calc.taxonomyName(T, /series/i.test(f) ? 'series' : 'category', v) || v; }
+        // CR-37: ส่วนประกอบ · ประเภทสินค้า · Series ที่กำหนดเอง ของ Bundle
+        if (f === 'components' && Array.isArray(v)) return v.map(function (c) { return fill(BP.componentsText, { code: calc.codeOf(cur().products, c.skuId), qty: c.qty }); }).join(BP.componentsJoin);
+        if (f === 'kind') return page.filters.kindOptions[v] || v;
+        if (f === 'seriesManual') return v ? BP.drawer.seriesManual : BP.drawer.seriesAuto;
         if (typeof v === 'object') return JSON.stringify(v);
         return String(v);
       }
@@ -874,7 +916,7 @@
             if (!name.value.trim()) { msg.className = 'pm-msg is-error'; msg.textContent = Cr.nameRequired; return; }
             var r = coded();
             if (!r.ok) { msg.className = 'pm-msg is-error'; msg.textContent = Cr.codeErrors[r.error]; return; }
-            var at = new Date().toISOString();
+            var at = SP.core.clock.now();
             np.trCode = r.code;
             np.name = name.value.trim();
             np.nameEn = nameEn.value.trim();
@@ -945,7 +987,7 @@
     // นำเข้าสินค้าที่มีใน TRCLOUD แต่ไม่มีใน Product Master ด้วยรหัสเดิม (ไม่สร้างรหัสใหม่) · เลขนี้นับเป็นเลขที่ใช้แล้ว
     function importErp(row) {
       if (calc.findProduct(draft.products, row.trCode)) return;
-      var at = new Date().toISOString();
+      var at = SP.core.clock.now();
       draft.products.push(CAT.productFromErp(row, tax(), SP.data.productImport.categoryRules, { at: at }));
       draft.codeCounters = CAT.takeCode(draft.codeCounters, row.trCode);
       if (row.rsp > 0) {
@@ -961,7 +1003,7 @@
       var p = calc.findProduct(draft.products, m.key);
       if (!p) return;
       if (m.field === 'rsp') {
-        var res = calc.setBasePrice(draft.basePrices, { productKey: m.key, priceType: 'RSP', effectiveMonth: month, price: m.erp, by: 'ERP', at: new Date().toISOString() });
+        var res = calc.setBasePrice(draft.basePrices, { productKey: m.key, priceType: 'RSP', effectiveMonth: month, price: m.erp, by: 'ERP', at: SP.core.clock.now() });
         if (res.ok) draft.basePrices = res.list;
       } else {
         p[m.field] = m.erp;
@@ -971,7 +1013,606 @@
       renderErp();
     }
 
+    // ================================================================== CR-37 Bundle
+    //   หน้า Bundle (ctx.mode = 'bundle') ใช้ renderItems เดียวกับ Product List: โหมดแก้ไข · บันทึก · Drawer (แท็บราคา · Listing และวงจรสินค้า · ประวัติ ใช้ร่วม)
+    //   ต่างกันที่หน้ารายการ (KPI 4 ใบ · ตัวกรอง · ตาราง · ข้อมูลที่ต้องตรวจ) · ส่วนประกอบอยู่ในแท็บข้อมูลทั่วไปของ Drawer สินค้าแบบ Bundle (ทั้ง 2 หน้า)
+    //   กติกาชิ้นส่วนจาก calc (bundleIssues · normalizeBundles ที่ Store ใช้) · ราคารวมชิ้นส่วน / ส่วนลด = calc.bundleComponentPrice / bundleDiscount
+    function bundleList() { return cur().products.filter(calc.isBundle); }
+    function comps(p) { return calc.mergeComponents(p.components); }
+    function compOf(c) { return calc.findProduct(cur().products, c.skuId); }
+    function isCheckStatus(st) { return (BS.checkStatuses || []).indexOf(st) >= 0; }
+    function badComps(p) { return comps(p).filter(function (c) { var x = compOf(c); return x && isCheckStatus(statusOf(x)); }); }
+    function priceData() { return { basePrices: cur().basePrices }; }
+    function partsPrice(p) { return calc.bundleComponentPrice(priceData(), p, 'RSP', month); }
+    function discountOf(p) { return calc.bundleDiscount(priceData(), p, 'RSP', month); }
+    function pctText(v) { return v == null ? '–' : (v < 0 ? '−' : '') + F.pct(Math.abs(v), 1); }
+    function compText(p) { return comps(p).map(function (c) { return fill(BP.componentsText, { code: calc.codeOf(cur().products, c.skuId), qty: c.qty }); }).join(BP.componentsJoin); }
+    // ส่วนประกอบเปลี่ยนจากที่บันทึกไว้ (ตัดสินว่าต้องตรวจสถานะชิ้นส่วนหรือไม่ · เหมือน calc.normalizeBundles ที่ Store)
+    function compsChanged(p) { var o = original(calc.productKey(p)); return !o || JSON.stringify(calc.mergeComponents(o.components)) !== JSON.stringify(comps(p)); }
+    function issuesOf(p) { return calc.bundleIssues(p, cur().products, month, compsChanged(p)); }
+    function issueText(p, x) {
+      var E = BP.errors;
+      return fill(E[x.code] || E.invalid, { bundle: calc.productCode(p), code: x.skuId ? calc.codeOf(cur().products, x.skuId) : '', status: x.status ? L.status[x.status] : '' });
+    }
+    function blockedBundles() { return editing ? draft.products.filter(function (p) { return calc.isBundle(p) && issuesOf(p).length; }) : []; }
+    // ปุ่ม บันทึก ใช้ไม่ได้เมื่อมี Bundle ผิดกติกา (ข้อความเตือนสีแดงอยู่ใต้ตารางส่วนประกอบ)
+    function syncSave() {
+      var btn = bar.querySelector('.wf-save');
+      if (!btn) return;
+      var blocked = blockedBundles().length > 0;
+      btn.disabled = blocked;
+      btn.title = blocked ? BP.saveBlocked : '';
+    }
+    // หมวดสินค้าและ Series ของ Bundle ในฉบับร่าง (ตรงกับที่ Store กำหนดตอนบันทึก)
+    function syncBundle(p) {
+      p.components = comps(p);
+      p.categoryId = BS.categoryId; p.subCategoryId = BS.subCategoryId; p.typeId = BS.typeId; p.inferred = false;
+      if (!p.seriesManual) { p.seriesId = calc.bundleSeries(p, cur().products); p.subSeriesId = null; }
+    }
+    // Bundle เดิมที่ส่วนประกอบเปลี่ยนและมีในแผน SKU → ถามยืนยัน (CR-37 ข้อ 1.2)
+    function confirmBundleChanges() {
+      var D2 = BP.drawer.planConfirm;
+      var list = draft.products.filter(function (p) { return calc.isBundle(p) && original(calc.productKey(p)) && compsChanged(p); });
+      return list.reduce(function (chain, p) {
+        return chain.then(function (ok) {
+          if (!ok) return false;
+          var units = unitsWithPlan(calc.productKey(p));
+          if (!units.length) return true;
+          return C.dialog({ title: fill(D2.title, { name: calc.productCode(p) + ' ' + p.name }), lines: [fill(D2.line, { n: units.length })], confirmLabel: D2.confirm })
+            .then(function (r) { return r.ok; });
+        });
+      }, Promise.resolve(true));
+    }
+
+    // จำนวนชุดในแผน SKU ปีแผน (ทุกหน่วยขายในแผน · คำนวณครั้งเดียวต่อการวาด)
+    var planCache = null;
+    function planTotals() {
+      if (planCache) return planCache;
+      var td = store.get(store.planKey('topDown'));
+      var plans = {};
+      Object.keys(td.units || {}).forEach(function (ch) { (td.units[ch] || []).forEach(function (u) { plans[u] = store.get(store.planKey('sku.' + u)); }); });
+      planCache = calc.bundlePlanTotals(store.data(), store.master(), plans, year);
+      return planCache;
+    }
+    function planSets(p) { var t = planTotals()[calc.productKey(p)]; return t ? t.total : 0; }
+
+    function bundleMatches(p, skipKpi) {
+      var f = bundleFilters;
+      var q = f.q.trim().toLowerCase();
+      if (q) {
+        var text = [calc.productCode(p), p.name, p.shortName].concat(comps(p).map(function (c) {
+          var x = compOf(c);
+          return [c.skuId, x ? calc.productCode(x) : '', x ? x.name : '', x ? x.shortName : ''].join(' ');
+        })).join(' ').toLowerCase();
+        if (text.indexOf(q) < 0) return false;
+      }
+      var st = statusOf(p);
+      if (!f.status && st === 'delete') return false;
+      if (f.status && f.status !== 'all' && st !== f.status) return false;
+      if (!calc.inSeries(p, f.series)) return false;
+      if (f.component && !comps(p).some(function (c) { return c.skuId === f.component; })) return false;
+      if (!skipKpi && f.kpi) {
+        if (f.kpi === 'active' && st !== 'active') return false;
+        if (f.kpi === 'inPlan' && !(planSets(p) > 0)) return false;
+        if (f.kpi === 'check' && !badComps(p).length) return false;
+      }
+      return true;
+    }
+
+    function drawBundles() {
+      planCache = null;
+      var K = BP.kpi;
+      var base = bundleList().filter(function (p) { return bundleMatches(p, true); });
+      var kpis = [
+        { key: '', label: K.all, n: base.filter(function (p) { return statusOf(p) !== 'delete'; }).length, sub: K.allSub },
+        { key: 'active', label: K.active, n: base.filter(function (p) { return statusOf(p) === 'active'; }).length },
+        { key: 'inPlan', label: K.inPlan, n: base.filter(function (p) { return planSets(p) > 0; }).length, sub: fill(K.inPlanSub, { year: year }) },
+        { key: 'check', label: K.check, n: base.filter(function (p) { return badComps(p).length > 0; }).length, sub: K.checkSub, cls: 'is-warn' }
+      ];
+      root.appendChild(h('div', { class: 'pl-kpis bd-kpis' }, kpis.map(function (k) {
+        return h('button', {
+          type: 'button', class: 'card pl-kpi bd-kpi-' + (k.key || 'all') + ' ' + (k.cls || '') + (bundleFilters.kpi === k.key ? ' is-selected' : ''), title: K.title,
+          'aria-pressed': bundleFilters.kpi === k.key ? 'true' : 'false',
+          onClick: function () { bundleFilters.kpi = bundleFilters.kpi === k.key ? '' : k.key; draw(); }
+        }, h('span', { class: 'pl-kpi-label' }, k.label), h('strong', { class: 'pl-kpi-value' }, F.number(k.n)), h('span', { class: 'pl-kpi-unit' }, K.unit),
+          k.sub ? h('span', { class: 'pl-kpi-sub' }, k.sub) : null);
+      })));
+      root.appendChild(bundleToolbar());
+      chipSlot = h('div', { class: 'pl-chips' });
+      root.appendChild(chipSlot);
+      if (editing) { var b = C.editBanner(); b.update(dirty()); root.appendChild(b); }
+      tableSlot = h('div', { class: 'card fit-card pl-card bd-card' });
+      root.appendChild(tableSlot);
+      renderTable();
+      if (drawerCtl.isOpen()) renderDrawer();
+    }
+
+    function bundleToolbar() {
+      var Fl = BP.filters;
+      var search = h('input', { type: 'search', class: 'search-input pl-search bd-search', placeholder: BP.searchPlaceholder, 'aria-label': BP.searchPlaceholder, value: bundleFilters.q });
+      search.addEventListener('input', function () { bundleFilters.q = search.value; renderTable(); });
+      var used = {};
+      bundleList().forEach(function (p) { comps(p).forEach(function (c) { used[c.skuId] = true; }); });
+      var compOptions = Object.keys(used).map(function (k) { return calc.findProduct(cur().products, k); }).filter(Boolean)
+        .sort(function (a, b) { return String(calc.productCode(a)) < String(calc.productCode(b)) ? -1 : 1; })
+        .map(function (x) { return { value: calc.productKey(x), label: calc.productCode(x) + ' ' + calc.displayName(x) }; });
+      function bsel(label, key, options) {
+        var el = C.select({ label: label, value: bundleFilters[key], options: options, className: 'pl-filter-' + key + (bundleFilters[key] ? ' is-active' : ''),
+          onChange: function (v) { bundleFilters[key] = v; draw(); } });
+        el.title = label;
+        return el;
+      }
+      return h('div', { class: 'tool-row pl-toolbar bd-toolbar' },
+        search,
+        bsel(Fl.status, 'status', [{ value: '', label: Fl.statusAll }, { value: 'all', label: Fl.statusEverything }].concat(calc.PRODUCT_STATUSES.map(function (s) { return { value: s, label: L.status[s] }; }))),
+        C.seriesFilter({ options: calc.seriesList(tax(), bundleList()), value: bundleFilters.series, onChange: function (v) { bundleFilters.series = v; draw(); } }),
+        bsel(Fl.component, 'component', [{ value: '', label: Fl.componentAll }].concat(compOptions)),
+        h('span', { class: 'tool-right' }, bundleChecks(),
+          editing && canEdit() ? h('button', { type: 'button', class: 'btn btn-primary btn-sm bd-add', onClick: openCreate }, BP.add) : null));
+    }
+
+    // ข้อมูลที่ต้องตรวจ (components.dataCheck): ชิ้นส่วนสถานะผิดปกติ · ชุดส่วนประกอบซ้ำ · ส่วนลดติดลบ · ไม่มี RSP
+    function bundleChecks() {
+      var X = BP.checks;
+      var list = bundleList().filter(function (p) { return statusOf(p) !== 'delete'; });
+      function go(key) { return function () { openProduct(key); }; }
+      var groups = [
+        { key: 'componentStatus', label: X.componentStatus, items: [] },
+        { key: 'duplicate', label: X.duplicate, items: [] },
+        { key: 'negative', label: X.negative, items: [] },
+        { key: 'noRsp', label: X.noRsp, items: [] }
+      ];
+      list.forEach(function (p) {
+        var key = calc.productKey(p);
+        var name = calc.productCode(p) + ' ' + calc.displayName(p);
+        badComps(p).forEach(function (c) {
+          var x = compOf(c);
+          groups[0].items.push({ text: fill(X.componentLine, { bundle: name, code: calc.productCode(x), status: L.status[statusOf(x)] }), go: go(key) });
+        });
+        var d = discountOf(p);
+        if (d != null && d < 0) groups[2].items.push({ text: fill(X.negativeLine, { bundle: name, pct: pctText(d) }), go: go(key) });
+        if (rsp(p) == null) groups[3].items.push({ text: fill(X.noRspLine, { bundle: name }), go: go(key) });
+      });
+      calc.duplicateBundleSets(list).forEach(function (g) {
+        groups[1].items.push({ text: fill(X.duplicateLine, { codes: g.map(function (k) { return calc.codeOf(cur().products, k); }).join(' · ') }), go: go(g[0]) });
+      });
+      return C.dataCheck({ groups: groups, criteria: groups.map(function (g) { return g.label; }) });
+    }
+
+    function bundleColumns() {
+      var X = BP.columns, T = tax();
+      return [
+        { key: 'code', label: X.code, value: function (p) { return calc.productCode(p); } },
+        { key: 'name', label: X.name, value: function (p) { return p.name; } },
+        { key: 'status', label: X.status, value: function (p) { return L.status[statusOf(p)]; } },
+        { key: 'components', label: X.components, value: compText },
+        { key: 'pieces', label: X.pieces, num: true, value: function (p) { return calc.bundleQty(p); } },
+        { key: 'partsPrice', label: X.partsPrice, num: true, money: true, value: partsPrice },
+        { key: 'rsp', label: X.rsp, num: true, money: true, value: rsp },
+        { key: 'discount', label: X.discount, num: true, pct: true, value: discountOf },
+        { key: 'series', label: X.series, value: function (p) { return calc.taxonomyName(T, 'series', p.seriesId); } },
+        { key: 'planSets', label: fill(X.planSets, { year: year }), num: true, value: planSets }
+      ];
+    }
+
+    function renderBundleTable() {
+      if (!tableSlot) return;
+      var cols = bundleColumns();
+      var all = bundleList();
+      var shown = all.filter(function (p) { return bundleMatches(p); });
+      var head = cols.map(function (c) {
+        return h('th', { scope: 'col', class: (c.key === 'code' ? 'pl-code ' : c.key === 'name' ? 'pl-name ' : 'bd-col-' + c.key + ' ') + (c.num ? 'num' : '') }, c.label);
+      }).concat([h('th', { scope: 'col', class: 'manage' }, BP.columns.manage)]);
+      var body = h('tbody');
+      if (!shown.length) body.appendChild(h('tr', null, h('td', { class: 'grid-empty', colspan: String(cols.length + 1) }, BP.empty)));
+      shown.forEach(function (p) { body.appendChild(bundleRow(p, cols)); });
+      C.clear(tableSlot).appendChild(h('div', { class: 'fit-scroll pl-scroll' },
+        h('table', { class: 'data-grid pl-table bd-table' }, h('thead', null, h('tr', null, head)), body)));
+      bundleChipsBar(shown.length, all.length);
+      highlight();
+    }
+
+    function compChip(c) {
+      var x = compOf(c);
+      var st = x ? statusOf(x) : null;
+      var code = x ? calc.productCode(x) : c.skuId;
+      return h('span', { class: 'bd-chip' + (st && isCheckStatus(st) ? ' is-warn' : ''), title: fill(BP.chipTip, { code: code, name: x ? x.name : '', status: st ? L.status[st] : '–' }) },
+        fill(BP.chip, { code: code, qty: c.qty }));
+    }
+
+    function bundleRow(p, cols) {
+      var key = calc.productKey(p);
+      var tds = cols.map(function (c) {
+        if (c.key === 'code') return h('td', { class: 'pl-code' }, h('span', { class: 'pl-code-text' }, calc.productCode(p)));
+        if (c.key === 'name') return h('td', { class: 'pl-name', title: p.name }, h('span', { class: 'pl-name-row' }, h('span', { class: 'pl-name-text' }, calc.displayName(p))));
+        if (c.key === 'status') return h('td', null, C.statusBadge(statusOf(p)));
+        if (c.key === 'components') return h('td', { class: 'bd-components' }, h('span', { class: 'bd-chips' }, comps(p).map(compChip)));
+        var v = c.value(p);
+        if (c.pct) return h('td', { class: 'num' + (v != null && v < 0 ? ' is-negative' : ''), title: v != null && v < 0 ? BP.discountTip : null }, pctText(v));
+        if (c.money) return h('td', { class: 'num' }, v == null ? '–' : F.baht(v, 2));
+        if (c.num) return h('td', { class: 'num' }, v == null ? '–' : F.number(v));
+        return h('td', { class: 'ellipsis', title: v || '' }, v || '–');
+      });
+      var manage = h('td', { class: 'manage' }, h('span', { class: 'manage-group' },
+        editing && canEdit() ? C.trashButton({
+          label: page.removeTitle, disabled: referenced(p), disabledTitle: page.removeBlocked, confirmTitle: fill(page.removeConfirm, { code: key }),
+          onConfirm: function () {
+            draft.products = draft.products.filter(function (x) { return calc.productKey(x) !== key; });
+            draft.basePrices = draft.basePrices.filter(function (r) { return r.productKey !== key; });
+            if (selected === key) drawerCtl.close();
+            draw();
+          }
+        }) : null,
+        h('button', { type: 'button', class: 'icon-btn pl-open', title: page.viewDetail, 'aria-label': page.viewDetail + ' ' + key }, '›')));
+      return h('tr', {
+        class: 'is-clickable', dataset: { key: key },
+        onClick: function (e) { if (e.target.closest && e.target.closest('.trash-btn')) return; openProduct(key); }
+      }, tds, manage);
+    }
+
+    function bundleChipsBar(shown, total) {
+      if (!chipSlot) return;
+      var Fl = BP.filters, f = bundleFilters, T = tax();
+      var items = [];
+      function add(label, value, clear) { items.push({ label: fill(Fl.chip, { label: label, value: value }), onRemove: function () { clear(); draw(); } }); }
+      if (f.kpi) items.push({ label: fill(Fl.kpiChip, { value: BP.kpi[f.kpi] }), onRemove: function () { bundleFilters.kpi = ''; draw(); } });
+      if (f.q.trim()) items.push({ label: fill(Fl.searchChip, { value: f.q.trim() }), onRemove: function () { bundleFilters.q = ''; draw(); } });
+      if (f.status) add(Fl.status, f.status === 'all' ? Fl.statusEverything : L.status[f.status], function () { bundleFilters.status = ''; });
+      f.series.forEach(function (s) {
+        add(L.series.label, calc.taxonomyName(T, 'series', s) || L.series.none, function () { bundleFilters.series = bundleFilters.series.filter(function (x) { return x !== s; }); });
+      });
+      if (f.component) add(Fl.component, calc.codeOf(cur().products, f.component), function () { bundleFilters.component = ''; });
+      C.clear(chipSlot);
+      chipSlot.appendChild(h('span', { class: 'pl-summary' },
+        h('span', { class: 'pl-count' }, fill(BP.resultCount, { n: F.number(shown), total: F.number(total) })),
+        ' · ' + fill(page.statusAsOf, { month: F.date(month) })));
+      var chips = C.filterChips(items, function () { bundleFilters = emptyBundleFilters(); draw(); });
+      if (chips) chipSlot.appendChild(chips);
+    }
+
+    function bundleExportSpec(source) {
+      var list = (source === 'draft' && editing ? draft : saved).products.filter(function (p) { return calc.isBundle(p) && bundleMatches(p); });
+      var st = C.exportStamp(null);
+      return {
+        filename: fill(BP.exportFile, { date: st.date }),
+        sheets: [{
+          name: BP.exportSheet,
+          header: C.exportHeader(year, null, [[page.statusAsOf.replace(' {month}', ''), F.date(month)]]),
+          columns: bundleColumns().map(function (c) {
+            return { key: c.key, label: c.label, width: c.key === 'name' || c.key === 'components' ? 36 : 14,
+              value: c.pct ? function (p) { var v = c.value(p); return v == null ? '' : Math.round(v * 10000) / 100; } : c.value };
+          }),
+          rows: list
+        }]
+      };
+    }
+
+    // ส่วนประกอบใน Drawer (ดู / แก้ไข) · opts = { onChange (Drawer สร้าง Bundle), rsp (RSP ที่ยังไม่บันทึก), issues }
+    function componentsSection(p, opts) {
+      opts = opts || {};
+      var BD = BP.drawer, X = BD.columns;
+      var edit = editing || !!opts.onChange;
+      var changed = opts.onChange || function () { syncBundle(p); refresh(); };
+      var list = comps(p);
+      var rows = list.map(function (c, i) {
+        var x = compOf(c);
+        var st = x ? statusOf(x) : null;
+        var price = x ? rsp(x) : null;
+        var code = x ? calc.productCode(x) : c.skuId;
+        function setQty(q) { p.components = list.map(function (y, j) { return { skuId: y.skuId, qty: j === i ? q : y.qty }; }); changed(); }
+        var qtyCell = F.number(c.qty);
+        if (edit) {
+          var qIn = h('input', { type: 'number', class: 'pm-input bd-qty-input', min: '1', step: '1', value: String(c.qty), 'aria-label': fill(BD.qtyLabel, { code: code }) });
+          qIn.addEventListener('change', function () { setQty(Number(qIn.value)); });
+          qtyCell = h('span', { class: 'bd-qty' },
+            h('button', { type: 'button', class: 'btn btn-secondary btn-sm bd-minus', title: BD.minus, 'aria-label': BD.minus, disabled: c.qty <= 1, onClick: function () { setQty(c.qty - 1); } }, '−'),
+            qIn,
+            h('button', { type: 'button', class: 'btn btn-secondary btn-sm bd-plus', title: BD.plus, 'aria-label': BD.plus, onClick: function () { setQty(c.qty + 1); } }, '+'));
+        }
+        return h('tr', { class: st && isCheckStatus(st) ? 'is-warn' : null },
+          h('td', { class: 'pl-code' }, code),
+          h('td', { class: 'ellipsis', title: x ? x.name : '' }, x ? calc.displayName(x) : '–'),
+          h('td', null, st ? C.statusBadge(st) : '–'),
+          h('td', { class: 'num' }, qtyCell),
+          h('td', { class: 'num' }, price == null ? '–' : F.baht(price, 2)),
+          h('td', { class: 'num' }, price == null ? '–' : F.baht(price * c.qty, 2)),
+          edit ? h('td', { class: 'manage' }, h('button', { type: 'button', class: 'btn btn-ghost btn-sm bd-remove', title: fill(BD.removeTitle, { code: code }),
+            onClick: function () { p.components = list.filter(function (y, j) { return j !== i; }); changed(); } }, BD.remove)) : null);
+      });
+      var head = h('tr', null, ['sku', 'name', 'status', 'qty', 'price', 'total'].map(function (k) {
+        return h('th', { scope: 'col', class: k === 'qty' || k === 'price' || k === 'total' ? 'num' : null }, X[k]);
+      }), edit ? h('th', { scope: 'col', class: 'manage' }) : null);
+      var parts = partsPrice(p);
+      var own = opts.rsp !== undefined ? opts.rsp : rsp(p);
+      var disc = parts && own != null ? 1 - own / parts : null;
+      var issues = edit ? (opts.issues || issuesOf(p)) : [];
+      return h('section', { class: 'pd-section bd-components-section' }, h('h3', null, BD.components),
+        list.length ? h('table', { class: 'data-grid bd-comp-table' }, h('thead', null, head), h('tbody', null, rows)) : h('p', { class: 'muted' }, BD.empty),
+        edit ? addComponentRow(p, list, changed) : null,
+        h('p', { class: 'bd-total' + (disc != null && disc < 0 ? ' is-negative' : '') }, fill(BD.total, {
+          n: F.number(calc.bundleQty(p)), parts: parts == null ? '–' : F.baht(parts, 2), rsp: own == null ? '–' : F.baht(own, 2), pct: pctText(disc)
+        })),
+        issues.length ? h('ul', { class: 'bd-issues', role: 'alert' }, issues.map(function (x) { return h('li', null, issueText(p, x)); })) : null);
+    }
+
+    // เพิ่มชิ้นส่วน: ค้นหา SKU เดี่ยว (ไม่ใช่ Bundle · ไม่ใช่ Request / Delete) · SKU ที่มีอยู่แล้วรวมจำนวน
+    var pickSeq = 0;
+    function addComponentRow(p, list, changed) {
+      var BD = BP.drawer;
+      var id = 'bd-pick-' + (++pickSeq);
+      var options = cur().products.filter(function (x) { return !calc.isBundle(x) && (BS.blockedStatuses || []).indexOf(statusOf(x)) < 0; })
+        .sort(function (a, b) { return String(calc.productCode(a)) < String(calc.productCode(b)) ? -1 : 1; });
+      var input = h('input', { type: 'search', class: 'pm-input bd-pick', list: id, placeholder: BD.pick, 'aria-label': BD.pick });
+      var dl = h('datalist', { id: id }, options.map(function (x) { return h('option', { value: fill(BD.pickOption, { code: calc.productCode(x), name: calc.displayName(x) }) }); }));
+      var msg = h('span', { class: 'pm-msg', role: 'status' });
+      function add() {
+        var code = input.value.split(' · ')[0].trim();
+        var x = options.filter(function (o) { return String(calc.productCode(o)) === code || calc.productKey(o) === code; })[0];
+        if (!x) { msg.className = 'pm-msg is-error'; msg.textContent = BD.pickInvalid; return; }
+        p.components = calc.mergeComponents(list.concat([{ skuId: calc.productKey(x), qty: 1 }]));
+        changed();
+      }
+      input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+      return h('div', { class: 'tool-row bd-add-row' }, input, dl, h('button', { type: 'button', class: 'btn btn-secondary btn-sm bd-add-comp', onClick: add }, BD.add), msg);
+    }
+
+    // ส่วนของ Drawer สินค้าแบบ Bundle ต่อจากรหัส / ชื่อ / รูป: ส่วนประกอบ · หมวดสินค้า (ระบบกำหนด) · Series (ระบบกำหนดจากชิ้นส่วน หรือทีม Product แก้เอง) · หมายเหตุ
+    function bundleSections(body, p) {
+      var T = tax(), G = page.general, BD = BP.drawer;
+      var tx = calc.productTaxonomy(T, p);
+      body.appendChild(componentsSection(p));
+      body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.category, ' ', h('span', { class: 'badge tag-muted pd-inferred', title: BD.categoryNote }, L.product.inferredTag)),
+        field(PF.categoryId, dval(tx.category)), field(PF.subCategoryId, dval(tx.subCategory)), field(PF.typeId, dval(tx.type))));
+      var serTag = h('span', { class: 'badge tag-muted bd-series-tag' }, p.seriesManual ? BD.seriesManual : BD.seriesAuto);
+      if (!editing) {
+        body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.series, ' ', serTag), field(PF.seriesId, dval(tx.series))));
+        if (p.note) body.appendChild(h('section', { class: 'pd-section' }, field(G.note, p.note)));
+        return;
+      }
+      body.appendChild(h('section', { class: 'pd-section' }, h('h3', null, G.series, ' ', serTag),
+        C.cascadeSelect({ tax: T, kind: 'series', value: p, labels: [PF.seriesId, PF.subSeriesId], placeholder: G.placeholder,
+          dirty: function (f) { return isDirty(p, f); },
+          onChange: function (v) { Object.keys(v).forEach(function (k) { p[k] = v[k]; }); p.seriesManual = true; refresh(); } }),
+        p.seriesManual ? h('button', { type: 'button', class: 'link-btn bd-series-auto', onClick: function () { p.seriesManual = false; syncBundle(p); refresh(); } }, BD.seriesUseAuto) : null));
+      body.appendChild(h('section', { class: 'pd-section' }, field(G.note, textInput(p, 'note', G.note))));
+    }
+
+    // SKU เดี่ยวที่เป็นชิ้นส่วนของ Bundle: อยู่ใน Bundle: 90100 (×2) · 90200 (×1) → หน้า Bundle (ui.bundleFocus = เปิด Drawer ของ Bundle นั้น)
+    function inBundlesField(p) {
+      if (calc.isBundle(p) || !calc.bundleOn()) return null;
+      var list = calc.bundlesContaining(cur().products, calc.productKey(p));
+      if (!list.length) return null;
+      var G = page.general;
+      var entry = SP.core.registry.byId('bundle');
+      return h('section', { class: 'pd-section pd-in-bundles' }, field(G.inBundles, list.map(function (x, i) {
+        var code = calc.productCode(x.product);
+        var label = fill(G.inBundleItem, { code: code, qty: x.qty });
+        return [i ? ' · ' : '', bundleMode
+          ? h('button', { type: 'button', class: 'link-btn', title: fill(G.inBundleTip, { code: code }), onClick: function () { openProduct(x.key); } }, label)
+          : h('a', { href: SP.core.paths.to(entry.path) + '#list', title: fill(G.inBundleTip, { code: code }), onClick: function () { store.set('ui.bundleFocus', x.key); } }, label)];
+      })));
+    }
+
+    // Drawer สร้าง Bundle (โหมดแก้ไขของหน้า Bundle) · Product Code จากตัวสร้างรหัสเดิม (Type Bundle เลขนำหน้า 90) · Status เริ่มต้น Planned (ยังไม่มีเดือนเปิดตัว)
+    var createDraft = null, createRsp = null;
+    function renderCreateBundle() {
+      var T = tax(), Cr = BP.create, G = page.general;
+      var r = CAT.nextCode(draft.products, T, BS.typeId, draft.codeCounters);
+      var np = createDraft || (createDraft = {
+        trCode: '', barcode: '', name: '', nameEn: '', shortName: '', inferred: false, categoryId: BS.categoryId, subCategoryId: BS.subCategoryId, typeId: BS.typeId,
+        seriesId: null, subSeriesId: null, packSize: null, uom: '', image: null, launchDate: null, discontinueMonth: null, clearance: null, note: '', inTrcloud: false,
+        kind: 'bundle', components: [], seriesManual: false
+      });
+      np.trCode = r.ok ? r.code : '';
+      drawerCtl.head.appendChild(h('div', { class: 'pd-head' }, h('div', { class: 'pd-title' }, h('h2', null, Cr.title))));
+      var name = h('input', { type: 'text', class: 'pm-input pd-input bd-new-name', 'aria-label': Cr.name, placeholder: Cr.name, value: np.name });
+      name.addEventListener('input', function () { np.name = name.value; });
+      var short = h('input', { type: 'text', class: 'pm-input pd-input bd-new-short', 'aria-label': Cr.shortName, placeholder: Cr.shortName, value: np.shortName });
+      short.addEventListener('input', function () { np.shortName = short.value; });
+      var rspIn = h('input', { type: 'number', class: 'pm-input pm-stock bd-new-rsp', min: '0', step: '0.01', 'aria-label': Cr.rsp, placeholder: Cr.rsp, value: createRsp == null ? '' : String(createRsp) });
+      rspIn.addEventListener('change', function () { createRsp = rspIn.value === '' ? null : Number(rspIn.value); renderDrawer(); });
+      var preview = h('p', { class: 'pd-code-preview' + (r.ok ? ' is-ok' : ' is-error') }, r.ok ? fill(Cr.codePreview, { code: r.code }) : page.create.codeErrors[r.error]);
+      var msg = h('p', { class: 'pm-msg', role: 'status' });
+      function rerender() {
+        np.components = calc.mergeComponents(np.components);
+        if (!np.seriesManual) np.seriesId = calc.bundleSeries(np, draft.products);
+        renderDrawer();
+      }
+      var issues = np.components.length ? calc.bundleIssues(np, draft.products, month, true) : [];
+      drawerCtl.body.appendChild(h('div', { class: 'pd-body' },
+        h('section', { class: 'pd-section' }, h('h3', null, G.names), field(Cr.name, name), field(Cr.shortName, short), preview, h('p', { class: 'muted small' }, Cr.statusNote)),
+        componentsSection(np, { onChange: rerender, rsp: createRsp, issues: issues }),
+        h('section', { class: 'pd-section' }, field(Cr.rsp, rspIn)),
+        msg,
+        h('div', { class: 'dlg-actions' },
+          h('button', { type: 'button', class: 'btn btn-ghost', onClick: function () { drawerCtl.close(); } }, L.dialog.cancel),
+          h('button', { type: 'button', class: 'btn btn-primary bd-create', onClick: function () {
+            if (!String(np.name).trim()) { msg.className = 'pm-msg is-error'; msg.textContent = Cr.nameRequired; return; }
+            var iss = calc.bundleIssues(np, draft.products, month, true);
+            if (iss.length) { msg.className = 'pm-msg is-error'; msg.textContent = issueText(np, iss[0]); return; }
+            if (!r.ok) { msg.className = 'pm-msg is-error'; msg.textContent = page.create.codeErrors[r.error]; return; }
+            var at = SP.core.clock.now();
+            var p = clone(np);
+            p.trCode = r.code;
+            p.name = String(np.name).trim();
+            p.shortName = String(np.shortName || '').trim() || p.name;
+            p.createdAt = at;
+            p.updatedAt = at;
+            syncBundle(p);
+            draft.products.push(p);
+            draft.codeCounters = CAT.takeCode(draft.codeCounters, r.code);
+            if (createRsp > 0) {
+              var res = calc.setBasePrice(draft.basePrices, { productKey: r.code, priceType: 'RSP', effectiveMonth: month, price: createRsp, by: byName(), at: at });
+              if (res.ok) draft.basePrices = res.list;
+            }
+            creating = false;
+            createDraft = null;
+            createRsp = null;
+            selected = r.code;
+            tab = 'general';
+            bundleFilters.q = '';
+            draw();
+          } }, Cr.submit))));
+    }
+
+    // CR-37: ลิงก์ อยู่ใน Bundle จาก Product List (ui.bundleFocus อ่านครั้งเดียว) → เปิด Drawer ของ Bundle นั้น
+    var focusKey = bundleMode ? store.get('ui.bundleFocus') : null;
+    if (focusKey) store.remove('ui.bundleFocus');
     draw();
+    if (focusKey && calc.findProduct(cur().products, focusKey)) openProduct(focusKey);
+  }
+
+  // ---------- CR-37 หน้า Bundle แท็บ ความต้องการชิ้นส่วน (อ่านอย่างเดียว · calc.componentDemand · หน่วย ชิ้น · ไม่ใช่ยอดขาย) ----------
+  //   ตัวกรอง: ปีแผน (components.yearPicker · app.planYear ใช้ร่วมทุกหน้า) · Channel · หน่วยขาย · Series ของ SKU เดี่ยว
+  //   ตาราง: แถวละ SKU เดี่ยวที่เป็นชิ้นส่วนของ Bundle อย่างน้อย 1 รายการ · 3 บรรทัด ขายเดี่ยว · ผ่าน Bundle (กางดูราย Bundle) · รวม (ตัวหนา) × ม.ค.–ธ.ค. + รวมปี
+  var demandState = { channel: '', unit: '', series: [], open: {} };
+  function renderDemand(root, ctx) {
+    var BP = SP.data.content.pages.bundle;
+    var X = BP.demand;
+    var S = demandState;
+    function year() { return store.year(); }
+    function plans() {
+      var td = store.get(store.planKey('topDown'));
+      var out = {};
+      Object.keys(td.units || {}).forEach(function (ch) { (td.units[ch] || []).forEach(function (u) { out[u] = store.get(store.planKey('sku.' + u)); }); });
+      return out;
+    }
+    var exportBtn = C.exportButton({ build: exportSpec });
+    // ปุ่มส่งออกชิดขวาเหมือนแท็บรายการ (ตำแหน่งเดียวกับ workflowBar)
+    if (ctx.intro) ctx.intro.appendChild(h('span', { class: 'wf-bar' }, h('span', { class: 'wf-actions no-print' }, exportBtn)));
+    var tableSlot = null;
+
+    function compute() {
+      var p = plans();
+      var d = store.data();
+      var unitIds = Object.keys(p).filter(function (u) {
+        if (S.unit) return u === S.unit;
+        if (!S.channel) return true;
+        var i = calc.unitInfo(d, u);
+        return !!(i && i.channel && i.channel.id === S.channel);
+      });
+      return { units: Object.keys(p), rows: calc.componentDemand({ data: d, master: store.master(), plans: p, year: year(), unitIds: unitIds }).filter(function (r) { return calc.inSeries(r.product, S.series); }) };
+    }
+
+    function draw() {
+      C.clear(root);
+      var res = compute();
+      var d = store.data();
+      if (S.unit && res.units.indexOf(S.unit) < 0) S.unit = '';
+      var unitOpts = res.units.filter(function (u) {
+        if (!S.channel) return true;
+        var i = calc.unitInfo(d, u);
+        return !!(i && i.channel && i.channel.id === S.channel);
+      }).map(function (u) { var i = calc.unitInfo(d, u); return { value: u, label: i ? i.unit.name : u }; });
+      var allComps = calc.componentDemand({ data: d, master: store.master(), plans: {}, year: year() }).map(function (r) { return r.product; });
+      root.appendChild(h('div', { class: 'tool-row pl-toolbar bd-demand-toolbar' },
+        C.yearPicker({ years: SP.data.settings.PLAN_YEARS, value: year(), label: X.year, onChange: function (y) { store.set('app.planYear', y); draw(); } }),
+        C.select({ label: X.channel, value: S.channel, className: 'bd-dm-channel' + (S.channel ? ' is-active' : ''),
+          options: [{ value: '', label: X.channelAll }].concat(SP.data.channels.filter(function (c) { return c.active !== false; }).map(function (c) { return { value: c.id, label: c.name }; })),
+          onChange: function (v) { S.channel = v; S.unit = ''; draw(); } }),
+        C.select({ label: X.unit, value: S.unit, className: 'bd-dm-unit' + (S.unit ? ' is-active' : ''), options: [{ value: '', label: X.unitAll }].concat(unitOpts),
+          onChange: function (v) { S.unit = v; draw(); } }),
+        C.seriesFilter({ options: calc.seriesList(store.get('master.taxonomy'), allComps), value: S.series, onChange: function (v) { S.series = v; draw(); } }),
+        h('span', { class: 'tool-right muted small bd-dm-unit-label' }, X.unitLabel)));
+      tableSlot = h('div', { class: 'card fit-card pl-card bd-demand-card' });
+      root.appendChild(tableSlot);
+      renderTable(res.rows);
+      root.appendChild(h('p', { class: 'muted small bd-dm-note' }, X.note));
+    }
+
+    function nums(arr, cls) {
+      return arr.map(function (v) { return h('td', { class: 'num' + (cls ? ' ' + cls : '') }, v ? F.number(v) : '–'); });
+    }
+    function renderTable(rows) {
+      var head = h('tr', null, h('th', { scope: 'col', class: 'pl-code' }, X.columns.sku), h('th', { scope: 'col', class: 'bd-dm-line' }, X.columns.line),
+        F.MONTHS.map(function (m) { return h('th', { scope: 'col', class: 'num' }, m); }), h('th', { scope: 'col', class: 'num' }, X.columns.total));
+      var body = h('tbody');
+      if (!rows.length) body.appendChild(h('tr', null, h('td', { class: 'grid-empty', colspan: '15' }, X.empty)));
+      rows.forEach(function (r) {
+        var open = !!S.open[r.key] && r.bundles.length > 0;
+        var span = 3 + (open ? r.bundles.length : 0);
+        var sku = h('th', { scope: 'rowgroup', class: 'pl-code bd-dm-sku', rowspan: String(span) },
+          h('strong', null, calc.productCode(r.product)), h('span', { class: 'bd-dm-name', title: r.product.name }, calc.displayName(r.product)), C.statusBadge(calc.productStatus(r.product, SP.core.clock.currentMonth())));
+        body.appendChild(h('tr', { class: 'bd-dm-direct', dataset: { key: r.key } }, sku, h('td', { class: 'bd-dm-line' }, X.lines.direct), nums(r.direct), h('td', { class: 'num' }, F.number(r.sum.direct))));
+        var toggle = r.bundles.length ? h('button', { type: 'button', class: 'link-btn bd-dm-toggle', 'aria-expanded': open ? 'true' : 'false',
+          title: open ? X.collapse : X.expand, onClick: function () { S.open[r.key] = !open; renderTable(rows); } }, h('span', { 'aria-hidden': 'true' }, open ? '▾ ' : '▸ '), X.lines.viaBundle) : X.lines.viaBundle;
+        body.appendChild(h('tr', { class: 'bd-dm-via' }, h('td', { class: 'bd-dm-line' }, toggle), nums(r.viaBundle), h('td', { class: 'num' }, F.number(r.sum.viaBundle))));
+        if (open) r.bundles.forEach(function (b) {
+          body.appendChild(h('tr', { class: 'bd-dm-bundle' }, h('td', { class: 'bd-dm-line bd-dm-sub', title: b.product.name },
+            fill(X.bundleLine, { code: calc.productCode(b.product), name: calc.displayName(b.product), qty: b.qty })), nums(b.units, 'muted'), h('td', { class: 'num muted' }, F.number(calc.sum(b.units)))));
+        });
+        body.appendChild(h('tr', { class: 'bd-dm-total' }, h('td', { class: 'bd-dm-line' }, X.lines.total), nums(r.total, 'is-strong'), h('td', { class: 'num is-strong' }, F.number(r.sum.total))));
+      });
+      C.clear(tableSlot).appendChild(h('div', { class: 'fit-scroll pl-scroll' }, h('table', { class: 'data-grid bd-demand-table' }, h('thead', null, head), body)));
+    }
+
+    function exportSpec() {
+      var rows = compute().rows;
+      var out = [];
+      rows.forEach(function (r) {
+        [['direct', r.direct], ['viaBundle', r.viaBundle], ['total', r.total]].forEach(function (x) {
+          var o = { code: calc.productCode(r.product), name: r.product.name, line: X.lines[x[0]], total: calc.sum(x[1]) };
+          x[1].forEach(function (v, m) { o['m' + m] = v; });
+          out.push(o);
+          if (x[0] === 'viaBundle') r.bundles.forEach(function (b) {
+            var ob = { code: calc.productCode(r.product), name: r.product.name, line: fill(X.bundleLine, { code: calc.productCode(b.product), name: calc.displayName(b.product), qty: b.qty }), total: calc.sum(b.units) };
+            b.units.forEach(function (v, m) { ob['m' + m] = v; });
+            out.push(ob);
+          });
+        });
+      });
+      var st = C.exportStamp(null);
+      var cols = [{ key: 'code', label: X.columns.sku, width: 12 }, { key: 'name', label: BP.columns.name, width: 36 }, { key: 'line', label: X.columns.line, width: 28 }]
+        .concat(F.MONTHS.map(function (m, i) { return { key: 'm' + i, label: m, width: 9 }; })).concat([{ key: 'total', label: X.columns.total, width: 11 }]);
+      return {
+        filename: fill(X.exportFile, { year: year(), date: st.date }),
+        sheets: [{ name: X.exportSheet, header: C.exportHeader(year(), null, [[X.unitLabel, '']]), columns: cols.map(function (c) { return { key: c.key, label: c.label, width: c.width, value: function (o) { return o[c.key]; } }; }), rows: out }]
+      };
+    }
+
+    draw();
+  }
+
+  // ---------- CR-37 หน้า Bundle (registry id bundle · modules/bundle/index.html โหลดไฟล์นี้) · แท็บ รายการ Bundle | ความต้องการชิ้นส่วน ----------
+  //   รายการ Bundle = renderItems โหมด bundle (Drawer / โหมดแก้ไขเดียวกับ Product List · สิทธิ์ของหน้า bundle) · #list / #demand · ui.bundleTab
+  var BUNDLE_TABS = ['list', 'demand'];
+  function renderBundlePage(root, ctx) {
+    var page = ctx.page;
+    var PG = SP.data.content.pages;
+    var hash = (location.hash || '').replace('#', '');
+    var tab = BUNDLE_TABS.indexOf(hash) >= 0 ? hash : (BUNDLE_TABS.indexOf(store.get('ui.bundleTab')) >= 0 ? store.get('ui.bundleTab') : 'list');
+    var introSlot = h('span', { class: 'pl-intro' });
+    if (ctx.intro) ctx.intro.appendChild(introSlot);
+    var tabSlot = h('div', { class: 'tool-row pl-page-tabs no-print' });
+    var body = h('div', { class: 'pl-body' });
+    root.appendChild(tabSlot);
+    root.appendChild(body);
+    function subCtx() {
+      return { entry: ctx.entry, page: PG.productList, content: ctx.content, year: ctx.year, intro: introSlot, refreshMenu: ctx.refreshMenu, addHelp: ctx.addHelp, mode: 'bundle', openLevel: null };
+    }
+    function drawTabs() {
+      C.clear(tabSlot);
+      tabSlot.appendChild(C.tabs({ label: page.pageTabLabel, value: tab, className: 'pl-page-seg bd-page-seg',   // CR-40 แท็บขีดเส้นใต้
+        options: BUNDLE_TABS.map(function (t) { return { value: t, label: page.pageTabs[t] }; }), onChange: function (v) { show(v); } }));
+    }
+    function show(t) {
+      if (t === tab) return;
+      if (!C.confirmDiscard(C.unsavedCount())) { drawTabs(); return; }
+      tab = t;
+      store.set('ui.bundleTab', t);
+      if (history.replaceState) history.replaceState(null, '', location.pathname + location.search + '#' + t);
+      paint();
+    }
+    function paint() {
+      C.clear(body);
+      C.clear(introSlot);
+      Array.prototype.forEach.call(document.querySelectorAll('aside.drawer, .drawer-backdrop, .popover'), function (el) { if (el.parentNode) el.parentNode.removeChild(el); });
+      C.guardUnsaved(function () { return 0; });
+      drawTabs();
+      document.title = page.title + ' · ' + page.pageTabs[tab] + ' · ' + SP.data.content.site.name;
+      if (tab === 'demand') renderDemand(body, subCtx()); else renderItems(body, subCtx());
+    }
+    paint();
   }
 
 
@@ -1061,7 +1702,7 @@
       if (ctx.intro) ctx.intro.appendChild(bar);
 
       function save() {
-        var by = C.roleName(store.role()), at = new Date().toISOString();
+        var by = C.roleName(store.role()), at = SP.core.clock.now();
         var entries = [];
         ['category', 'series'].forEach(function (k) {
           draft.tax[k].forEach(function (d) { if (nodeDirty(k, d.id)) entries = entries.concat(calc.auditDiff('taxonomy', d.id, byId(saved.tax[k], d.id), d, { by: by, at: at })); });
@@ -1785,7 +2426,7 @@
     function drawTabs() {
       C.clear(tabSlot);
       if (tabs.length < 2) return;
-      tabSlot.appendChild(C.segmented({ label: page.pageTabLabel, value: tab, className: 'pl-page-seg',
+      tabSlot.appendChild(C.tabs({ label: page.pageTabLabel, value: tab, className: 'pl-page-seg',   // CR-40 แท็บขีดเส้นใต้
         options: tabs.map(function (t) { return { value: t, label: page.pageTabs[t] }; }), onChange: function (v) { show(v); } }));
     }
     function show(t, force) {
@@ -1806,4 +2447,5 @@
   }
 
   SP.modules.productList = { render: render };
+  SP.modules.bundle = { render: renderBundlePage };   // CR-37
 })(window.SP);

@@ -1,6 +1,6 @@
 # CLAUDE.md — Sales Target Planning (Prototype)
 
-Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales Planning · Product Master · Account Master) ใช้นำเสนอและทดลอง Flow ก่อนทำระบบจริง
+Prototype เว็บวางแผน Sales Target ของ Charmiss ใช้ทดลอง Flow ก่อนทำระบบจริง
 ไม่มี Login · ไม่มีฐานข้อมูล (เก็บใน sessionStorage) · ข้อมูลตัวอย่างอยู่ใน `data/` · ตอบผู้ใช้เป็นภาษาไทย
 
 ## คำสั่ง
@@ -15,6 +15,8 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 - ทุกไฟล์ JS ห่อ IIFE และผูกใต้ `window.SP` (`SP.core.*`, `SP.data.*`, `SP.modules.*`)
 - ลิงก์ Relative ชี้ไฟล์ `index.html` ตรงๆ ผ่าน `SP.core.paths.to()` ห้าม Path ขึ้นต้นด้วย `/`
 - ไฟล์ภายนอกได้ 2 อย่าง: Google Font และ SheetJS (โหลดเมื่อกดส่งออกหรือนำเข้า Excel ครั้งแรกเท่านั้น)
+- ใช้ Token สีเท่านั้น: ห้ามค่าสี `#xxx` / `rgb(` นอก `styles/tokens.css`
+- เดือน / วันปัจจุบันอ่านจาก `SP.core.clock` เท่านั้น ห้าม Hardcode เดือน / ปี
 - `data/seed/` สร้างจาก Excel ห้ามแก้ด้วยมือ · ต้องมี `.nojekyll` ที่ Root
 
 ## โค้ดอยู่ตรงไหน
@@ -25,16 +27,17 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 | รายการหน้า เมนู กลุ่ม ลำดับขั้น | `core/registry.js` |
 | ลำดับการโหลดไฟล์ | `core/loader.js` |
 | สูตรคำนวณทั้งหมด (pure functions) | `core/calc.js` |
-| Workflow / ร้านค้าและเขต / หมวดสินค้า / รายงาน / นำเข้า seed / เพิ่มสินค้าในแผน SKU | `core/workflow.js` · `core/stores.js` · `core/taxonomy.js` · `core/report.js` · `core/seed.js` · `core/plan-edits.js` |
-| Account Master / หน่วยขายและคู่ค้า / คู่มือ | `core/master.js` · `core/units.js` · `core/guide.js` (ข้อความคู่มือ `data/guide.js`) |
+| Workflow · ร้านค้าและเขต · หมวดสินค้า · รายงาน · seed · สินค้าในแผน SKU | `core/workflow.js` · `core/stores.js` · `core/taxonomy.js` · `core/report.js` · `core/seed.js` · `core/plan-edits.js` |
+| Revision · คำขออนุมัติ · สถานการณ์ Demo | `core/revision.js` · `core/approval.js` · `core/scenario.js` |
+| Account Master / หน่วยขายและคู่ค้า / คู่มือ | `core/master.js` · `core/units.js` · `core/guide.js` |
 | Product Code · Preset คอลัมน์ · นำเข้าราคา · TRCLOUD | `core/catalog.js` |
 | UI ที่ใช้หลายหน้า · กราฟ SVG · ส่งออกไฟล์ | `core/components.js` · `core/charts.js` · `core/export.js` |
 | ส่งข้อมูลข้ามหน้า | `SP.core.store` เท่านั้น |
 | ข้อความทุกหน้า | `data/content.js` |
-| สีและขนาด | `styles/tokens.css` (ที่อื่นใช้ `var(--...)`) |
+| สีและขนาด · ไอคอน | `styles/tokens.css` · `assets/icons.js` |
 | หน้าจอ | `modules/<ชื่อ>/` (index.html + <ชื่อ>.js) |
 
-**หาฟังก์ชันด้วย `grep` ในโค้ด ไม่ใช่จากเอกสาร** (เอกสารไม่มีรายชื่อฟังก์ชัน)
+**หาฟังก์ชันด้วย `grep` ในโค้ด ไม่ใช่จากเอกสาร**
 
 ## กติกาหลัก
 
@@ -45,6 +48,7 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 5. สินค้าอ้างด้วย `calc.productKey(p)` เสมอ
 6. เพิ่มหน้า = คัดลอก `modules/_template/` + 1 บรรทัดใน registry + ข้อความใน `content.js`
 7. ถ้า CR ขัดกับกติกานี้หรือกับ `docs/spec/` ให้ถามก่อน ห้ามเดา
+8. ทุกการเขียนข้อมูล Sales Planning ต้องผ่าน `SP.core.revision.assertWritable` / `guardWrite` (บังคับใน `store.set` · ห้ามเลี่ยง Store)
 
 ## เอกสาร (อ่านเฉพาะที่เกี่ยวกับงาน)
 
@@ -52,12 +56,13 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 |---|---|
 | แก้โครงโค้ด loader / registry / store | `docs/spec/architecture.md` |
 | แก้โครงข้อมูลหรือ Key ใน store | `docs/spec/data-model.md` · สินค้า ราคา `data-model-products.md` |
-| แก้ UI กลาง คำศัพท์ สี Workflow Component · กราฟ | `docs/spec/ui-standards.md` · `docs/spec/ui-charts.md` |
+| แก้ UI กลาง คำศัพท์ Workflow Component · ธีม สี ไอคอน · กราฟ | `docs/spec/ui-standards.md` · `ui-theme.md` · `ui-charts.md` |
 | แก้หน้าใดหน้าหนึ่ง | `docs/spec/pages/<หน้า>.md` |
+| นาฬิกา · สถานการณ์ Demo | `docs/spec/demo-scenarios.md` |
 | Business Rule / สิ่งที่ห้ามทำ | `docs/spec/business-rules.md` · สินค้า ราคา Listing `docs/spec/product-rules.md` |
 | สมมติฐาน / คำถามค้าง | `docs/spec/open-items.md` · `open-items-assumptions.md` |
 | วิธีทดสอบบนเบราว์เซอร์ | `docs/spec/testing.md` |
-| สารบัญและการอ้างหัวข้อเดิมของ SPEC | `docs/SPEC.md` |
+| สารบัญ SPEC | `docs/SPEC.md` |
 | ข้อสรุป · ประวัติการเปลี่ยนแปลง | `docs/DECISIONS.md` · `docs/CHANGELOG.md` |
 | งานที่ได้รับ | `docs/change-requests/CR-XX_*.md` |
 
@@ -74,7 +79,7 @@ Prototype เว็บวางแผน Sales Target ของ Charmiss (Sales 
 ## ไฟล์ที่แก้ได้โดยไม่ต้องถาม
 
 นอกจากไฟล์ที่ CR ระบุ แก้ไฟล์เหล่านี้ได้เลยเมื่องานต้องใช้:
-- `core/loader.js` / `core/manifest.js` — เพิ่มไฟล์ใหม่ในรายการโหลด
+- `core/loader.js` — เพิ่มไฟล์ใหม่ในรายการโหลด
 - `core/registry.js` — เพิ่ม/ซ่อน/เปลี่ยนชื่อหน้าตาม CR
 - `data/content.js`, `data/guide.js` — ข้อความ
 - `core/<ชื่อใหม่>.js` — ไฟล์ใหม่ที่เป็น pure functions

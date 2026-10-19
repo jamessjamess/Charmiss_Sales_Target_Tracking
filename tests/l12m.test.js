@@ -3,7 +3,7 @@
  *
  * รันด้วย Node: node tests/run.js l12m / ในเบราว์เซอร์: tests/calc.test.html รวม Test ชุดนี้ด้วย
  *   cr24-1..9 = Test ตาม CR-24 ข้อ 5 — ข้อมูลตั้งต้นจาก data/ (DEMO_CURRENT_MONTH 2026-09 · ปีแผน 2027) store: ไม่อ่าน ไม่เขียน
- *   cr24-4 เปลี่ยน settings.DEMO_CURRENT_MONTH ชั่วคราวแล้วคืนค่าเสมอ / cr24-9 ใช้ SP.core.charts (เบราว์เซอร์เท่านั้น)
+ *   cr24-4 เลื่อนนาฬิกากลางชั่วคราวด้วย clock.withMonth (CR-41) แล้วคืนค่าเสมอ / cr24-9 ใช้ SP.core.charts (เบราว์เซอร์เท่านั้น)
  */
 (function () {
   'use strict';
@@ -17,11 +17,8 @@
   function clone(v) { return JSON.parse(JSON.stringify(v)); }
   function sum(a) { return a.reduce(function (s, v) { return s + (v || 0); }, 0); }
   function r4(v) { return Math.round(v * 1e4) / 1e4; }
-  function withClock(month, fn) {
-    var S = SP.data.settings, old = S.DEMO_CURRENT_MONTH;
-    S.DEMO_CURRENT_MONTH = month;
-    try { return fn(); } finally { S.DEMO_CURRENT_MONTH = old; }
-  }
+  // CR-41: เลื่อนนาฬิกากลางชั่วคราว (clock.withMonth คืนค่าเสมอ · แทนการแก้ settings.DEMO_CURRENT_MONTH)
+  function withClock(month, fn) { return K().withMonth(month, fn); }
   var MASTER = null;
   function master() { return MASTER || (MASTER = { products: D().products, listings: D().listings, basePrices: D().basePrices, npdPlans: D().npdPlans }); }
 
@@ -53,7 +50,7 @@
       }
     },
     {
-      name: 'cr24-4. DEMO_CURRENT_MONTH = 2026-12 → เดือน 1–11 ใช้ปี 2026 · เดือน 12 ใช้ปี 2025 · L12M = ธ.ค. 2025 – พ.ย. 2026 (ข้อมูลสมมติ ยอดจริง 11 เดือน)',
+      name: 'cr24-4. เดือนปัจจุบัน = 2026-12 (clock.withMonth) → เดือน 1–11 ใช้ปี 2026 · เดือน 12 ใช้ปี 2025 · L12M = ธ.ค. 2025 – พ.ย. 2026 (ข้อมูลสมมติ ยอดจริง 11 เดือน)',
       expected: [[2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2025], { from: '2025-12', to: '2026-11' }, 'ธ.ค. 2025 – พ.ย. 2026', 1178, '2026-09'],
       actual: function () {
         var m25 = [], m26 = [];

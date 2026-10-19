@@ -15,6 +15,7 @@
  *   planYearPicker (ปีแผนต่อท้ายชื่อหน้า — layout ใส่ให้หน้าที่ registry ตั้ง year: true)
  *   dialog (กล่องยืนยัน), popover, menuButton, seriesFilter, rulesContent, rulesPanel, rulesButton
  *   calcExplainer (ⓘ วิธีคำนวณ), cellBreakdown (Tooltip รายช่อง), bindArrowNav
+ *   CR-37 bundleTag (ป้าย Bundle ต่อท้ายชื่อสินค้า · Tooltip ส่วนประกอบ · Flag bundle ปิด = ไม่แสดง)
  *   Product Master: productThumb (รูปย่อ / ตัวอักษรย่อของ Series), resizeImage (ย่อรูปด้วย Canvas), completenessBadge,
  *   statusStrip (เส้นเวลา Status 12 เดือน), cascadeSelect (Dropdown หมวดสินค้า/Series แบบลำดับชั้น), drawer (แผงด้านขวา),
  *   hoverTip (Tooltip ทั่วไป), choiceDialog, exportButton (ส่งออก ▾ Excel / CSV ผ่าน SP.core.export), priorLabel (ยอดขายปี {ปี} ⓘ)
@@ -371,6 +372,25 @@
     return wrap;
   }
 
+  // CR-40: แท็บระดับหน้าแบบขีดเส้นใต้ (ข้อความ --text-muted · แท็บที่เลือก --primary + เส้นใต้ 2px) · ตัวนับ = ตัวเลขเล็กสีเทาต่อท้าย (ทั้งหมด 5)
+  //   opts = { label, value, options: [{ value, label, count, title, disabled, className }], onChange, className } — รูปแบบเดียวกับ segmented + count
+  //   ปุ่มสลับค่า (เช่น จำนวนชิ้น | Sale Amount | Net Sales) ยังใช้ segmented
+  function tabs(opts) {
+    var wrap = h('div', { class: 'page-tabs' + (opts.className ? ' ' + opts.className : ''), role: 'tablist', 'aria-label': opts.label });
+    opts.options.forEach(function (o) {
+      var on = o.value === opts.value;
+      var hasCount = o.count !== undefined && o.count !== null && o.count !== '';
+      wrap.appendChild(h('button', {
+        type: 'button', role: 'tab',
+        class: 'page-tab' + (on ? ' is-active' : '') + (o.className ? ' ' + o.className : ''),
+        'aria-selected': on ? 'true' : 'false',
+        title: o.title, disabled: o.disabled,
+        onClick: function () { if (!on) opts.onChange(o.value); }
+      }, h('span', { class: 'page-tab-label' }, o.label), hasCount ? h('span', { class: 'page-tab-count' }, String(o.count)) : null));
+    });
+    return wrap;
+  }
+
   // ---------------------------------------------------------------------
   // กล่องเนื้อหา
   // ---------------------------------------------------------------------
@@ -711,22 +731,30 @@
   }
 
   // ไอคอน SVG เส้น (ไม่มีสีใน JS ใช้ currentColor)
+  //   CR-40: ชื่อใน assets/icons.js (Lucide · SP.data.icons) → class icon-lucide (เส้น 1.75 · 18px · styles/components.css) · opts.className เพิ่ม class
+  //   ชื่อเดิม (trash · lock · person-off) = Path ในไฟล์นี้ (ขนาดเดิม 16px)
   var ICONS = {
     trash: 'M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7',
     lock: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5zM12 15v2',
     'person-off': 'M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM5 20a7 7 0 0 1 14 0M4 4l16 16'
   };
-  function icon(name) {
+  function icon(name, opts) {
+    opts = opts || {};
     var ns = 'http://www.w3.org/2000/svg';
     var svgEl = document.createElementNS(ns, 'svg');
+    var lucide = !ICONS[name] && SP.data.icons ? SP.data.icons[name] : null;
     svgEl.setAttribute('viewBox', '0 0 24 24');
-    svgEl.setAttribute('class', 'icon icon-' + name);
+    svgEl.setAttribute('class', 'icon icon-' + name + (lucide ? ' icon-lucide' : '') + (opts.className ? ' ' + opts.className : ''));
     svgEl.setAttribute('aria-hidden', 'true');
+    if (lucide) { svgEl.innerHTML = lucide; return svgEl; }
     var path = document.createElementNS(ns, 'path');
-    path.setAttribute('d', ICONS[name]);
+    path.setAttribute('d', ICONS[name] || '');
     svgEl.appendChild(path);
     return svgEl;
   }
+  function hasIcon(name) { return !!(ICONS[name] || (SP.data.icons && SP.data.icons[name])); }
+  // CR-40: วงกลมเลขขั้นแบบเส้น (ขั้นที่ 1–4 ของ Sales Planning ในเมนูข้าง · สีตามสถานะเมนูเหมือนไอคอนอื่น)
+  function stepIcon(n) { return h('span', { class: 'step-icon', 'aria-hidden': 'true' }, String(n)); }
 
   // ปุ่มไอคอนถังขยะ + Tooltip + กล่องยืนยัน opts: { label, confirmTitle, lines, onConfirm, disabled, disabledTitle }
   // CR-34: ป้ายประเภทสินค้าในแผน (labels.planTypes · calc.planTypeOf) — สินค้าเดิม = ไม่มีป้าย · สีจาก tokens (--c-type-*) · ใช้ร่วม SKU Planning / Plan Summary
@@ -742,6 +770,15 @@
     if (!SP.core.calc.isRequestProduct(product)) return null;
     var X = labels().tempName;
     return h('span', { class: 'temp-name-tag', title: X.tip }, X.tag);
+  }
+  // CR-37: ป้าย Bundle ต่อท้ายชื่อสินค้า (เหมือนกันทุกหน้า) · Tooltip = ส่วนประกอบ (12130 × 1 + 12140 × 1) · ไม่ใช่ Bundle / Flag bundle ปิด = null
+  //   products (ไม่บังคับ) = ใช้แสดง Product Code ของชิ้นส่วน
+  function bundleTag(product, products) {
+    var calc = SP.core.calc;
+    if (!calc.isBundle(product) || !calc.bundleOn()) return null;
+    var X = labels().bundleTag;
+    var parts = calc.mergeComponents(product.components).map(function (c) { return fill(X.part, { code: products ? calc.codeOf(products, c.skuId) : c.skuId, qty: c.qty }); }).join(X.join);
+    return h('span', { class: 'badge bundle-tag', title: fill(X.tip, { components: parts }) }, X.tag);
   }
   function tempCodeTag(product) {
     if (!SP.core.calc.isRequestProduct(product)) return null;
@@ -1294,11 +1331,24 @@
   // โหมดแก้ไข: แถบ "กำลังแก้ไข · ยังไม่บันทึก n ช่อง" / เตือนก่อนออกจากหน้าหรือทิ้งค่าที่ยังไม่บันทึก
   // ---------------------------------------------------------------------
   // CR-35: opts.suffix = ข้อความ / Node ต่อท้าย (เช่น วิธีแก้ไขของหน้า · ปุ่มสลับมุมมอง) · ไม่ส่ง = แบบเดิม
+  // CR-40: opts.revision = true (หน้า Sales Planning) → แถบเดียวรวมข้อความของรอบ: โหมดแก้ไข · {รอบ} ร่าง · แก้ไขได้ตั้งแต่ {เดือน} | แก้ไขได้ทุกเดือน · {จำนวนที่ยังไม่บันทึก}
+  //   (ไม่ส่ง / ปิด Flag revision = ข้อความเดิม)
   function editBanner(opts) {
     opts = opts || {};
     var W = labels().workflow;
     var el = h('div', { class: 'edit-banner no-print', role: 'status' });
     var text = el;
+    var rv = opts.revision && SP.core.revision && SP.core.revision.enabled() ? SP.core.revision.overview() : null;
+    if (rv) {
+      var E = revText().editBar || {};
+      var head = fill(E.head, { name: rv.rev.name, status: (revText().status || {})[rv.rev.status] || rv.rev.status }) + ' · ' +
+        (rv.lockN ? fill(E.from, { month: SP.core.clock.label(rv.rev.effectiveMonth) }) : E.all);
+      el.classList.add('edit-banner-rev');
+      el.update = function (n) { el.textContent = head + ' · ' + (n ? fill(E.dirty, { n: n }) : E.clean); el.classList.toggle('is-dirty', n > 0); };
+      if (rv.rev.returnNote) el.title = fill(E.returned, { note: rv.rev.returnNote });
+      el.update(0);
+      return el;
+    }
     if (opts.suffix != null) {
       text = h('span', { class: 'edit-banner-text' });
       el.appendChild(text);
@@ -1319,6 +1369,113 @@
     window.addEventListener('beforeunload', function (e) {
       if (dirtyFn && dirtyFn()) { e.preventDefault(); e.returnValue = SP.data.content.site.leaveConfirm; return e.returnValue; }
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // CR-38 Revision (core/revision.js · ข้อความจาก labels.revision)
+  //   revisionBadge(status) = ป้าย ร่าง (เทา) · รอ Lock (เหลือง) · Lock แล้ว (เขียว)
+  //   revisionPicker() = ตัวเลือก 2027 · R2 ร่าง ▾ ต่อท้ายชื่อหน้าใน Sales Planning (แทน planYearPicker) · รายการจัดกลุ่มตามปี · เลือกแล้วโหลดหน้าใหม่ (ถามก่อนถ้ายังไม่บันทึก)
+  //   revisionBar(ov) = แถบสถานะ 1 บรรทัดใต้หัวหน้า (ov = revision.overview) · Lock แล้ว = ลิงก์ ดูรอบปัจจุบัน
+  //     CR-40: หน้าไม่เรียกแล้ว (โหมดดู = ป้ายของรอบ + Tooltip revisionTip · โหมดแก้ไข = editBanner revision) · คงฟังก์ชันไว้ไม่ลบ
+  //   revisionCard(ov, opts) = การ์ดสถานะรอบ (ชื่อ · สถานะ · เดือนที่มีผล · ผู้เปิด / เหตุผล · ข้อความของ MD · Total เทียบรอบก่อน · ตรวจก่อนเสนอ Lock ลิงก์ไปหน้าที่ต้องแก้)
+  // ---------------------------------------------------------------------
+  function revText() { return labels().revision || {}; }
+  function revisionBadge(status) {
+    var X = revText();
+    return h('span', { class: 'badge rev-badge rev-' + status }, (X.status || {})[status] || status);
+  }
+  function revisionPicker() {
+    var R = SP.core.revision, X = revText().picker || {};
+    var cur = R.current();
+    if (!cur) return planYearPicker();
+    // CR-40: แถบสถานะของโหมดดูตัดออก → ป้ายของรอบบอกสถานะ + Tooltip · รอบที่ไม่ใช่รอบปัจจุบัน = ลิงก์ ไปรอบปัจจุบัน
+    var tip = revisionTip(cur);
+    var badge = revisionBadge(cur.status);
+    badge.title = tip;
+    badge.classList.add('rev-picker-badge');
+    var btn = h('button', { type: 'button', class: 'year-title rev-picker', title: X.title, 'aria-label': X.title + ' ' + cur.name + ' · ' + tip },
+      h('span', { class: 'year-title-value' }, String(cur.planYear)), h('span', { class: 'rev-picker-sep' }, '·'),
+      h('span', { class: 'rev-picker-name' }, 'R' + cur.seq), badge,
+      h('span', { class: 'year-title-caret no-print', 'aria-hidden': 'true' }, '▾'));
+    var all0 = R.list();
+    var now = R.openOf(all0, cur.planYear) || R.lastLocked(all0, cur.planYear);
+    var goNow = now && now.id !== cur.id ? h('button', { type: 'button', class: 'link-btn rev-go-current no-print', title: fill(X.goCurrentTip, { name: now.name }), onClick: function () {
+      if (!confirmDiscard(dirtyFn ? dirtyFn() || 0 : 0)) return;
+      guardUnsaved(null); R.select(now.id); location.reload();
+    } }, X.goCurrent) : null;
+    popover(btn, function (close) {
+      var all = R.list();
+      return h('div', { class: 'rev-picker-list' }, R.years(all).map(function (y) {
+        return h('div', { class: 'rev-picker-year' }, h('div', { class: 'rev-picker-year-head' }, String(y)),
+          h('ul', { class: 'menu-list' }, R.byYear(all, y).slice().reverse().map(function (r) {
+            return h('li', null, h('button', { type: 'button', class: 'menu-item rev-option' + (r.id === cur.id ? ' is-current' : ''), 'aria-current': r.id === cur.id ? 'true' : null,
+              onClick: function () {
+                close();
+                if (r.id === cur.id) return;
+                if (!confirmDiscard(dirtyFn ? dirtyFn() || 0 : 0)) return;
+                guardUnsaved(null);
+                R.select(r.id);
+                location.reload();
+              } }, h('span', { class: 'rev-option-name' }, r.name), revisionBadge(r.status),
+              h('span', { class: 'rev-option-eff muted small' }, fill(X.effective, { month: SP.core.clock.label(r.effectiveMonth) }))));
+          })));
+      }));
+    }, { className: 'menu-popover rev-popover', label: X.title });
+    return goNow ? h('span', { class: 'rev-picker-wrap' }, btn, goNow) : btn;
+  }
+  // Tooltip ของป้ายรอบ (CR-40 ข้อ 1.1): ร่าง = แก้ไขได้ตั้งแต่ … (R1 แก้ไขได้ทุกเดือน) · รออนุมัติ = ส่งเมื่อ · ขั้นปัจจุบัน · Lock แล้ว = เมื่อ · โดย
+  function revisionTip(r) {
+    var R = SP.core.revision, T = revText().tip || {}, K = SP.core.clock, F2 = SP.core.format;
+    var ov = R.overview(r.id);
+    if (r.status === 'draft') {
+      var t = ov && ov.lockN ? fill(T.draft, { month: K.label(r.effectiveMonth), base: ov.base ? ov.base.name : '' }) : T.draftAll;
+      return r.returnNote ? t + ' · ' + fill(T.returned, { note: r.returnNote }) : t;
+    }
+    if (r.status === 'submitted') {
+      var A = SP.core.approval, q = A && A.enabled() ? A.pendingFor(r.id) : null, c = q ? A.currentStep(q) : null;
+      var at = F2.date(String(r.submittedAt || '').slice(0, 10));
+      return c ? fill(T.submitted, { at: at, step: A.stepLabel(c.key) }) : fill(T.submittedLite, { at: at });
+    }
+    return fill(T.locked, { at: F2.date(String(r.lockedAt || '').slice(0, 10)), by: r.lockedBy || '' });
+  }
+  function revisionBar(ov) {
+    if (!ov) return null;
+    var R = SP.core.revision, X = revText().bar || {}, K = SP.core.clock;
+    var r = ov.rev;
+    var text;
+    if (r.status === 'draft') text = ov.lockN ? fill(X.draft, { name: r.name, month: K.label(r.effectiveMonth), base: ov.base ? ov.base.name : '' }) : fill(X.draftAll, { name: r.name });
+    else if (r.status === 'submitted') text = fill(X.submitted, { name: r.name });
+    else text = fill(X.locked, { name: r.name, at: SP.core.format.date(String(r.lockedAt || '').slice(0, 10)), by: r.lockedBy || '' });
+    var w = R.working(r.planYear);
+    var link = r.status === 'locked' && w && w.id !== r.id ? h('button', { type: 'button', class: 'link-btn rev-bar-link', onClick: function () {
+      if (!confirmDiscard(dirtyFn ? dirtyFn() || 0 : 0)) return;
+      guardUnsaved(null); R.select(w.id); location.reload();
+    } }, fill(X.current, { name: w.name })) : null;
+    var note = r.status === 'draft' && r.returnNote ? h('span', { class: 'rev-bar-note' }, fill(X.returned, { note: r.returnNote })) : null;
+    return h('div', { class: 'rev-bar rev-bar-' + r.status, role: 'status', title: text }, h('span', { class: 'rev-bar-text' }, text), note, link);
+  }
+  function revisionCard(ov, opts) {
+    opts = opts || {};
+    if (!ov) return null;
+    var X = revText(), Y = X.card || {}, K = SP.core.clock, F2 = SP.core.format;
+    var r = ov.rev;
+    var reg = SP.core.registry;
+    var lines = [h('div', { class: 'rev-card-title' }, h('strong', null, r.name), revisionBadge(r.status), h('span', { class: 'muted' }, fill(Y.effective, { month: K.label(r.effectiveMonth) })), opts.actions || null)];
+    if (r.openedBy) lines.push(h('p', { class: 'rev-card-line' }, fill(Y.opened, { by: r.openedBy, at: F2.date(String(r.openedAt || '').slice(0, 10)), reason: r.reason || '–' })));
+    if (r.status === 'locked') lines.push(h('p', { class: 'rev-card-line' }, fill(Y.locked, { by: r.lockedBy || '', at: F2.date(String(r.lockedAt || '').slice(0, 10)) })));
+    if (r.status === 'submitted') lines.push(h('p', { class: 'rev-card-line' }, fill(Y.submitted, { by: r.submittedBy || '', at: F2.date(String(r.submittedAt || '').slice(0, 10)), note: r.submitNote || '–' })));
+    if (r.status === 'draft' && r.returnNote) lines.push(h('p', { class: 'rev-card-line rev-card-returned' }, fill(Y.returned, { note: r.returnNote })));
+    lines.push(h('p', { class: 'rev-card-line rev-card-total' }, fill(Y.total, { amount: F2.baht(ov.total) }),
+      ov.base && ov.baseTotal != null ? h('span', { class: 'muted' }, ' ' + fill(Y.vsBase, { base: ov.base.name, amount: F2.baht(ov.baseTotal), diff: (ov.diff < 0 ? '−' : '+') + F2.baht(Math.abs(ov.diff)), pct: (ov.pct < 0 ? '−' : '+') + F2.pct(Math.abs(ov.pct || 0), 1) })) : null));
+    var CK = X.checks || {};
+    var items = ((ov.checks || {}).items || []).map(function (c) {
+      var e = reg.byId(c.page);
+      var label = c.ok ? Y.ok : c.warn ? fill(Y.warnN, { n: c.n }) : c.n ? fill(Y.missingN, { n: c.n }) : Y.missing;
+      var chip = h('span', { class: 'rev-check-chip ' + (c.ok ? 'is-ok' : c.warn ? 'is-warn' : 'is-bad') }, label);
+      return h('a', { class: 'rev-check', href: e ? SP.core.paths.to(e.path) : null, title: fill(Y.goTip, { page: e ? (SP.core.layout ? SP.core.layout.pageLabel(e.id) : e.title) : '' }) }, chip, ' ', CK[c.key] || c.key);
+    });
+    if (items.length) lines.push(h('p', { class: 'rev-card-line rev-card-checks' }, h('span', { class: 'muted' }, r.status === 'locked' ? Y.checksLocked : Y.checks), items));
+    return h('section', { class: 'card rev-card rev-card-' + r.status + (opts.className ? ' ' + opts.className : '') }, lines);
   }
 
   // ตัวเลือกปีแผนในแถวหัวข้อ (CR-10) ขนาดตัวอักษรเท่าหัวข้อหน้า มี ▾ และ Tooltip "เปลี่ยนปีแผน"
@@ -1408,6 +1565,7 @@
   // ---------------------------------------------------------------------
   // opts เพิ่มเติม: extra = node ที่วางหน้าปุ่มเสมอ (เช่น ส่งออก ▾) / editRoles = บทบาทที่แก้หน้า Master ได้ (simple)
   //   CR-23: editBlocked() → ข้อความเหตุผล | null = ปุ่มแก้ไขกดไม่ได้พร้อมข้อความ (เช่น Channel ที่ยังไม่มีเป้าหมาย)
+  //   CR-38: readOnly() → ข้อความ | null = อ่านอย่างเดียวทั้งหน้า (ไม่มีปุ่มแก้ไข · รอบ Revision ที่ไม่ใช่ร่าง)
   //   getState() + onAction(action, payload) → { ok, error } = สถานะที่ไม่ได้เก็บใน plan.<ปี>.workflow (แผน NPD)
   // CR-19 สิทธิ์ (SP.core.permissions): แก้ไข / บันทึก / ยกเลิก ตามตารางสิทธิ์ — Module ของแถบ = opts.modules > หน้า Master (id ของหน้าจาก
   //   layout.currentPage()) > ขั้น (topDown · phasing · sku) / Channel ของหน่วยขาย = opts.channelId หรือหาจาก unitId
@@ -1440,14 +1598,14 @@
     function apply(action, extra) {
       extra = extra || {};
       if (opts.onAction) {
-        var r = opts.onAction(action, { by: roleName(store.role()), at: new Date().toISOString(), note: extra.note });
+        var r = opts.onAction(action, { by: roleName(store.role()), at: SP.core.clock.now(), note: extra.note });
         if (!r.ok) { window.alert(r.error === 'noteRequired' ? WL.noteRequired : r.error); return; }
         if (opts.onChange) opts.onChange(r);
         return;
       }
       var res = W.applyAction(store.workflowStates(), {
         step: opts.step, unitId: opts.unitId, action: action,
-        by: roleName(store.role()), at: new Date().toISOString(), note: extra.note,
+        by: roleName(store.role()), at: SP.core.clock.now(), note: extra.note,
         snapshot: extra.snapshot, invalidateNote: WL.invalidateNote[opts.step]
       });
       if (!res.ok) { window.alert(res.error === 'noteRequired' ? WL.noteRequired : res.error); return; }
@@ -1576,6 +1734,9 @@
       wrap.actions = [];
       if (opts.extra) actionsEl.appendChild(opts.extra);
       var editing = !!(opts.editing && opts.editing());
+      // CR-38: opts.readOnly() → ข้อความ = อ่านอย่างเดียวทั้งหน้า (รอบ Revision รอ Lock / Lock แล้ว) ไม่มีปุ่มแก้ไข · ไม่ส่ง = เหมือนเดิม
+      var ro = opts.readOnly ? opts.readOnly() : null;
+      if (ro && !editing) { actionsEl.appendChild(h('span', { class: 'wf-hint wf-readonly-revision' }, ro)); return; }
       var wfOn = opts.simple ? false : FT.stepOn(opts.step);
       if (opts.step === 'npd' && !wfOn) return;
       if (opts.simple) {
@@ -2118,9 +2279,11 @@
 
   // ข้อความ ⓘ ของยอดขายฐาน — CR-24: ยอดขาย L12M = ยอดขายจริง 12 เดือนล่าสุดที่ปิดแล้ว (ช่วงเดือนจาก core/clock.js) ใช้เทียบการเติบโต
   //   (ไม่มี clock = แบบเดิม: ยอดขายปี {ปี} = ยอดขายจริง ม.ค.–{เดือนตัดยอด} + ประมาณการ {เดือนถัดไป}–ธ.ค.)
-  function priorNote(year) {
+  //   CR-41: K = นาฬิกาของข้อมูลที่แสดง (calc.refClock · รอบที่ Lock แล้ว = เดือนตอน Lock) ไม่ส่ง = นาฬิกากลาง
+  function priorNote(year, K) {
     var P = labels().priorInfo;
-    if (SP.core.clock && P.l12mNote) return fill(P.l12mNote, { range: SP.core.clock.rangeLabel(false) });
+    K = K || SP.core.clock;
+    if (K && P.l12mNote) return fill(P.l12mNote, { range: K.rangeLabel(false) });
     var y = SP.data.history.years[year];
     if (!y) return fill(P.none, { year: year });
     var n = y.actualMonths;
@@ -2186,16 +2349,15 @@
     var wfStatus = !!labels().workflow.status[status];
     var rows = [[X.headerYear, year]];
     if (status && (!wfStatus || SP.core.features.isOn('approvalWorkflow'))) rows.push([X.headerStatus, labels().workflow.status[status] || status]);
-    return rows.concat([[X.headerAt, F.dateTime(new Date().toISOString())], [X.headerRole, roleName(SP.core.store.role())]]).concat(extra || []);
+    return rows.concat([[X.headerAt, F.dateTime(SP.core.clock.now())], [X.headerRole, roleName(SP.core.store.role())]]).concat(extra || []);
   }
 
   // ส่วนท้ายชื่อไฟล์: สถานะภาษาอังกฤษสั้น + วันที่ YYYYMMDD / ชื่อหน่วยขายตัดอักขระที่ใช้ในชื่อไฟล์ไม่ได้
   //   CR-17: ปิด approvalWorkflow = status ว่าง (Module ตัด _ ที่ซ้ำในชื่อไฟล์)
+  //   CR-41: วันที่ในชื่อไฟล์ = วันที่ของสถานการณ์ (clock.asOfDate)
   function exportStamp(status) {
-    var d = new Date();
-    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
     var code = SP.core.features.isOn('approvalWorkflow') ? labels().exporting.statusCode[status] || status : '';
-    return { status: code, date: d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) };
+    return { status: code, date: SP.core.clock.asOfDate().replace(/-/g, '') };
   }
   function fileSafe(text) { return String(text || '').replace(/[\\/:*?"<>|\s]+/g, '-'); }
 
@@ -2206,10 +2368,20 @@
     return h('span', { class: 'prior-label' }, text || fill(labels().priorInfo.label, { year: year }),
       h('span', { class: 'info-dot', title: n, 'aria-label': n, tabindex: '0', role: 'note' }, 'ⓘ'));
   }
+  // CR-41: บรรทัดเล็ก "จริง <ค่า>" ใต้ค่าเป้าหมาย / แผนของเดือนที่ปิดแล้ว · ต่ำกว่า = แดง (text-short) · ไม่ต่ำกว่า = เขียว (text-ok)
+  //   opts = { format (ค่าตั้งต้น F.baht), sample (true = ยอดจริงตัวอย่าง → Tooltip บอกว่าเป็นข้อมูลตัวอย่าง) }
+  function actualLine(actual, target, opts) {
+    opts = opts || {};
+    var X = labels().actualLine;
+    var f = opts.format || F.baht;
+    var low = target != null && actual < target - 0.5;
+    var tip = fill(X.tip, { actual: f(actual), target: target == null ? '–' : f(target) }) + (opts.sample ? ' · ' + X.sample : '');
+    return h('small', { class: 'actual-line ' + (low ? 'text-short' : 'text-ok'), title: tip }, fill(X.text, { value: f(actual) }));
+  }
   // CR-24: ⓘ ของยอดขายอ้างอิงรายเดือน — ม.ค.–ส.ค. ใช้ยอดจริงปี 2026 · ก.ย.–ธ.ค. ใช้ยอดจริงปี 2025 (ช่วงเดือนจาก core/clock.js)
-  function referenceNote() {
+  function referenceNote(K) {
     var R = labels().referenceInfo;
-    var K = SP.core.clock;
+    K = K || SP.core.clock;   // CR-41 นาฬิกาของข้อมูลที่แสดง (calc.refClock)
     var lc = K.parse(K.lastClosedMonth());
     if (lc.month >= 12) return fill(R.allLatest, { year: lc.year });
     return fill(R.note, { latestMonths: F.monthRange(0, lc.month - 1), year: lc.year, olderMonths: F.monthRange(lc.month, 11), prev: lc.year - 1 });
@@ -2566,6 +2738,9 @@
     remainingPct: remainingPct,
     contextStats: contextStats,
     icon: icon,
+    actualLine: actualLine,
+    hasIcon: hasIcon,
+    stepIcon: stepIcon,
     trashButton: trashButton,
     multiSelect: multiSelect,
     statusBadge: statusBadge,
@@ -2582,6 +2757,7 @@
     targetGrowth: targetGrowth,
     select: select,
     segmented: segmented,
+    tabs: tabs,
     card: card,
     callout: callout,
     approveBox: approveBox,
@@ -2604,6 +2780,7 @@
     viewOnlyNote: viewOnlyNote,
     yearPicker: yearPicker,
     tempNameTag: tempNameTag,
+    bundleTag: bundleTag,
     unsavedCount: unsavedCount,
     treeSelect: treeSelect,
     groupPicker: groupPicker,
@@ -2626,6 +2803,10 @@
     guardUnsaved: guardUnsaved,
     confirmDiscard: confirmDiscard,
     planYearPicker: planYearPicker,
+    revisionBadge: revisionBadge,
+    revisionPicker: revisionPicker,
+    revisionBar: revisionBar,
+    revisionCard: revisionCard,
     workflowBar: workflowBar,
     bindArrowNav: bindArrowNav,
     hoverTip: hoverTip,

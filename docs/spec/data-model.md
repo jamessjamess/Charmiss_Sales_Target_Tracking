@@ -133,12 +133,12 @@
   | TT | ประเสริฐ | สิริกาญจน์ · ฝนเทพ · อภิญญา · กฤษดา · อัมพร (ถึง ก.ค. 2026) |
   | ECOM | ณัฐวุฒิ | มิลิน · ต้นกล้า |
 - `data/permissions.js`:
-  - `SP.data.roles` = `{ id, name, description, system, order, defaultLevel, homePageId }`: บทบาทตั้งต้น 8 บทบาท และผู้ดูแลระบบใช้ `defaultLevel: 'EDIT'`
+  - `SP.data.roles` = `{ id, name, description, system, order, defaultLevel, homePageId }`: บทบาทตั้งต้น 8 บทบาท (CR-38 + MD = 9) และผู้ดูแลระบบใช้ `defaultLevel: 'EDIT'`
     - CR-25 `homePageId` = หน้าเริ่มต้น (id ใน registry) · `master.roles` ที่บันทึกก่อน CR-25 ไม่มีค่า = ใช้ค่าตั้งต้นของบทบาท id เดียวกันใน data/
     - `SP.data.permissions` ระบุครบทุกช่องตามตาราง CR-25 ข้อ 3 (เขียนเป็นตาราง TABLE ใน data/permissions.js)
   - `SP.data.permissionResources` = สิทธิ์ของหน้าที่ใช้ id ต่างจากหน้า (`annualTarget` · `unitTargets` · `skuPlan` · `listing`) + สิทธิ์ย่อย + สิทธิ์ทุกหน้า (ส่งออก)
   - `SP.data.permissions` = `{ <roleId>: { <resourceId>: { level, scope } } }` เก็บเฉพาะที่ต่างจาก `defaultLevel`
-- `data/users.js` = `{ id, name, roleIds, active, email }` มี 18 คน (CR-32 ไม่มี `salesPersonId` · การผูกอยู่ที่ `person.userId` · ค่าตั้งต้น `SP.data.personUsers` 12 คน):
+- `data/users.js` = `{ id, name, roleIds, active, email }` มี 18 คน (CR-38 + `u-md` ธนวัฒน์ ศรีประเสริฐ บทบาท MD = 19 คน) (CR-32 ไม่มี `salesPersonId` · การผูกอยู่ที่ `person.userId` · ค่าตั้งต้น `SP.data.personUsers` 12 คน):
   - บทบาทละ 1 คน: วรวุฒิ · ปรียา · ชนิดา · ธีรพล · กมลวรรณ · ศิริพร
   - Sales Person ในทีมขายทุกคน (วิทยาและอัมพรปิดใช้งาน)
 
@@ -172,3 +172,31 @@ CR-35 แยกไป [data-model-products.md](data-model-products.md) (ไฟ�
   - จัดสรรครบ 1 หน่วย: TT เขต 3
 - ตัวนับรายการที่ต้องดำเนินการของขั้นที่ 4 = 9
 - แผน NPD · ยอดขายจริงปี 2027 · ข้อมูล ERP · Promotion เป็นข้อมูลตัวอย่างบนสินค้าจริง
+
+## CR-37 Key ใหม่
+
+- `ui.bundleTab` = แท็บของหน้า Bundle (`list` | `demand`) · `ui.bundleFocus` = productKey ของ Bundle ที่จะเปิด Drawer ตอนเปิดหน้า Bundle (ลิงก์ อยู่ใน Bundle · อ่านครั้งเดียวแล้วลบ)
+- `master.products` ของ Bundle มี `kind` · `components` · `seriesManual` (ดู [data-model-products.md](data-model-products.md)) · `app.dataVersion` 16
+
+## CR-38 Key ใหม่ (Revision · รายละเอียดที่ [revision.md](revision.md))
+
+- `revision.list` = รายการ Revision ทุกปี (ค่าตั้งต้น `data/revisions.js` defaults = `2027 R1 ร่าง` มีผล ม.ค. 2027) · ฟิลด์ดู revision.md
+- `revision.snap.<id>` = Snapshot ตอน Lock (`plan` · `master` · `channels` · `history` · `report` · `base` · `lockBefore` · `checks`) · สร้างครั้งเดียว แก้ / ลบไม่ได้ (ยกเว้น `store.reset`)
+- `plan.<ปี>.*` = ข้อมูลของรอบล่าสุดของปี (R1 = Key เดิม ตัวเลขเท่าก่อน CR) · รอบที่ Lock แล้วอ่านจาก Snapshot · Store ตรวจข้อบังคับห้ามแก้ย้อนหลังทุกครั้งที่เขียน
+- `ui.revision` = id ของรอบที่เลือกใน Sales Planning (`null` = รอบร่าง / รอ Lock ของปี → รอบ Lock ล่าสุด) · เลือกแล้ว `app.planYear` = ปีของรอบ
+- `ui.revisionCompare` = `{ a, b }` จาก Revision List (อ่านครั้งเดียว) · `ui.revisionCompareOpts` = ตัวเลือกล่าสุดของ Revision Compare (`a · b · level · metric · view · channel · unit`)
+- `data/revisions.js` = `{ defaults: [{ planYear }], sample: { year, r1: { history }, r2: { effectiveMonth, reason, userId, at, total, channelDelta, unitDelta } } }` (ข้อมูลเท่านั้น ไม่แก้ `data/seed/`)
+- `app.dataVersion` 17
+
+## CR-39 Key ใหม่ (Approval · รายละเอียดที่ [approval.md](approval.md))
+
+- `approval.requests` = คำขออนุมัติทุกรายการ (ไม่มี = []) · `approvalConfig.revisionLock` = `{ sdConfirm }` (ค่าตั้งต้น `data/approvals.js` config)
+- `ui.approvalTab` = แท็บของหน้า Approval (`mine` | `all` | `settings`) · `ui.approvalOpen` = id ของคำขอที่จะเปิด (ส่งต่อจากแท็บ Revision · อ่านครั้งเดียว)
+- `ui.summaryTab` เพิ่มค่า `revision` · `compare` (CR-39 แท็บของ Plan Summary)
+- CR-41: `app.scenario` = สถานการณ์ Demo (`S1` | `S2` · ไม่มี = S1 · นาฬิกาอ่าน sessionStorage เอง) · `app.dataVersion` 19 · ยอดจริงตัวอย่าง `history.years[ปี].sample` (12 bool) ·
+  Snapshot `history.asOfMonth` · `data/scenarios.js` · รายละเอียดที่ [demo-scenarios.md](demo-scenarios.md)
+- CR-40 (การแสดงผลเท่านั้น · ไม่เปลี่ยน `app.dataVersion`): `ui.skuFilters` = `{ age, noSale, node, nodeLevel, planType, kind }` ตัวกรองเพิ่มเติมของ SKU Planning ·
+  `ui.skuFilterPanel` = แผงตัวกรองเปิดอยู่ (true/false) · `ui.sidebarCollapsed` เดิม (ปุ่มพับเป็นไอคอนที่กล่องโลโก้)
+- `data/approvals.js` = `{ config: { revisionLock: { sdConfirm } }, sample: { r1: { comments: [{ userId, at, text }] } } }` (ข้อมูลเท่านั้น · ไม่แก้ `data/seed/` · ผู้ใช้เลือก)
+- `data/revisions.js` defaults[].createdAt = วันที่ของรายการ สร้างจากข้อมูลตั้งต้น ในประวัติของ R1 · `revision.history[].action` เพิ่ม `create` · `confirm`
+- `app.dataVersion` 18

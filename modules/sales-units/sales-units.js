@@ -76,7 +76,7 @@
     var months = S.monthsBetween(firstKey < nowKey ? firstKey : nowKey, lastKey);
     var futureMonths = S.monthsBetween(nowKey, lastKey);
     var month = nowKey;
-    var refYear = SP.data.settings.DEFAULT_PLAN_YEAR - 1;
+    var refYear = SP.core.clock.planYear() - 1;   // CR-41 ยอดอ้างอิงของร้านค้า TT = ปีก่อนปีแผน
     var peopleEntry = SP.core.registry.byId('people');
     var peopleTitle = (SP.data.content.pages.people && SP.data.content.pages.people.title) || (peopleEntry && peopleEntry.title) || '';
     var saved = snapshot();
@@ -149,7 +149,7 @@
 
     // ---------- บันทึกทันที: changes จาก units.command* → store + Audit log + Toast ----------
     function auditEntries(before, after) {
-      var meta = { by: roleName(), at: new Date().toISOString() };
+      var meta = { by: roleName(), at: SP.core.clock.now() };
       var codes = M.unitCodes(after.accounts, after.channels);
       after.accounts.forEach(function (a) { if (!a.code) a.code = codes[a.id]; });
       var provinces = function (c) { return c.territories.map(function (t) { return { id: t.id, provinces: (c.provinceSuggestions[t.id] || []).slice().sort() }; }); };
@@ -361,14 +361,14 @@
     function toolbar(tab) {
       var Fl = page.filters;
       var c = cur();
-      var tabCtl = C.segmented({
+      var tabCtl = C.tabs({   // CR-40 แท็บขีดเส้นใต้ · จำนวนหน่วยขาย = ตัวนับเล็กสีเทา
         label: page.tabLabel, value: tab,
         options: tabIds(c).map(function (id) {
           var ch = id === 'all' ? null : channel(id);
           var n = model.all.filter(function (x) { return id === 'all' ? inTab(x, 'all') : x.channelId === id; }).length;
           var w = id === 'all' ? model.checks.total : model.checks.byChannel[id] || 0;
           return { value: id, title: w ? fill(page.tabWarn, { n: w }) : (ch ? ch.fullName : null),
-            label: [fill(page.tabCount, { name: ch ? ch.name : page.tabAll, n: F.number(n) }), w ? h('span', { class: 'su-tab-dot', 'aria-label': fill(page.tabWarn, { n: w }) }) : null] };
+            label: [ch ? ch.name : page.tabAll, w ? h('span', { class: 'su-tab-dot', 'aria-label': fill(page.tabWarn, { n: w }) }) : null], count: F.number(n) };
         }),
         onChange: function (v) { store.set('ui.salesUnitsTab', v); panelSel = 'all'; selected = {}; draw(); }
       });
@@ -656,7 +656,7 @@
       });
       return out;
     }
-    function stamp() { return { current: nowKey, at: new Date().toISOString(), by: roleName() }; }
+    function stamp() { return { current: nowKey, at: SP.core.clock.now(), by: roleName() }; }
     function done() { selected = {}; }
 
     function moveDialog(ids, target) {

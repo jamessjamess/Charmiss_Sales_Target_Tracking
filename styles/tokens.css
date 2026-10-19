@@ -1,23 +1,62 @@
 /*
  * styles/tokens.css — สี ฟอนต์ ขนาด (ที่เดียวที่กำหนดค่าสี)
  * ไฟล์ CSS อื่นและ Module ใช้ var(--...) เท่านั้น ห้าม Hardcode สี
+ * CR-40: ธีมตามแนวระบบ KOL Management ของ Charmiss (docs/spec/ui-theme.md)
+ *   Token ของธีม = ชื่อตาม CR-40 ข้อ 3.1 (--bg · --surface · --primary · --success …) ค่าจาก Repo charmiss-kol-affiliate-tracking (src/styles.css)
+ *   ชื่อเดิม (--c-bg · --c-primary · --c-success-bg …) เป็นชื่อแทน (Alias) ที่ชี้ไป Token ของธีม — CSS เดิมใช้ต่อได้
+ *   สีข้อมูล (Channel --ch-* · กราฟ · Series · ผู้รับผิดชอบ · ประเภทสินค้าในแผน) คงค่าเดิม ไม่อ้าง Token ของธีม
  */
 :root {
-  /* พื้นหลังและตัวอักษร */
-  --c-bg: #f6f5f2;
-  --c-surface: #ffffff;
-  --c-surface-2: #f0eeea;
-  --c-text: #1f2328;
-  --c-text-muted: #5a6069;
-  --c-border: #dedad3;
-  --c-border-strong: #b3ada4;
+  /* ---------- CR-40 ธีม ---------- */
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --border: #e4e7ec;
+  --border-strong: #d0d5dd;
+  --text: #101828;
+  --text-2: #344054;
+  --text-muted: #667085;
+  --primary: #c2185b;
+  --primary-hover: #a3144c;
+  --primary-soft: #fdeef4;
+  --on-primary: #ffffff;
+  --header-gradient: linear-gradient(90deg, #fce4ec 0%, #fff5f8 70%, #ffffff 100%);
+  /* ป้ายสถานะ 5 กลุ่ม (ข้อ 3.3): ตัวอักษรสีเข้ม + พื้นอ่อน ไม่มีเส้นขอบ */
+  --success: #067647;
+  --success-soft: #ecfdf3;
+  --warning: #b54708;
+  --warning-soft: #fffaeb;
+  --danger: #b42318;
+  --danger-soft: #fef3f2;
+  --neutral: #344054;
+  --neutral-soft: #f2f4f7;
+  --row-hover: #f9fafb;
+  --row-hover-overlay: rgba(16, 24, 40, 0.035);   /* Hover แถวตาราง: ชั้นบางทับสีพื้นเดิมของช่อง (ช่องสีสถานะยังเห็นสีเดิม) */
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-pop: 0 12px 32px rgba(16, 24, 40, 0.16);
+  /* สีประจำ Channel (ชื่อตาม CR-40 · ค่าเดิม = Channel Master colorToken --ch-1 … --ch-3) */
+  --ch-mt: var(--ch-1);
+  --ch-tt: var(--ch-2);
+  --ch-ecom: var(--ch-3);
+
+  /* พื้นหลังและตัวอักษร (ชื่อเดิม → Token ของธีม) */
+  --c-bg: var(--bg);
+  --c-surface: var(--surface);
+  --c-surface-2: var(--surface-2);
+  --c-text: var(--text);
+  --c-text-muted: var(--text-muted);
+  --c-border: var(--border);
+  --c-border-strong: var(--border-strong);
 
   /* สีหลักของเว็บ */
-  --c-primary: #8c2f5d;
-  --c-primary-strong: #6d2147;
-  --c-primary-soft: #f7e8ef;
-  --c-on-primary: #ffffff;
-  --c-focus: #8c2f5d;
+  --c-primary: var(--primary);
+  --c-primary-strong: var(--primary-hover);
+  --c-primary-soft: var(--primary-soft);
+  --c-on-primary: var(--on-primary);
+  --c-focus: var(--primary);
 
   /* Source ของช่อง SKU: ล็อก 0 = เทา, กรอกเอง = ฟ้า, ระบบเติม = เขียว, Clearance = ส้ม */
   --c-src-locked-bg: #e8e9eb;
@@ -33,15 +72,16 @@
   --c-src-clearance-fg: #873c05;
   --c-src-clearance-bd: #e98a33;
 
-  /* สีทั่วไป: สำเร็จ = เขียว, คำเตือน = เหลือง, อันตราย/ข้อผิดพลาด = แดง (ไม่ใช่สถานะคงเหลือ — ใช้ --status-* แทน) */
-  --c-success-bg: #d9f1df;
-  --c-success-fg: #185a2d;
+  /* สีทั่วไป: สำเร็จ = เขียว, คำเตือน = ส้ม, อันตราย/ข้อผิดพลาด = แดง (ไม่ใช่สถานะคงเหลือ — ใช้ --status-* แทน)
+   * CR-40: พื้น / ตัวอักษร = Token ของธีม · เส้น (-bd) คงค่าเดิม (ใช้เป็นสีแท่งสถานะในกราฟ) */
+  --c-success-bg: var(--success-soft);
+  --c-success-fg: var(--success);
   --c-success-bd: #37995a;
-  --c-warn-bg: #fff1bf;
-  --c-warn-fg: #664a00;
+  --c-warn-bg: var(--warning-soft);
+  --c-warn-fg: var(--warning);
   --c-warn-bd: #deb100;
-  --c-danger-bg: #fddedb;
-  --c-danger-fg: #8c1c16;
+  --c-danger-bg: var(--danger-soft);
+  --c-danger-fg: var(--danger);
   --c-danger-bd: #d8443a;
 
   /* สถานะคงเหลือ (ทุกหน้า: ตาราง, Dropdown, กราฟ, รายงาน) — ขาดเป้ารุนแรงกว่าเกินเป้า
@@ -56,29 +96,30 @@
   --status-over-bg: var(--c-warn-bg);
   --status-over-fg: var(--c-warn-fg);
   --status-empty: #c9c4bc;
-  --status-empty-bg: #f3f1ed;
-  --status-empty-fg: #6b717a;
+  --status-empty-bg: var(--neutral-soft);   /* CR-40 ยังไม่กำหนด = กลุ่ม neutral */
+  --status-empty-fg: var(--neutral);
 
   /* Status ระดับ SKU */
-  /* Status สินค้า (calc.productStatus): Planned เทา · New ม่วง · Active เขียว · Clearance ส้ม · Discontinued แดงเข้ม */
-  --c-st-planned-bg: #eceef1;
-  --c-st-planned-fg: #545b66;
-  --c-st-new-bg: #ece3fb;
-  --c-st-new-fg: #4a2a8c;
-  --c-st-active-bg: #dcf1e2;
-  --c-st-active-fg: #1f6a3a;
+  /* Status สินค้า (calc.productStatus) — CR-40 ป้าย 5 กลุ่ม: Planned · New (NPD) = primary · Active = success · Discontinued = neutral · Delete = danger (ขีดฆ่า)
+   * Clearance คงสีส้มเดิม · Request คงขอบประ (สีหลัก) */
+  --c-st-planned-bg: var(--primary-soft);
+  --c-st-planned-fg: var(--primary);
+  --c-st-new-bg: var(--primary-soft);
+  --c-st-new-fg: var(--primary);
+  --c-st-active-bg: var(--success-soft);
+  --c-st-active-fg: var(--success);
   --c-st-clearance-bg: var(--c-src-clearance-bg);
   --c-st-clearance-fg: var(--c-src-clearance-fg);
-  --c-st-discontinued-bg: #f3d9d9;
-  --c-st-discontinued-fg: #7c1d1d;
-  --c-st-request-bg: #ffffff;           /* CR-35 Request = คำขอ NPD (ขอบประม่วง) */
-  --c-st-request-fg: #5b3f9a;
-  --c-st-delete-bg: #d3d6db;            /* CR-35 Delete = เทาเข้ม ตัวอักษรขีดฆ่า */
-  --c-st-delete-fg: #33373d;
+  --c-st-discontinued-bg: var(--neutral-soft);
+  --c-st-discontinued-fg: var(--neutral);
+  --c-st-request-bg: var(--surface);    /* CR-35 Request = คำขอ NPD (ขอบประ) */
+  --c-st-request-fg: var(--primary);
+  --c-st-delete-bg: var(--danger-soft); /* CR-35 Delete = ตัวอักษรขีดฆ่า */
+  --c-st-delete-fg: var(--danger);
   /* CR-34 ประเภทสินค้าในแผน: สินค้าเดิม / Listing ใหม่ = สีหลัก · NPD ยืนยันแล้ว = ม่วง (เดียวกับ NPD) · ขอ NPD = ม่วงอ่อนลายเส้นทแยง · Clearance = เทา */
-  --c-type-existing: var(--c-primary);
+  --c-type-existing: #8c2f5d;            /* CR-40 คงสีเดิม (สีข้อมูลของกราฟ ไม่ตามสีหลักของธีม) */
   --c-type-npd: #6a4fa0;
-  --c-type-npd-bg: var(--c-st-new-bg);
+  --c-type-npd-bg: #ece3fb;             /* CR-40 คงสีเดิมของกราฟ (ไม่ตาม Status New) */
   --c-type-request: #bba9e2;
   --c-type-request-bd: #7d63b8;
   --c-type-clearance: #9aa1ab;
@@ -88,6 +129,18 @@
   /* ป้ายทั่วไปสีม่วงอ่อน (แถวรวม Series ที่เลือก) */
   --c-accent-soft-bg: #ece3fb;
   --c-accent-soft-fg: #4a2a8c;
+  /* CR-38 Revision: แถบสถานะ ร่าง (เหลืองอ่อน) · รอ Lock (เหลือง) · Lock แล้ว (เทา) · เดือนที่ล็อก = พื้นเทาลายเส้นบาง */
+  --c-rev-draft-bg: #fff9e3;
+  --c-rev-draft-bd: #ecd98a;
+  --c-rev-submitted-bg: #ffeaa3;
+  --c-rev-submitted-bd: #deb100;
+  --c-rev-locked-bg: #eceef1;
+  --c-rev-locked-bd: #c4c8ce;
+  --c-rev-hatch: rgba(95, 102, 112, 0.14);
+  /* CR-37 ป้าย Bundle (ชุดสินค้า) เหมือนกันทุกหน้า */
+  --c-bundle-bg: #dff3f1;
+  --c-bundle-fg: #0f5a54;
+  --c-bundle-bd: #4fa69d;
 
   /* ช่วงเวลา Forecast */
   --c-win-past-bg: #d6d8dc;
@@ -162,8 +215,8 @@
 
   /* ขั้นของ NPD (หน้าแผน NPD) */
   /* Waterfall การเติบโต: เพิ่ม = เขียว ลด = แดง ยอดรวม = สีกลาง */
-  --wfc-up: var(--c-success-bd);
-  --wfc-down: var(--c-danger-bd);
+  --wfc-up: #37995a;                     /* CR-40 คงสีเดิมของกราฟ */
+  --wfc-down: #d8443a;
   --wfc-total: #6f7682;
   --promo-bg: var(--c-primary-soft);
   --promo-bd: var(--c-primary);
@@ -178,17 +231,17 @@
   --c-vacant-stripe: #efc9c4;
   --c-vacant-fg: #8c1c16;
 
-  /* สถานะ Workflow: ร่าง = เทา, รออนุมัติ = ฟ้า, อนุมัติแล้ว = เขียว, ส่งกลับแก้ = แดง, ต้องตรวจใหม่ = เหลือง */
-  --c-wf-draft-bg: #eceae6;
-  --c-wf-draft-fg: #4a4f57;
-  --c-wf-submitted-bg: #dcebff;
-  --c-wf-submitted-fg: #16468c;
-  --c-wf-approved-bg: #d9f1df;
-  --c-wf-approved-fg: #185a2d;
-  --c-wf-returned-bg: #fddedb;
-  --c-wf-returned-fg: #8c1c16;
-  --c-wf-review-bg: #fff1bf;
-  --c-wf-review-fg: #664a00;
+  /* สถานะ Workflow (CR-40 ป้าย 5 กลุ่ม): ร่าง = neutral, รออนุมัติ = warning, อนุมัติแล้ว = success, ส่งกลับแก้ = danger, ต้องตรวจใหม่ = warning */
+  --c-wf-draft-bg: var(--neutral-soft);
+  --c-wf-draft-fg: var(--neutral);
+  --c-wf-submitted-bg: var(--warning-soft);
+  --c-wf-submitted-fg: var(--warning);
+  --c-wf-approved-bg: var(--success-soft);
+  --c-wf-approved-fg: var(--success);
+  --c-wf-returned-bg: var(--danger-soft);
+  --c-wf-returned-fg: var(--danger);
+  --c-wf-review-bg: var(--warning-soft);
+  --c-wf-review-fg: var(--warning);
   --c-wf-locked-bg: #3d434c;
   --c-wf-locked-fg: #ffffff;
 
@@ -208,10 +261,10 @@
   --c-ly-fg: #7a818c;
 
   /* Tooltip รายช่อง / Popover */
-  --c-tip-bg: #1f2328;
+  --c-tip-bg: #101828;
   --c-tip-fg: #ffffff;
   --c-tip-muted: #b9c0c9;
-  --c-backdrop: rgba(31, 35, 40, 0.35);
+  --c-backdrop: rgba(16, 24, 40, 0.32);
 
   /* Growth: บวก = เขียว / ลบ = แดง */
   --c-growth-pos: var(--c-success-fg);
@@ -223,7 +276,7 @@
   --c-fail: var(--c-danger-fg);
   --c-fail-bg: var(--c-danger-bg);
 
-  --c-shadow: rgba(31, 35, 40, 0.08);
+  --c-shadow: rgba(16, 24, 40, 0.08);
 
   /* ตัวอักษร (ใหญ่พอสำหรับฉายบนจอประชุม) */
   --font-sans: 'IBM Plex Sans Thai', 'Leelawadee UI', 'Tahoma', sans-serif;
@@ -247,15 +300,15 @@
   --sp-5: 24px;
   --sp-6: 32px;
   --sp-7: 48px;
-  --radius: 12px;
-  --radius-sm: 6px;
+  --radius: var(--radius-card);
+  --radius-sm: var(--radius-control);
   --container: 1280px;
   --container-wide: 1760px;
   --gutter: 24px;
   --row-h: 36px;
   --bar-height: 220px;
   --header-h: 52px;
-  --side-w: 236px;
+  --side-w: 248px;
   --side-w-collapsed: 56px;
 }
 

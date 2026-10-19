@@ -1,0 +1,43 @@
+/* modules/bundle/bundle.css — CR-37 หน้า Bundle (ต่อจาก modules/products/products.css · Drawer ใช้ร่วมกับ Product List)
+ *   แท็บ รายการ Bundle (KPI 4 ใบ · ตาราง ส่วนประกอบเป็น Chip) | ความต้องการชิ้นส่วน (3 บรรทัดต่อ SKU) · หน้าสูงเท่าจอ ตารางเลื่อนภายในการ์ด
+ */
+@media (min-width: 1024px) {
+  .page-bundle .module-body > .pl-body { flex: 1 1 auto; min-height: 0; }
+}
+.page-bundle .module-body > * + * { margin-top: var(--sp-2); }
+.bd-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 760px) { .bd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ตารางรายการ Bundle */
+.bd-table .bd-components { white-space: normal; min-width: 180px; }
+.bd-chips { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.bd-chip { display: inline-block; white-space: nowrap; font-size: 12px; line-height: 1.5; padding: 0 6px; border-radius: 999px; border: 1px solid var(--c-border); background: var(--c-surface); }
+.bd-chip.is-warn { border-color: var(--c-warn-bd); background: var(--c-warn-bg); color: var(--c-warn-fg); }
+.bd-table td.is-negative, .bd-total.is-negative { color: var(--c-danger-fg); }
+.bd-table .bd-col-planSets { white-space: nowrap; }
+
+/* Drawer: ส่วนประกอบ */
+.product-drawer .bd-components-section { display: block; }
+.bd-comp-table { width: 100%; margin-top: var(--sp-1); }
+.bd-comp-table tr.is-warn td { background: var(--c-warn-bg); }
+.bd-qty { display: inline-flex; align-items: center; gap: 4px; }
+.bd-qty .btn { min-width: 28px; padding-left: 6px; padding-right: 6px; }
+.bd-qty-input { width: 56px; text-align: right; }
+.bd-add-row { margin-top: var(--sp-2); gap: var(--sp-2); }
+.bd-pick { min-width: 260px; flex: 1 1 260px; }
+.bd-total { margin-top: var(--sp-2); font-weight: var(--fw-medium); }
+.bd-issues { margin: var(--sp-1) 0 0; padding-left: 1.2em; color: var(--c-danger-fg); }
+.bd-series-tag { margin-left: 4px; font-weight: var(--fw-medium); }
+.bd-series-auto { margin-top: var(--sp-1); }
+
+/* แท็บความต้องการชิ้นส่วน */
+.bd-demand-table th.bd-dm-sku { vertical-align: top; text-align: left; min-width: 200px; background: var(--c-surface); }
+.bd-dm-sku > * { display: block; }
+.bd-dm-name { font-weight: normal; color: var(--c-text-muted); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-dm-sku .status-badge, .bd-dm-sku .badge { display: inline-block; margin-top: 2px; }
+.bd-demand-table td.bd-dm-line { white-space: nowrap; }
+.bd-demand-table td.bd-dm-sub { padding-left: calc(var(--sp-2) + 1.2em); color: var(--c-text-muted); max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.bd-demand-table tr.bd-dm-total td { font-weight: var(--fw-bold); border-bottom: 2px solid var(--c-border); }
+.bd-demand-table td.is-strong { font-weight: var(--fw-bold); }
+.bd-dm-toggle { text-decoration: none; }
+.bd-dm-note { margin: 0; }

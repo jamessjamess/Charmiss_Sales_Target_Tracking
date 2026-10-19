@@ -274,3 +274,6 @@ button.sa-note.has-note { cursor: pointer; }
 .sa-note-input { width: min(460px, 80vw); font: inherit; resize: vertical; }
 .ph-table [hidden] { display: none !important; }
 .ph-table .ph-growth-line { grid-column: 1 / -1; justify-content: flex-start; gap: 6px; font-size: 12px; color: var(--c-text-muted); }
+
+/* CR-41: เดือนที่ปิดแล้ว = บรรทัดเล็ก จริง <ค่า> ใต้เป้าหมาย (components.actualLine) */
+.ph-cell.num:has(> .actual-line) { flex-direction: column; align-items: flex-end; justify-content: center; line-height: 1.2; }

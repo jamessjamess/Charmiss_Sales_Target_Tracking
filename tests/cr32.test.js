@@ -216,7 +216,7 @@
     },
     {
       name: 'cr32-16. สิทธิ์ของผู้ใช้ตัวอย่างทุกคน (18) เหมือนก่อน CR: อ่านทีมผ่าน person.userId ได้ผลเท่ากับการผูกแบบเดิม (salesPersonId) ทุกช่องและทุก Channel ของแผน SKU',
-      expected: [18, 0, 12],
+      expected: [19, 0, 12],   // CR-38 + ผู้ใช้ MD
       actual: function () {
         var P = SP.core.permissions, D = SP.data;
         var legacy = {};

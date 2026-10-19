@@ -93,6 +93,19 @@
     samplePatches: [
       { trCode: '32090', patch: { isSample: true, clearance: { fromMonth: '2027-01', toMonth: '2027-04', stockQty: 1200, price: 79, unitIds: ['watsons', 'TT-01'], expiry: '2027-06-30', note: 'ตัวอย่างแผน Clearance',
         plan: { watsons: { '2027-01': 125, '2027-02': 125, '2027-03': 125, '2027-04': 125 }, 'TT-01': { '2027-01': 125, '2027-02': 125, '2027-03': 125, '2027-04': 125 } } } } }
+    ],
+    // CR-37: ตัวอย่างสินค้าแบบ Bundle (ไม่แก้ data/seed/) · core/seed.js สร้างสินค้า (kind: 'bundle' · หมวด Set & Bundle · Series จากชิ้นส่วน)
+    //   ราคาหลัก RSP = rsp · ราคาหลักประเภทอื่น = สัดส่วนเดียวกับ priceRatioOf (ปัดเป็นบาท) · Listing = units · แผน SKU ตั้งต้นของปี planYear = plan (<หน่วยขาย>: { เดือน 0–11: ชุด })
+    //   ยอดแผนของ Watsons และ Shopee ยังต่ำกว่าเป้าหมาย (แถวคงเหลือยังเป็น ขาด)
+    bundles: [
+      { trCode: '90100', name: 'Charmiss Matte All Day Cushion 5g -01 Twin Set', shortName: 'Matte All Day Cushion 5g -01 Twin Set',
+        components: [{ skuId: '12130', qty: 2 }], rsp: 109, priceRatioOf: '12130', launchDate: '2026-01-01', isSample: true,
+        units: [{ unitId: 'watsons', fromMonth: '2027-01' }], planYear: 2027, plan: { watsons: { 0: 150, 1: 150, 2: 150, 3: 150, 4: 150, 5: 150, 6: 150, 7: 150, 8: 150, 9: 150, 10: 150, 11: 150 } },
+        note: 'ตัวอย่าง Bundle', createdAt: '2026-09-25T10:00:00' },
+      { trCode: '90200', name: 'Charmiss Matte All Day Cushion 5g Duo -01/-02', shortName: 'Matte All Day Cushion 5g Duo -01/-02',
+        components: [{ skuId: '12130', qty: 1 }, { skuId: '12140', qty: 1 }], rsp: 109, priceRatioOf: '12130', launchDate: '2026-01-01', isSample: true,
+        units: [{ unitId: 'shopee', fromMonth: '2027-03' }], planYear: 2027, plan: { shopee: { 2: 200, 3: 200, 4: 200, 5: 200, 6: 200, 7: 200, 8: 200, 9: 200, 10: 200, 11: 200 } },
+        note: 'ตัวอย่าง Bundle', createdAt: '2026-09-25T10:00:00' }
     ]
   };
 

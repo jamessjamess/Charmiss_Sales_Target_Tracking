@@ -36,6 +36,7 @@ CR-28 แทนหน้าเกี่ยวกับ Prototype (คง id · P
   - เป้าหมายและแผน: Total Target · Net Sales · Sale Amount · GP / Platform Fee (`{gpLabels}`) · L12M · ยอดอ้างอิงรายเดือน · เป้าหมาย Top-down · แผน Bottom-up · คงเหลือ · สิ้นสุดแผน
   - หน่วยขายและคู่ค้า: หน่วยขาย · คู่ค้า · รหัสคู่ค้า · ภาระเป้าหมายต่อคน
   - สินค้า: Request · Planned · NPD (`{npdMonths}` เดือนแรก) · Active · Discontinued · Clearance · Delete · รหัสชั่วคราว `NPD-YYMM-NNN` · ชื่อชั่วคราว · Product Level · Product Year · Listing
+  - CR-37 Bundle (`feature: 'bundle'` · Flag ปิด = ไม่แสดงกลุ่ม): Bundle · ส่วนประกอบ · ส่วนลด Bundle · Mix Series · ความต้องการชิ้นส่วน
   - ประเภทสินค้าในแผน: สินค้าเดิม · Listing ใหม่ · NPD ยืนยันแล้ว · ขอ NPD
   - Clearance: ราคา Clearance · แผน Clearance (ไม่นับในเป้าหมาย) · ลำดับราคา (Clearance → Promotion หน่วยขาย → Promotion Channel → ราคาหลัก)
 - สูตร (`guide.formulaLines`): `Sale Amount = …` + 1 บรรทัดต่อ Channel ที่ใช้งาน · มีส่วนแบ่ง = `÷ 1.07 × (1 − {gpLabel})` · ไม่มี = `÷ 1.07` ·
@@ -50,3 +51,23 @@ CR-28 แทนหน้าเกี่ยวกับ Prototype (คง id · P
 - Module เพิ่มหัวข้อได้ด้วย `ctx.addHelp(label, build)` (กดแล้วแสดงในกล่องเดิม + `← กลับ`) —
   SKU Planning: `กฎ Status และวิธีเติมยอด` (Legend + กฎ + คีย์ลัด)
 - CR-36 หน้าแผน NPD / Listing / Category & Series เดิมไม่มีรายการของตัวเอง (หน้าเดิมเป็นทางผ่าน) · Product List มีขั้นตอนของแท็บ Product Level
+
+## CR-38 Revision (Flag `revision` · ปิด = ไม่แสดง)
+
+- แท็บภาพรวม: บรรทัด `รอบ Revision:` ใต้การ์ดลำดับงาน (`guide.revisionFlow`): เปิดรอบ → ปรับ 4 ขั้น (เฉพาะเดือนที่มีผล) → เสนอ Lock → MD Lock หรือส่งกลับแก้ไข → ดูย้อนหลังและเปรียบเทียบ ·
+  ลิงก์ Revision List · Revision Compare (เฉพาะหน้าที่ผู้ใช้เห็น)
+- คำศัพท์กลุ่ม `Revision` (`feature: 'revision'`): Revision · เดือนที่มีผล · Lock · ร่าง / รอ Lock / Lock แล้ว · Snapshot · ห้ามแก้ย้อนหลัง (อธิบายทั้ง 2 ข้อ)
+- ตารางบทบาทมี MD อัตโนมัติ (สร้างจาก Permissions) · ปุ่ม `?` ของ Revision List / Revision Compare = `guide.pages.revisionList` / `revisionCompare`
+
+## CR-39
+
+- บรรทัด `รอบ Revision:` = เปิดรอบ ({page_summary} › Revision) → ปรับ 4 ขั้น → ส่งขออนุมัติ → (Sales Director ยืนยัน ถ้าเปิดใช้) → MD อนุมัติและ Lock ที่หน้า {page_approval} → ดูย้อนหลังและเปรียบเทียบ ·
+  ลิงก์ Plan Summary · Approval · ปิด Flag approval = ลำดับของ CR-38 (`revisionFlow.stepsLite`) · ข้อความเติมชื่อหน้าจากเมนู (`guide.textVars`)
+- คำศัพท์: กลุ่ม Revision ปรับ Lock และสถานะ (`ร่าง / Lock แล้ว` · ไม่มี รอ Lock) · กลุ่มใหม่ `การอนุมัติ` (Flag approval): คำขออนุมัติ · ขั้นอนุมัติ · ชุดสรุป · รออนุมัติ
+- ตารางบทบาท (สร้างจากสิทธิ์): Sales Director และ MD มีหน้า Approval · ปุ่ม `?` ของหน้า Approval (`guide.pages.approval`) · Plan Summary มีขั้นตอนของแท็บ Revision / เปรียบเทียบ
+
+## CR-41 คู่มือ
+
+- กล่อง `สำหรับการทดสอบ`: เลือกสถานการณ์ Demo (ป้าย / เมนู · สลับแล้วข้อมูลหาย) · {s1} 3 ขั้น · {s2} 7 ขั้นตาม CR-41 ข้อ 4.6 (ข้อความสั้นคั่นด้วยลูกศร) · ข้อมูล ณ {asOf} จากนาฬิกากลาง
+- คำศัพท์กลุ่ม `สถานการณ์ Demo`: สถานการณ์ Demo · เดือนปิดล่าสุด · ยอดจริงสะสม · ยอดจริงตัวอย่าง · แก้ L12M และ ยอดอ้างอิงรายเดือน ตามกติกาแบบทั่วไป
+- ตัวแปรข้อความใหม่: `{s1}` `{s2}` (ชื่อสถานการณ์) · `{year}` · `{closed}` (เดือนปิดล่าสุด) · `{sampleRange}` (ช่วงยอดจริงตัวอย่างของ S2)

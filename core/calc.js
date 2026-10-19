@@ -312,23 +312,32 @@
   }
 
   // ---------------------------------------------------------------------
-  // CR-24: ยอดขายอ้างอิง = ยอดจริงล่าสุดของแต่ละเดือน ตามเดือนปัจจุบันกลาง (core/clock.js)
-  //   เดือน ≤ เดือนปิดล่าสุด (ม.ค.–ส.ค.) = ปี 2026 · หลังจากนั้น (ก.ย.–ธ.ค.) = ปี 2025 → ผลรวม 12 เดือน = L12M (ก.ย. 2025 – ส.ค. 2026)
-  //   ยอดของเดือนที่เป็นประมาณการ (เกิน history.years[ปี].actualMonths) ไม่ใช้เสมอ
+  // CR-24 · CR-41: ยอดขายอ้างอิง = ยอดจริงของเดือนเดียวกันในปีล่าสุดที่เดือนนั้นปิดแล้ว (≤ เดือนปิดล่าสุดของนาฬิกากลาง core/clock.js)
+  //   → ผลรวม 12 เดือน = L12M เสมอ (S1 ก.ย. 2026: ม.ค.–ส.ค. ปีล่าสุด · ก.ย.–ธ.ค. ปีก่อน · S2 ก.พ. 2027: ม.ค. ปีแผน · ก.พ.–ธ.ค. ปีก่อน)
+  //   ยอดของเดือนที่ยังไม่ปิด หรือเป็นประมาณการ (เกิน history.years[ปี].actualMonths) ไม่ใช้เสมอ
   // ---------------------------------------------------------------------
   function clock() { return SP.core.clock; }
-  // ยอดจริงเดือน m (0–11) ของหน่วยขายในปี year → บาท | null (ไม่มีข้อมูล หรือยังเป็นประมาณการ)
+  // CR-41: นาฬิกาของยอดอ้างอิง = history.asOfMonth (ยอดขายใน Snapshot ของรอบที่ Lock แล้ว = เดือนปัจจุบันตอน Lock) ไม่มี = นาฬิกากลาง
+  //   → ตัวเลขของรอบที่ Lock แล้วไม่เปลี่ยนเมื่อสลับสถานการณ์ Demo (ยอดอ้างอิงคิดจากเดือนตอน Lock)
+  function refClock(history) {
+    var K = clock();
+    return history && history.asOfMonth && K ? K.at(history.asOfMonth) : K;
+  }
+  // ยอดจริงเดือน m (0–11) ของหน่วยขายในปี year → บาท | null (ไม่มีข้อมูล · ยังไม่ปิด · หรือยังเป็นประมาณการ)
   function actualMonthValue(history, year, unitId, m) {
     var y = history && history.years && history.years[year];
     var row = y && y.monthly && unitId != null ? y.monthly[unitId] : null;
     if (!row) return null;
     var n = y.actualMonths == null ? 12 : y.actualMonths;
+    var K = refClock(history);
+    if (K && !K.isClosed(Number(year), m)) return null;
     return m < n ? (row[m] || 0) : null;
   }
   function referenceOfUnit(history, unitId) {
     var out = [];
+    var K = refClock(history);
     for (var m = 0; m < 12; m++) {
-      var y = clock().referenceYear(m);
+      var y = K.referenceYear(m);
       out.push({ month: m + 1, value: actualMonthValue(history, y, unitId, m), sourceYear: y });
     }
     return out;
@@ -1300,7 +1309,7 @@
     var items = (plan && plan.items) || {};
     return master.products.filter(function (p) {
       var key = productKey(p);
-      return listedInYear(master.listings, key, unitId, year) && !items[key] && soldInYear(p, year);
+      return listedInYear(master.listings, key, unitId, year) && !items[key] && soldInYear(p, year) && bundleVisible(p);
     }).map(function (p) {
       var key = productKey(p);
       var c = productCompleteness(p, master.basePrices);
@@ -1319,7 +1328,7 @@
   function addableSkus(master, unitId, plan, year, history) {
     var items = (plan && plan.items) || {};
     return master.products.filter(function (p) {
-      if (items[productKey(p)] || deletedInYear(p, year)) return false;
+      if (items[productKey(p)] || deletedInYear(p, year) || !bundleVisible(p)) return false;   // CR-37: Flag bundle ปิด = ไม่มี Bundle
       var pp = planProduct(p);
       return soldInYear(pp, year) || (!!history && hasStatusInYear(pp, year, ['discontinued']) && soldInUnit(history, unitId, productKey(p)));
     }).map(function (p) {
@@ -1454,9 +1463,13 @@
     var g = method === 'lastYear' ? growthFactor(opts.target, unitLY) : null;
     var totals = { units: zeros(12), sellOut: zeros(12), net: zeros(12) };
     var prior = { units: zeros(12), sellOut: zeros(12), net: zeros(12) };
+    // CR-38: opts.revisionLock = { before (จำนวนเดือนแรกที่ล็อก), items: { <productKey>: { u: [ชิ้น], s: [Sale Amount], n: [Net Sales] } } } ค่าของรอบก่อน
+    //   เดือนที่ล็อก = ค่าจากรอบก่อน (ไม่ใช่ค่าระบบเติม / ราคาปัจจุบัน) · อ่านอย่างเดียว (state.reason revision) · ไม่ส่ง = ผลเดิมทุกค่า
+    var rl = opts.revisionLock && opts.revisionLock.before > 0 ? opts.revisionLock : null;
     var items = (plan && plan.items) || {};
 
-    var rows = master.products.filter(function (p) { return items[productKey(p)]; }).map(function (p0) {
+    // CR-37: Flag bundle ปิด = ไม่แสดงและไม่นับแถว Bundle (bundleVisible)
+    var rows = master.products.filter(function (p) { return items[productKey(p)] && bundleVisible(p); }).map(function (p0) {
       var key = productKey(p0);
       var p = planProduct(p0);
       var item = items[key];
@@ -1485,8 +1498,11 @@
         var override = source === 'clearance' ? !!(item.overrides && item.overrides[m]) : !!(item.overrides && item.overrides[m]) && systemUnits != null;
         var planned = source === 'locked' ? 0 : (source === 'manual' || override) ? Number(item.qty[m] || 0) : source === 'clearance' ? 0 : systemUnits;
         var units = state.reason === 'actual' ? actualUnits(data.actuals, year, unitId, key, m) : planned;
+        var rlv = rl && m < rl.before ? (rl.items && rl.items[key]) || {} : null;
+        if (rlv) { planned = rlv.u ? Number(rlv.u[m]) || 0 : 0; units = planned; state = { editable: false, reason: 'revision' }; lock = lock || 'revision'; }
         var pm = monthPricing(pricing, key, unitId, ctx, year, m);
         var c = chain({ units: units, price: pm.price, gp: pm.gp, hasGP: ctx.hasGP, includesVat: includesVat });
+        if (rlv) c = { saleAmount: rlv.s ? Number(rlv.s[m]) || 0 : 0, netSales: rlv.n ? (rlv.n[m] == null ? null : Number(rlv.n[m])) : 0 };
         totals.units[m] += units;
         totals.sellOut[m] += c.saleAmount;
         totals.net[m] += c.netSales || 0;
@@ -2357,16 +2373,18 @@
   //   เดือน ≤ เดือนปิดล่าสุด = ยอดจริงปีล่าสุด · หลังจากนั้น = ยอดจริงปีก่อนหน้า / ไม่มียอดจริงรายเดือนของปีนั้น (ข้อมูล SKU ใน seed มีแค่ปี 2026)
   //   → ใช้ค่าปีล่าสุดของเดือนนั้น (ประมาณการ) และ estimated = true (ไม่ใช้เป็นฐานของเป้าหมายรายเดือน)
   function skuReference(history, unitId, key) {
-    var lc = clock().parse(clock().lastClosedMonth());
+    var K = refClock(history);
+    var lc = K.parse(K.lastClosedMonth());
     var latest = skuHistory(history, lc.year, unitId, key);
     var older = skuHistory(history, lc.year - 1, unitId, key);
     if (!latest && !older) return null;
     var out = { monthly: [], sourceYears: [], estimated: [] };
     for (var m = 0; m < 12; m++) {
-      var y = clock().referenceYear(m);
+      var y = K.referenceYear(m);
       var src = y === lc.year ? latest : older;
       if (src) { out.monthly.push(src[m] || 0); out.sourceYears.push(y); out.estimated.push(false); }
-      else if (latest && y !== lc.year) { out.monthly.push(latest[m] || 0); out.sourceYears.push(lc.year); out.estimated.push(true); }
+      // CR-41: เดือนของปีล่าสุดที่ยังไม่เกิด (ค่าว่าง null · ปีแผนของสถานการณ์ S2) ไม่ใช้เป็นประมาณการ
+      else if (latest && y !== lc.year && latest[m] != null) { out.monthly.push(latest[m] || 0); out.sourceYears.push(lc.year); out.estimated.push(true); }
       else { out.monthly.push(0); out.sourceYears.push(y); out.estimated.push(false); }
     }
     return out;
@@ -2434,7 +2452,7 @@
   function salesAge(data, key, unitId, opts) {
     opts = opts || {};
     var S = data.settings || settings();
-    var lc = clock().lastClosedMonth();
+    var lc = refClock(data.history).lastClosedMonth();
     var master = opts.master || data;
     var span = saleSpan(data.history, unitId, key, lc);
     var out = { started: true, firstSaleMonth: null, lastSaleMonth: null, sellingMonths: 0, monthsSinceLastSale: null,
@@ -2807,7 +2825,8 @@
   //   discontinued = ไม่ได้ขายในปีแผน (เลิกขายก่อนปีแผน) / incomplete = ขาดข้อมูลจำเป็น / other = ขายได้แต่ไม่อยู่ในแผน
   //   CR-24: ยอดขายปีก่อน = ยอดอ้างอิงราย SKU 12 เดือน (skuReference · ราคาของปีที่ใช้)
   function priorOutsidePlan(data, master, unitId, plan, year) {
-    var lc = clock().parse(clock().lastClosedMonth());
+    var K = refClock(data.history);
+    var lc = K.parse(K.lastClosedMonth());
     var q = {};
     [lc.year, lc.year - 1].forEach(function (yy) {
       var yq = data.history && data.history.years[yy] && data.history.years[yy].skuQty && data.history.years[yy].skuQty[unitId];
@@ -3356,7 +3375,8 @@
       var u = findById(all, id);
       if (!u) return null;
       var p = phasing && phasing[id] && phasing[id].monthPct ? phasing[id].monthPct : defaultPhasing(data, year, id);
-      var t = phasingTotals(u.amount, p);
+      // CR-38: phasing[id].locked = บาทของเดือนล็อก (revisionPhasing) · ไม่ส่ง = ผลเดิม
+      var t = phasing && phasing[id] && phasing[id].locked ? revisionPhasing(u.amount, p, phasing[id].locked) : phasingTotals(u.amount, p);
       var prior = priorMonthly(data.history, year, id);
       return {
         id: id, name: u.name, channelId: u.channel.id, color: u.channel.color, target: u.amount, amounts: t.amounts,
@@ -3499,6 +3519,514 @@
     var afterTo = q.toMonth != null && q.toMonth < horizonEnd ? q.toMonth : horizonEnd;
     return { ask: true, current: q.salesPersonId, range: { fromMonth: q.fromMonth, toMonth: q.toMonth == null ? null : q.toMonth }, replaceEnd: replaceEnd < end ? end : replaceEnd,
       after: { from: addMonths(end, 1), to: afterTo } };
+  }
+
+  // =====================================================================
+  // 23) CR-37 Bundle (Mix Product): สินค้า 1 รายการที่ประกอบด้วย SKU เดี่ยว × จำนวน
+  //   product.kind = 'bundle' · components = [{ skuId (productKey ของ SKU เดี่ยว), qty (จำนวนเต็ม ≥ 1) }] · ไม่มี kind = สินค้าเดี่ยว ('single')
+  //   วางแผนเป็นชุดในแถวของ Bundle · Net Sales คิดจากราคา Bundle เอง (ไม่แตกยอดไปที่ชิ้นส่วน · ไม่นับซ้ำ)
+  //   ความต้องการชิ้นส่วน (componentDemand) = ข้อมูลประกอบสำหรับ Supply Chain ไม่ใช่ยอดขาย
+  //   Flag bundle ปิด → bundleVisible(p) = false: แผน SKU ไม่แสดงและไม่นับแถว Bundle · รายการเพิ่มสินค้าไม่มี Bundle (ข้อมูลยังอยู่ใน Store)
+  //   หมวดสินค้า / Mix Series / กติกาชิ้นส่วน = settings.BUNDLE
+  // =====================================================================
+  function bundleSettings() { return settings().BUNDLE || {}; }
+  function isBundle(product) { return !!product && product.kind === 'bundle'; }
+  function productKind(product) { return isBundle(product) ? 'bundle' : 'single'; }
+  function bundleOn() { var F = SP.core.features; return !F || F.isOn('bundle'); }
+  function bundleVisible(product) { return !isBundle(product) || bundleOn(); }
+
+  // รวมบรรทัดที่ skuId ซ้ำเป็นบรรทัดเดียว (บวกจำนวน) ตามลำดับที่พบครั้งแรก → [{ skuId, qty }]
+  function mergeComponents(list) {
+    var out = [], at = {};
+    (list || []).forEach(function (c) {
+      if (!c || !c.skuId) return;
+      var q = Number(c.qty);
+      if (Object.prototype.hasOwnProperty.call(at, c.skuId)) { out[at[c.skuId]].qty += q; return; }
+      at[c.skuId] = out.length;
+      out.push({ skuId: String(c.skuId), qty: q });
+    });
+    return out;
+  }
+  // จำนวนชิ้นต่อชุด = ผลรวม qty
+  function bundleQty(bundle) { return sum(((bundle && bundle.components) || []).map(function (c) { return Number(c.qty) || 0; })); }
+
+  // Series ของ Bundle = Series ของชิ้นส่วนถ้าเหมือนกันทั้งหมด · ต่าง Series = Mix Series (settings.BUNDLE.mixSeriesId) · ไม่มีชิ้นส่วน = null
+  function bundleSeries(bundle, products) {
+    var ids = [];
+    ((bundle && bundle.components) || []).forEach(function (c) {
+      var p = findProduct(products, c.skuId);
+      var s = p ? p.seriesId || null : null;
+      if (ids.indexOf(s) < 0) ids.push(s);
+    });
+    if (!ids.length) return null;
+    return ids.length === 1 ? ids[0] : bundleSettings().mixSeriesId || null;
+  }
+
+  // ปัญหาของชิ้นส่วน (กติกาข้อ 1.2) month = 'YYYY-MM' ใช้ตัดสินสถานะชิ้นส่วน · checkStatus = false ไม่ตรวจสถานะ
+  //   → [{ code: 'empty' (ไม่มีชิ้นส่วน) | 'qty' (ไม่ใช่จำนวนเต็ม ≥ 1) | 'missing' (ไม่พบสินค้า) | 'nested' (ชิ้นส่วนเป็น Bundle) | 'status' (Request / Delete)
+  //        | 'minQty' (รวมน้อยกว่า settings.BUNDLE.minQty), skuId, status }]
+  function bundleIssues(bundle, products, month, checkStatus) {
+    var B = bundleSettings();
+    var comps = (bundle && bundle.components) || [];
+    var out = [];
+    if (!comps.length) out.push({ code: 'empty' });
+    comps.forEach(function (c) {
+      var q = Number(c.qty);
+      if (!(q >= 1) || Math.floor(q) !== q) out.push({ code: 'qty', skuId: c.skuId });
+      var p = findProduct(products, c.skuId);
+      if (!p) { out.push({ code: 'missing', skuId: c.skuId }); return; }
+      if (isBundle(p) || productKey(p) === productKey(bundle)) { out.push({ code: 'nested', skuId: c.skuId }); return; }
+      var st = productStatus(p, month);
+      if (checkStatus !== false && (B.blockedStatuses || []).indexOf(st) >= 0) out.push({ code: 'status', skuId: c.skuId, status: st });
+    });
+    if (comps.length && bundleQty(bundle) < (B.minQty || 2)) out.push({ code: 'minQty' });
+    return out;
+  }
+
+  // กติกาตอนบันทึก Product Master (store.set('master.products') เรียกใช้ · บังคับที่ Store ไม่ใช่แค่หน้าจอ)
+  //   ทุก Bundle: รวม skuId ซ้ำ · หมวดสินค้า = Set & Bundle › Bundle › Bundle · Series = bundleSeries (ยกเว้นทีม Product แก้เอง seriesManual = true)
+  //   ตรวจ bundleIssues เฉพาะ Bundle ที่สร้างใหม่หรือชิ้นส่วนเปลี่ยนจาก prev (ชิ้นส่วนที่กลายเป็น Delete ภายหลังไม่ทำให้บันทึกไม่ได้ → ข้อมูลที่ต้องตรวจ)
+  //   → { ok, products, error: null | { code, key, skuId, status } }
+  function normalizeBundles(products, prev, month) {
+    var B = bundleSettings();
+    var list = products || [];
+    if (!list.some(isBundle)) return { ok: true, products: list, error: null };
+    var before = {};
+    (prev || []).forEach(function (p) { if (isBundle(p)) before[productKey(p)] = JSON.stringify(mergeComponents(p.components)); });
+    var error = null;
+    var out = list.map(function (p) {
+      if (!isBundle(p) || error) return p;
+      var o = copy(p);
+      o.components = mergeComponents(o.components);
+      var key = productKey(o);
+      if (before[key] !== JSON.stringify(o.components)) {
+        var issues = bundleIssues(o, list, month, true);
+        if (issues.length) { error = { code: issues[0].code, key: key, skuId: issues[0].skuId || null, status: issues[0].status || null }; return p; }
+      }
+      if (B.typeId) { o.categoryId = B.categoryId; o.subCategoryId = B.subCategoryId; o.typeId = B.typeId; o.inferred = false; }
+      if (!o.seriesManual) { o.seriesId = bundleSeries(o, list); o.subSeriesId = null; }
+      return o;
+    });
+    return error ? { ok: false, products: list, error: error } : { ok: true, products: out, error: null };
+  }
+
+  // ราคาของสินค้าตามลำดับราคาเดิม (ไม่แก้ลำดับราคา) month = 'YYYY-MM'
+  //   ไม่ระบุหน่วยขาย = ราคาหลักประเภท priceType (ไม่ระบุ = RSP) · ระบุหน่วยขาย = resolvePrice (Clearance → Promotion ของหน่วยขาย → ของ Channel → ราคาหลัก)
+  //   ระบุทั้งหน่วยขายและ priceType = ลำดับเดียวกันแต่ใช้ราคาหลักประเภทนั้น → ราคา | null
+  function itemPriceAt(data, key, priceType, month, unitId) {
+    var m = monthOf(month);
+    if (!unitId) return basePriceAt(data.basePrices, key, priceType || 'RSP', m);
+    if (!priceType) return resolvePrice(data, key, unitId, m).price;
+    var info = unitInfo(data, unitId);
+    var ch = info ? info.channel : findById(data.channels, unitId);
+    if (!ch) return null;
+    return resolveWith({ basePrices: data.basePrices, promoPrices: data.promoPrices, clearance: clearanceMap(data.products) }, key, ch.id, info ? unitId : null, priceType, m).price;
+  }
+  // ราคารวมชิ้นส่วน = Σ (ราคาชิ้นส่วน × qty) ตามลำดับราคาเดิมของแต่ละชิ้นส่วน → บาท | null (ชิ้นส่วนใดไม่มีราคา)
+  //   90100 (12130 × 2 · RSP 59) → 118
+  function bundleComponentPrice(data, bundle, priceType, month, unitId) {
+    var comps = (bundle && bundle.components) || [];
+    if (!comps.length) return null;
+    var total = 0;
+    for (var i = 0; i < comps.length; i++) {
+      var p = itemPriceAt(data, comps[i].skuId, priceType, month, unitId);
+      if (p == null) return null;
+      total += p * (Number(comps[i].qty) || 0);
+    }
+    return Math.round(total * 100) / 100;
+  }
+  // ราคาของ Bundle เอง (ลำดับราคาเดียวกับสินค้าทั่วไป) → บาท | null
+  function bundlePrice(data, bundle, priceType, month, unitId) { return itemPriceAt(data, productKey(bundle), priceType, month, unitId); }
+  // ส่วนลด Bundle = 1 − ราคา Bundle ÷ ราคารวมชิ้นส่วน (ติดลบ = Bundle แพงกว่าซื้อแยก) → สัดส่วน | null (ไม่มีราคา)
+  function bundleDiscount(data, bundle, priceType, month, unitId) {
+    var parts = bundleComponentPrice(data, bundle, priceType, month, unitId);
+    var own = bundlePrice(data, bundle, priceType, month, unitId);
+    if (!parts || own == null) return null;
+    return 1 - own / parts;
+  }
+
+  // ชิ้นส่วนของ Bundle ที่เป็น Delete ภายในปีแผน (แถว Bundle ในแผน SKU ขอบเหลือง · ไม่ล็อกแถว) → [product]
+  function bundleDeletedParts(bundle, products, year) {
+    return mergeComponents((bundle && bundle.components) || []).map(function (c) { return findProduct(products, c.skuId); }).filter(function (p) { return p && deletedInYear(p, year); });
+  }
+
+  // Bundle ที่มี SKU เดี่ยวนี้เป็นชิ้นส่วน → [{ product, key, qty }] เรียงตาม Product Code
+  function bundlesContaining(products, key) {
+    var out = [];
+    (products || []).forEach(function (p) {
+      if (!isBundle(p)) return;
+      (p.components || []).forEach(function (c) { if (c.skuId === key) out.push({ product: p, key: productKey(p), qty: Number(c.qty) || 0 }); });
+    });
+    return out.sort(function (a, b) { return String(productCode(a.product)) < String(productCode(b.product)) ? -1 : 1; });
+  }
+
+  // Bundle ที่มีชุดส่วนประกอบเหมือนกันทุกบรรทัด (บันทึกได้ · ข้อมูลที่ต้องตรวจ) → [[key, key, ...]]
+  function duplicateBundleSets(products) {
+    var groups = {};
+    (products || []).forEach(function (p) {
+      if (!isBundle(p)) return;
+      var sig = mergeComponents(p.components).map(function (c) { return c.skuId + '×' + c.qty; }).sort().join('|');
+      if (!sig) return;
+      (groups[sig] = groups[sig] || []).push(productKey(p));
+    });
+    return Object.keys(groups).map(function (k) { return groups[k]; }).filter(function (g) { return g.length > 1; });
+  }
+
+  // จำนวนชุดในแผน SKU ของ Bundle (ตัวเลขเดียวกับแถว Bundle ในแผน) plans = { <unitId>: plan }
+  //   → { <bundleKey>: { total, months: [12], units: { <unitId>: ชุดทั้งปี } } } (เฉพาะ Bundle ที่มีแถวในแผน)
+  function bundlePlanTotals(data, master, plans, year) {
+    var out = {};
+    var products = (master && master.products) || [];
+    if (!products.some(isBundle)) return out;
+    Object.keys(plans || {}).forEach(function (u) {
+      var plan = plans[u];
+      if (!plan || !plan.items || !Object.keys(plan.items).some(function (k) { return isBundle(findProduct(products, k)); })) return;
+      skuPlanGrid(data, master, u, plan, { year: year, mode: 'initial' }).rows.forEach(function (r) {
+        if (!isBundle(r.product)) return;
+        var t = out[r.key] || (out[r.key] = { total: 0, months: zeros(12), units: {} });
+        r.cells.forEach(function (c, m) { t.months[m] += c.units || 0; });
+        t.total += r.total.units;
+        t.units[u] = (t.units[u] || 0) + r.total.units;
+      });
+    });
+    return out;
+  }
+
+  // ความต้องการชิ้นส่วน (ชิ้น) ต่อ SKU เดี่ยว × เดือน จากแผน SKU (จำนวนที่ใช้คำนวณ = ตัวเลขเดียวกับแถวรวมแผน)
+  //   scope = { data, master, plans: { <unitId>: plan }, year, unitIds (ไม่ระบุ = ทุกหน่วยใน plans), seriesId (Series ของ SKU เดี่ยว · ไม่ระบุ = ทุก Series) }
+  //   → [{ key, product, direct: [12], viaBundle: [12], total: [12], bundles: [{ key, product, qty, units: [12] }], sum: { direct, viaBundle, total } }]
+  //   แถว = SKU เดี่ยวที่เป็นชิ้นส่วนของ Bundle อย่างน้อย 1 รายการ · direct = แผนของ SKU เดี่ยวนั้น · viaBundle = Σ (จำนวนชุดในแผน × qty ของชิ้นส่วน)
+  function componentDemand(scope) {
+    var data = scope.data, master = scope.master, year = scope.year;
+    var products = (master && master.products) || [];
+    var rows = {}, order = [];
+    products.forEach(function (b) {
+      if (!isBundle(b)) return;
+      (b.components || []).forEach(function (c) {
+        if (rows[c.skuId]) return;
+        var p = findProduct(products, c.skuId);
+        if (!p || isBundle(p)) return;
+        if (scope.seriesId && p.seriesId !== scope.seriesId) return;
+        rows[c.skuId] = { key: c.skuId, product: p, direct: zeros(12), viaBundle: zeros(12), total: zeros(12), bundles: [] };
+        order.push(c.skuId);
+      });
+    });
+    (scope.unitIds || Object.keys(scope.plans || {})).forEach(function (u) {
+      var plan = scope.plans && scope.plans[u];
+      if (!plan) return;
+      skuPlanGrid(data, master, u, plan, { year: year, mode: 'initial' }).rows.forEach(function (r) {
+        if (!isBundle(r.product)) {
+          if (rows[r.key]) r.cells.forEach(function (c, m) { rows[r.key].direct[m] += c.units || 0; });
+          return;
+        }
+        mergeComponents(r.product.components).forEach(function (c) {
+          var target = rows[c.skuId];
+          if (!target) return;
+          var line = target.bundles.filter(function (x) { return x.key === r.key; })[0];
+          if (!line) { line = { key: r.key, product: r.product, qty: Number(c.qty) || 0, units: zeros(12) }; target.bundles.push(line); }
+          r.cells.forEach(function (cell, m) {
+            var n = (cell.units || 0) * (Number(c.qty) || 0);
+            line.units[m] += n;
+            target.viaBundle[m] += n;
+          });
+        });
+      });
+    });
+    return order.map(function (k) {
+      var r = rows[k];
+      for (var m = 0; m < 12; m++) r.total[m] = r.direct[m] + r.viaBundle[m];
+      r.sum = { direct: sum(r.direct), viaBundle: sum(r.viaBundle), total: sum(r.total) };
+      return r;
+    }).sort(function (a, b) { return String(productCode(a.product)) < String(productCode(b.product)) ? -1 : 1; });
+  }
+
+  // =====================================================================
+  // 24) CR-38 Revision: เดือนที่ล็อก (ก่อนเดือนที่มีผล) ใช้ค่าจากรอบก่อนเป็นบาท / ชิ้น · เดือนที่เปิดคำนวณแบบเดิม
+  //   locked = [12] ค่าบาทของเดือนที่ล็อก (null = เดือนที่เปิด) · ไม่มีเดือนล็อก (locked null) = ผลเท่า phasingTotals ทุกค่า
+  // =====================================================================
+  // เป้ารายเดือนของหน่วยขายในรอบที่มีเดือนล็อก → { amounts, pcts (ของเดือนล็อก = บาท ÷ เป้าทั้งปี), pctSum, amountSum, lockedSum, openPctSum, remaining }
+  function revisionPhasing(annual, monthPct, locked) {
+    if (!locked || !locked.some(function (v) { return v != null; })) {
+      var base = phasingTotals(annual, monthPct);
+      return { amounts: base.amounts, pcts: monthPct.slice(), pctSum: base.pctSum, amountSum: base.amountSum, lockedSum: 0, openPctSum: base.pctSum, remaining: base.remaining };
+    }
+    var amounts = [], pcts = [], lockedSum = 0, openPct = 0;
+    for (var m = 0; m < 12; m++) {
+      if (locked[m] != null) {
+        amounts.push(Number(locked[m]) || 0);
+        pcts.push(annual ? (Number(locked[m]) || 0) / annual : 0);
+        lockedSum += Number(locked[m]) || 0;
+      } else {
+        var p = monthPct[m] || 0;
+        amounts.push(amountFromPct(annual, p));
+        pcts.push(p);
+        openPct += p;
+      }
+    }
+    var amountSum = sum(amounts);
+    return { amounts: amounts, pcts: pcts, pctSum: sum(pcts), amountSum: amountSum, lockedSum: lockedSum, openPctSum: openPct, remaining: remaining(annual, amountSum) };
+  }
+  // กระจายเฉพาะเดือนที่เปิด: เดือนเปิดได้ (เป้าทั้งปี − ส่วนที่ล็อก) ตามสัดส่วน shares ของเดือนเปิด → monthPct [12]
+  //   เดือนล็อกคงค่าเดิมของ shares (revisionPhasing ไม่ใช้ค่านี้ · Store ห้ามแก้เดือนล็อก) · ไม่มีเดือนล็อก = shares เดิม · shares ของเดือนเปิดรวม 0 = เท่ากันทุกเดือนเปิด
+  function fillOpenMonths(annual, shares, locked) {
+    if (!locked || !locked.some(function (v) { return v != null; })) return shares.slice();
+    var lockedSum = 0, open = [];
+    for (var m = 0; m < 12; m++) { if (locked[m] != null) lockedSum += Number(locked[m]) || 0; else open.push(m); }
+    var openShare = sum(open.map(function (m) { return shares[m] || 0; }));
+    var rest = annual ? Math.max(0, annual - lockedSum) / annual : 0;
+    return shares.map(function (s, m) {
+      if (locked[m] != null) return s;
+      return openShare > 0 ? rest * (s || 0) / openShare : (open.length ? rest / open.length : 0);
+    });
+  }
+  // คงค่าของเดือนล็อก (0 … before − 1) จากแผน SKU ที่บันทึกไว้ (คำสั่งปรับทั้งแถวในหน้าจอไม่แตะเดือนล็อก) → แผนใหม่ (ไม่แก้ต้นฉบับ)
+  //   plan = { items: { <key>: { qty: [12], overrides: [12] } } } · สินค้าใหม่ในแผน = เดือนล็อกเป็น 0 / ไม่ใช่ค่าที่กรอกทับ
+  function keepLockedMonths(next, prev, before) {
+    if (!before || !next) return next;
+    var out = copy(next);
+    var pi = (prev && prev.items) || {};
+    Object.keys(out.items || {}).forEach(function (k) {
+      var n = out.items[k], o = pi[k];
+      n.qty = n.qty || zeros(12);
+      n.overrides = n.overrides || fill(12, false);
+      for (var m = 0; m < before && m < 12; m++) {
+        n.qty[m] = o && o.qty ? Number(o.qty[m] || 0) : 0;
+        n.overrides[m] = !!(o && o.overrides && o.overrides[m]);
+      }
+    });
+    return out;
+  }
+  // คงสัดส่วนรายเดือนของเดือนล็อกจากค่าที่บันทึกไว้ → [12]
+  function keepLockedShares(next, prev, before) {
+    if (!before || !next) return next;
+    return next.map(function (v, m) { return m < before && prev ? prev[m] : v; });
+  }
+  // ส่วนที่ล็อกของเป้าหมายทั้งปี: หน่วยขาย = Σ เดือนล็อก · Channel / Total = Σ ของหน่วยขาย → { total, channels: { <id>: บาท }, units: { <id>: บาท } }
+  //   tree = calc.topDown · lockedByUnit = { <unitId>: [12 | null] }
+  function lockedTargetSums(tree, lockedByUnit) {
+    var out = { total: 0, channels: {}, units: {} };
+    Object.keys(lockedByUnit || {}).forEach(function (u) { out.units[u] = sum((lockedByUnit[u] || []).map(function (v) { return Number(v) || 0; })); });
+    (tree && tree.children || []).forEach(function (ch) {
+      out.channels[ch.id] = sum(ch.children.map(function (u) { return out.units[u.id] || 0; }));
+    });
+    out.total = sum(Object.keys(out.units).map(function (u) { return out.units[u]; }));
+    return out;
+  }
+  // ตรวจเป้าหมายทั้งปีไม่ต่ำกว่าส่วนที่ล็อก (Annual Target · Sub-channel Allocation · Store) → [{ level: 'total' | 'channel' | 'unit', id, name, amount, locked }] ที่ต่ำกว่า
+  //   หน่วยขายที่มีส่วนที่ล็อกแต่ไม่อยู่ในแผนแล้ว = amount 0 · ยอมให้ต่างไม่เกิน 1 บาท (ปัดเศษ)
+  function lockedTargetIssues(tree, lockedByUnit) {
+    var s = lockedTargetSums(tree, lockedByUnit);
+    var out = [];
+    var inPlan = {};
+    (tree.children || []).forEach(function (ch) {
+      ch.children.forEach(function (u) {
+        inPlan[u.id] = true;
+        if ((s.units[u.id] || 0) > 0 && u.amount < s.units[u.id] - 1) out.push({ level: 'unit', id: u.id, name: u.name, amount: u.amount, locked: s.units[u.id] });
+      });
+      if ((s.channels[ch.id] || 0) > 0 && ch.amount < s.channels[ch.id] - 1) out.push({ level: 'channel', id: ch.id, name: ch.name, amount: ch.amount, locked: s.channels[ch.id] });
+    });
+    Object.keys(s.units).forEach(function (u) { if (s.units[u] > 0 && !inPlan[u]) out.push({ level: 'unit', id: u, name: u, amount: 0, locked: s.units[u] }); });
+    if (s.total > 0 && tree.amount < s.total - 1) out.push({ level: 'total', id: null, name: null, amount: tree.amount, locked: s.total });
+    return out;
+  }
+
+  // CR-38 เปรียบเทียบ Revision 2 รอบ (core/revision.js dataset · รอบ Lock = Snapshot · อื่น = คำนวณสด)
+  //   ds = { id, name, planYear, seq, effectiveMonth, lockBefore, total: { annual, saleAnnual, net, sale }, channels / units: [{ id, name, channelId, annual, saleAnnual, net, sale }],
+  //          items: [{ key, name, unitId, channelId, seriesId, units, sale, net }], seriesNames: { <id>: ชื่อ } }
+  //   opts = { level: 'total' | 'channel' | 'unit' | 'series' | 'sku', metric: 'net' | 'sale' | 'units' (เฉพาะ series / sku), view: 'year' | 'month',
+  //            filter: { channelId, unitId } } · ระดับ total / channel / unit = เป้าหมาย · series / sku = แผน SKU
+  //   → { level, metric, view, rows: [{ id, name, a, b, diff, pct, aM, bM, dM }] (เรียง |ส่วนต่าง| มากไปน้อย), total, max, lockBefore, effectiveMonth, newer }
+  //   lockBefore = เดือนล็อกของรอบที่ใหม่กว่า (ปีเดียวกัน) · มุมมองทั้งปีของเป้าหมาย = เป้าหมายทั้งปี · อื่น = ผลรวม 12 เดือน
+  function compareRevisions(a, b, opts) {
+    opts = opts || {};
+    var level = opts.level || 'channel', view = opts.view === 'month' ? 'month' : 'year', f = opts.filter || {};
+    var plan = level === 'series' || level === 'sku';
+    var metric = opts.metric === 'sale' || (opts.metric === 'units' && plan) ? opts.metric : 'net';
+    function arr(v) { var o = zeros(12); (v || []).forEach(function (x, m) { if (m < 12) o[m] = Number(x) || 0; }); return o; }
+    function side(ds) {
+      var out = {};
+      if (!ds) return out;
+      function put(id, name, m, annual) {
+        var r = out[id] || (out[id] = { id: id, name: name, m: zeros(12), annual: 0 });
+        m.forEach(function (v, i) { r.m[i] += v; });
+        r.annual += annual;
+      }
+      if (level === 'total') { put('total', null, arr(metric === 'sale' ? ds.total.sale : ds.total.net), Number(metric === 'sale' ? ds.total.saleAnnual : ds.total.annual) || 0); return out; }
+      if (level === 'channel') {
+        (ds.channels || []).forEach(function (c) { if (!f.channelId || c.id === f.channelId) put(c.id, c.name, arr(metric === 'sale' ? c.sale : c.net), Number(metric === 'sale' ? c.saleAnnual : c.annual) || 0); });
+        return out;
+      }
+      if (level === 'unit') {
+        (ds.units || []).forEach(function (u) {
+          if (f.channelId && u.channelId !== f.channelId) return;
+          if (f.unitId && u.id !== f.unitId) return;
+          put(u.id, u.name, arr(metric === 'sale' ? u.sale : u.net), Number(metric === 'sale' ? u.saleAnnual : u.annual) || 0);
+        });
+        return out;
+      }
+      (ds.items || []).forEach(function (it) {
+        if (f.channelId && it.channelId !== f.channelId) return;
+        if (f.unitId && it.unitId !== f.unitId) return;
+        var id = level === 'series' ? it.seriesId || '' : it.key;
+        var name = level === 'series' ? (ds.seriesNames || {})[it.seriesId] || null : it.name;
+        var m = arr(metric === 'units' ? it.units : metric === 'sale' ? it.sale : it.net);
+        put(id, name, m, sum(m));
+      });
+      return out;
+    }
+    var ra = side(a), rb = side(b);
+    var ids = Object.keys(rb).concat(Object.keys(ra).filter(function (k) { return !rb[k]; }));
+    function val(r) { return !r ? 0 : view === 'year' && !plan ? r.annual : sum(r.m); }
+    var rows = ids.map(function (id) {
+      var x = ra[id], y = rb[id];
+      var aM = x ? x.m.slice() : zeros(12), bM = y ? y.m.slice() : zeros(12);
+      var av = val(x), bv = val(y);
+      return { id: id, name: (y && y.name) || (x && x.name) || id, a: av, b: bv, diff: bv - av, pct: av ? (bv - av) / av : null, aM: aM, bM: bM, dM: bM.map(function (v, m) { return v - aM[m]; }) };
+    }).sort(function (p, q) { return Math.abs(q.diff) - Math.abs(p.diff) || (p.name < q.name ? -1 : 1); });
+    var total = { id: 'total', a: sum(rows.map(function (r) { return r.a; })), b: sum(rows.map(function (r) { return r.b; })), aM: zeros(12), bM: zeros(12), dM: zeros(12) };
+    rows.forEach(function (r) { for (var m = 0; m < 12; m++) { total.aM[m] += r.aM[m]; total.bM[m] += r.bM[m]; total.dM[m] += r.dM[m]; } });
+    total.diff = total.b - total.a;
+    total.pct = total.a ? total.diff / total.a : null;
+    var newer = !a ? b : !b ? a : (b.planYear * 1000 + b.seq >= a.planYear * 1000 + a.seq) ? b : a;
+    var max = 0;
+    rows.forEach(function (r) { max = Math.max(max, Math.abs(r.a), Math.abs(r.b)); });
+    return { level: level, metric: metric, view: view, rows: rows, total: total, max: max,
+      lockBefore: a && b && a.planYear === b.planYear && newer ? newer.lockBefore || 0 : 0, effectiveMonth: newer ? newer.effectiveMonth : null, newer: newer ? newer.id : null };
+  }
+
+  // =====================================================================
+  // 25) CR-39 ชุดสรุปของคำขออนุมัติ Revision (core/revision.js summary · รอบ Lock = Snapshot.report · อื่น = report.build)
+  //   input = { id, name, planYear, seq, effectiveMonth, lockBefore, total (เป้าหมาย Total), prior (ยอดขาย L12M), channels: [{ id, name, amount }],
+  //             units: [{ id, name, channelId, target, plan, targetM: [12] }], items (report.skuItems), clearance (แผน Clearance รวม Net Sales · ไม่นับในเป้าหมาย) }
+  //   prev = input ของรอบก่อน (null = รอบแรก ไม่มีส่วนต่าง)
+  //   → { id, name, compareTo, compareName, total, prior, growth, prevTotal, diff, pct, channels: [{ id, name, a, b, diff, pct, share }], max,
+  //       topUnits (5 อันดับ |ส่วนต่าง|), sku: { ok, short, over, empty, shortTotal, units }, mix: { rows: [{ type, value, pct, skus }], total }, clearance,
+  //       monthly: { a: [12] | null, b: [12], lockBefore, effectiveMonth } }
+  // =====================================================================
+  function revisionSummary(cur, prev) {
+    if (!cur) return null;
+    var total = Number(cur.total) || 0, prior = Number(cur.prior) || 0;
+    var pTotal = prev ? Number(prev.total) || 0 : null;
+    function delta(a, b) { return { diff: a == null ? null : b - a, pct: a ? (b - a) / a : null }; }
+    var pch = {};
+    ((prev && prev.channels) || []).forEach(function (c) { pch[c.id] = Number(c.amount) || 0; });
+    var seen = {};
+    var channels = (cur.channels || []).map(function (c) {
+      seen[c.id] = true;
+      var b = Number(c.amount) || 0, a = prev ? (pch[c.id] || 0) : null, d = delta(a, b);
+      return { id: c.id, name: c.name, a: a, b: b, diff: d.diff, pct: d.pct, share: total ? b / total : 0 };
+    });
+    ((prev && prev.channels) || []).forEach(function (c) {
+      if (seen[c.id]) return;
+      var a = pch[c.id], d = delta(a, 0);
+      channels.push({ id: c.id, name: c.name, a: a, b: 0, diff: d.diff, pct: d.pct, share: 0 });
+    });
+    var max = 0;
+    channels.forEach(function (c) { max = Math.max(max, Math.abs(c.a || 0), Math.abs(c.b)); });
+    var pu = {};
+    ((prev && prev.units) || []).forEach(function (u) { pu[u.id] = Number(u.target) || 0; });
+    var units = (cur.units || []).map(function (u) {
+      var b = Number(u.target) || 0, a = prev ? (pu[u.id] || 0) : null, d = delta(a, b);
+      return { id: u.id, name: u.name, channelId: u.channelId, a: a, b: b, diff: d.diff, pct: d.pct };
+    });
+    var topUnits = prev ? units.filter(function (u) { return Math.abs(u.diff) >= 0.5; })
+      .sort(function (p, q) { return Math.abs(q.diff) - Math.abs(p.diff) || (p.name < q.name ? -1 : p.name > q.name ? 1 : 0); }).slice(0, 5) : [];
+    var sku = { ok: 0, short: 0, over: 0, empty: 0, shortTotal: 0, units: (cur.units || []).length };
+    (cur.units || []).forEach(function (u) {
+      var r = remaining(Number(u.target) || 0, Number(u.plan) || 0);
+      if (r.status === 'short') { sku.short++; sku.shortTotal += r.amount; } else if (r.status === 'over') sku.over++; else if (r.status === 'ok') sku.ok++; else sku.empty++;
+    });
+    var tm = planTypeMix(cur.items || [], (cur.units || []).map(function (u) { return u.id; }), total);
+    var mixRows = tm.rows.filter(function (r) { return r.type !== 'clearance'; });
+    var mixTotal = sum(mixRows.map(function (r) { return r.value; }));
+    var mix = { total: mixTotal, rows: mixRows.map(function (r) { return { type: r.type, value: r.value, skus: r.skus, pct: mixTotal ? r.value / mixTotal : 0 }; }) };
+    function monthsOf(list) {
+      var o = zeros(12);
+      (list || []).forEach(function (u) { for (var m = 0; m < 12; m++) o[m] += Number(u.targetM && u.targetM[m]) || 0; });
+      return o;
+    }
+    var d0 = delta(pTotal, total);
+    return {
+      id: cur.id, name: cur.name, compareTo: prev ? prev.id : null, compareName: prev ? prev.name : null,
+      total: total, prior: prior, growth: prior ? total / prior - 1 : null, prevTotal: pTotal, diff: d0.diff, pct: d0.pct,
+      channels: channels, max: max, topUnits: topUnits, sku: sku, mix: mix, clearance: Number(cur.clearance) || 0,
+      monthly: { a: prev ? monthsOf(prev.units) : null, b: monthsOf(cur.units), lockBefore: prev && prev.planYear === cur.planYear ? cur.lockBefore || 0 : 0, effectiveMonth: cur.effectiveMonth || null }
+    };
+  }
+  // ชุดสรุปที่เก็บตอนส่ง (a) เทียบกับที่คำนวณใหม่ (b) ปัดเป็นบาท → [ชื่อส่วนที่ต่าง] ([] = เหมือนกัน)
+  //   ใช้ตรวจความถูกต้องของข้อบังคับ: ระหว่างรออนุมัติรอบถูกล็อก ชุดสรุปต้องไม่เปลี่ยน
+  function revisionSummaryChanges(a, b) {
+    if (!a || !b) return a === b ? [] : ['all'];
+    function r(v) { return v == null ? null : Math.round(Number(v) || 0); }
+    function same(x, y) { return JSON.stringify(x) === JSON.stringify(y); }
+    var out = [];
+    if (!same([r(a.total), r(a.prior), r(a.prevTotal)], [r(b.total), r(b.prior), r(b.prevTotal)])) out.push('total');
+    function ch(s) { return (s.channels || []).map(function (c) { return [c.id, r(c.a), r(c.b)]; }); }
+    if (!same(ch(a), ch(b))) out.push('channels');
+    function tu(s) { return (s.topUnits || []).map(function (u) { return [u.id, r(u.diff)]; }); }
+    if (!same(tu(a), tu(b))) out.push('topUnits');
+    function sk(s) { var x = s.sku || {}; return [x.ok, x.short, x.over, x.empty, r(x.shortTotal)]; }
+    if (!same(sk(a), sk(b))) out.push('sku');
+    function mx(s) { return ((s.mix || {}).rows || []).map(function (x) { return [x.type, r(x.value)]; }); }
+    if (!same(mx(a), mx(b))) out.push('mix');
+    if (r(a.clearance) !== r(b.clearance)) out.push('clearance');
+    function mo(s) { var m = s.monthly || {}; return [(m.a || []).map(r), (m.b || []).map(r), m.lockBefore || 0]; }
+    if (!same(mo(a), mo(b))) out.push('monthly');
+    return out;
+  }
+
+  // =====================================================================
+  // 26) CR-40 ตัวกรองของ SKU Planning: ปุ่ม ตัวกรอง (n) = จำนวน Chip = จำนวนตัวกรองที่ใช้อยู่
+  //   f = { series: [id], node, age, planType, kind, noSale } · kind นับเมื่อเปิด Flag bundle เท่านั้น (ปิด = ไม่มีตัวกรองนี้และไม่กรอง)
+  //   → ['series' | 'category' | 'age' | 'planType' | 'kind' | 'noSale'] ตามลำดับ Chip
+  // =====================================================================
+  function skuFilterKeys(f, bundleOn) {
+    f = f || {};
+    var out = [];
+    if ((f.series || []).length) out.push('series');
+    if (f.node) out.push('category');
+    if (f.age) out.push('age');
+    if (f.planType) out.push('planType');
+    if (f.kind && bundleOn) out.push('kind');
+    if (f.noSale) out.push('noSale');
+    return out;
+  }
+  // ล้างตัวกรอง / ล้างทั้งหมด → ค่าว่างของทุกตัวกรอง (skuFilterKeys = [])
+  function clearedSkuFilters() { return { series: [], node: '', nodeLevel: '', age: '', planType: '', kind: '', noSale: false }; }
+
+  // =====================================================================
+  // 27) CR-41 ยอดจริงของปีแผน (เดือนที่ปิดแล้ว ≤ เดือนปิดล่าสุด · S2 = ม.ค. 2027 ยอดจริงตัวอย่าง) — Annual Target · Sub-channel Allocation · SKU Planning · Revision Compare
+  //   id = หน่วยขาย | Channel (ผลรวมทุกหน่วยใน Master ของ Channel) | null (Total = ทุก Channel)
+  // =====================================================================
+  // ยอดจริงรายเดือน (Net Sales บาท) → [12 × (บาท | null)] (null = ยังไม่ปิด / ไม่มีข้อมูล)
+  function actualMonthly(data, id, year) {
+    function ofUnit(u) { var o = []; for (var m = 0; m < 12; m++) o.push(actualMonthValue(data.history, year, u, m)); return o; }
+    function add(list) {
+      return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(function (m) {
+        var vals = list.map(function (x) { return x[m]; }).filter(function (v) { return v != null; });
+        return vals.length ? sum(vals) : null;
+      });
+    }
+    if (id == null) return add((data.channels || []).filter(function (c) { return c.active !== false; }).map(function (c) { return actualMonthly(data, c.id, year); }));
+    if (findById(data.channels, id)) return add(unitsOfChannel(data, id).map(function (u) { return ofUnit(u.id); }));
+    return ofUnit(id);
+  }
+  // ยอดจริงสะสม ม.ค.–เดือนปิดล่าสุดของปี year → { value, months (จำนวนเดือนที่ปิดในปี), from, to ('YYYY-MM') } | null (ยังไม่มีเดือนที่ปิดในปีนี้)
+  function actualToDate(data, id, year) {
+    var K = refClock(data.history);
+    var n = 0;
+    for (var m = 0; m < 12; m++) if (K.isClosed(year, m)) n = m + 1;
+    if (!n) return null;
+    var vals = actualMonthly(data, id, year).slice(0, n);
+    return { value: sum(vals.map(function (v) { return v || 0; })), months: n, from: monthKey(year, 0), to: monthKey(year, n - 1) };
+  }
+  // ยอดจริงรายชิ้นของ SKU ในหน่วยขาย เดือน m (0–11) ของปี year → ชิ้น | null (ยังไม่ปิด / ไม่มีข้อมูล)
+  function actualSkuUnits(history, unitId, key, year, m) {
+    var K = refClock(history);
+    var y = history && history.years && history.years[year];
+    if (!y || !K.isClosed(year, m) || m >= (y.actualMonths == null ? 12 : y.actualMonths)) return null;
+    var row = y.skuQty && y.skuQty[unitId] && y.skuQty[unitId][key];
+    return row ? row[m] || 0 : 0;
   }
 
   SP.core.calc = {
@@ -3797,6 +4325,44 @@
     suggestSalesUnit: suggestSalesUnit,
     ownerGaps: ownerGaps,
     personMonthlyLoad: personMonthlyLoad,
-    ownerReplace: ownerReplace
+    ownerReplace: ownerReplace,
+    // CR-37 Bundle
+    isBundle: isBundle,
+    productKind: productKind,
+    bundleOn: bundleOn,
+    bundleVisible: bundleVisible,
+    mergeComponents: mergeComponents,
+    bundleQty: bundleQty,
+    bundleSeries: bundleSeries,
+    bundleIssues: bundleIssues,
+    normalizeBundles: normalizeBundles,
+    itemPriceAt: itemPriceAt,
+    bundleComponentPrice: bundleComponentPrice,
+    bundlePrice: bundlePrice,
+    bundleDiscount: bundleDiscount,
+    bundlesContaining: bundlesContaining,
+    bundleDeletedParts: bundleDeletedParts,
+    duplicateBundleSets: duplicateBundleSets,
+    bundlePlanTotals: bundlePlanTotals,
+    componentDemand: componentDemand,
+    // CR-38 Revision
+    revisionPhasing: revisionPhasing,
+    fillOpenMonths: fillOpenMonths,
+    keepLockedMonths: keepLockedMonths,
+    keepLockedShares: keepLockedShares,
+    lockedTargetSums: lockedTargetSums,
+    lockedTargetIssues: lockedTargetIssues,
+    compareRevisions: compareRevisions,
+    // CR-39 ชุดสรุปของคำขออนุมัติ Revision
+    revisionSummary: revisionSummary,
+    revisionSummaryChanges: revisionSummaryChanges,
+    // CR-40 ตัวกรองของ SKU Planning
+    skuFilterKeys: skuFilterKeys,
+    clearedSkuFilters: clearedSkuFilters,
+    // CR-41 นาฬิกาของยอดอ้างอิง · ยอดจริงของปีแผน
+    refClock: refClock,
+    actualMonthly: actualMonthly,
+    actualToDate: actualToDate,
+    actualSkuUnits: actualSkuUnits
   };
 })(window.SP);

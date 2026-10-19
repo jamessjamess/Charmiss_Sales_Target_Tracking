@@ -27,6 +27,10 @@
  * CR-17 Feature Flags: ปิด approvalWorkflow = ติดตามสถานะเหลือ Channel · หน่วยขาย · ผู้รับผิดชอบ · ส่วนต่าง · การดำเนินการถัดไป (ปิดส่วนต่าง /
  *   กำหนดผู้รับผิดชอบ / –) ไม่มีบรรทัดจัดสรรเป้าหมายประจำปี · รายงานไม่มีบรรทัดสถานะ การอนุมัติ และคอลัมน์สถานะอนุมัติ · KPI = หน่วยขายที่จัดสรรครบ x / y
  *   ปิด baseline = ไม่มีปุ่มล็อก / บรรทัด Baseline / ส่วนการอนุมัติ / ช่องลงนาม รายงานเป็น {ปี}-DRAFT + ลายน้ำเสมอ
+ * CR-39:          แท็บ รายงาน | ติดตามสถานะ | Revision | เปรียบเทียบ (2 แท็บหลัง = summary-revision.js · Flag revision · สิทธิ์ revisionList / revisionCompare ·
+ *                 สูงเท่าจอ body.fit-screen) · ลิงก์ #report / #status / #revision / #compare เลือกแท็บ · ลายน้ำเฉพาะแท็บรายงาน
+ * CR-38:          ข้อมูลของรอบที่เลือก (core/report.js · core/revision.js) · ลายน้ำ ร่าง = ฉบับร่าง · รอ Lock = รอ Lock · Lock แล้ว = ไม่มี ·
+ *                 หัวรายงาน {รอบ} · Lock แล้ว {วันที่} โดย {MD} · แท็บติดตามสถานะมีการ์ดสถานะรอบ (components.revisionCard)
  * store อ่าน:     app.planYear, plan.<ปี>.workflow.*, plan.<ปี>.baselineVersions, ui.role, ui.summaryTab, ui.statusFilter (+ Key ที่ core/report.js อ่าน)
  * store เขียน:    ui.summaryTab · ui.statusFilter (CR-28) · ui.selection (ก่อนพาไปหน้าของรายการที่กด) · ui.summaryPivot · ui.skuSearchHandoff (CR-26)
  *                 plan.<ปี>.workflow.baseline.all (ล็อก / ปลดล็อกผ่าน core/workflow.js — snapshot = { gp ต่อหน่วยขาย, priceList,
@@ -40,6 +44,7 @@
   var calc = SP.core.calc;
   var W = SP.core.workflow;
   var store = SP.core.store;
+  var REV = SP.core.revision;   // CR-38
   var R = SP.core.report;
   var FT = SP.core.features;
   var h = C.h;
@@ -87,6 +92,28 @@
     function pageTitle(id) { return (P[id] && P[id].title) || reg.byId(id).title; }
     function stepEntry(step) { return step === 'sku' ? 'skuPlanning' : step; }
 
+    // CR-39: แท็บ Revision / เปรียบเทียบ (Flag revision · สิทธิ์ส่วนของหน้า revisionList / revisionCompare) — โค้ดอยู่ที่ summary-revision.js
+    function revTabs() {
+      if (!REV.enabled() || !SP.modules.summary.revisionTab) return [];
+      var u = SP.core.permissions.user();
+      return ['revision', 'compare'].filter(function (t) { return SP.core.permissions.level(u, t === 'revision' ? 'revisionList' : 'revisionCompare') !== 'NONE'; });
+    }
+    // ลิงก์เดิม / ลิงก์จากหน้าอื่น: #report · #status · #revision · #compare
+    var hashTab = String(location.hash || '').replace('#', '');
+    if (['report', 'status', 'revision', 'compare'].indexOf(hashTab) >= 0) store.set('ui.summaryTab', hashTab);
+    function goTab(v) {
+      store.set('ui.summaryTab', v);
+      try { history.replaceState(null, '', '#' + v); } catch (e) { /* file:// บางเบราว์เซอร์ */ }
+      draw();
+      window.scrollTo(0, 0);
+    }
+    var revEnv = {
+      refresh: function () { draw(); },
+      goTab: goTab,
+      // คำสั่งของรอบสำเร็จ = โหลดหน้าใหม่ (ตัวเลือก Revision และแถบสถานะที่หัวหน้าเปลี่ยนตามรอบ) แล้วแจ้งผล
+      reload: function (text) { if (text) store.set('ui.toast', text); location.reload(); }
+    };
+
     function draw() {
       C.clear(root);
       var states = store.workflowStates();
@@ -94,23 +121,32 @@
       var live = R.build();
       var acts = R.actions(live);
       var moved = R.storeMoves();
+      var extra = revTabs();
       var tab = store.get('ui.summaryTab');
-      if (tab !== 'status' && tab !== 'report') tab = 'report';
+      if (tab !== 'status' && tab !== 'report' && extra.indexOf(tab) < 0) tab = 'report';
+      var isRev = tab === 'revision' || tab === 'compare';
       document.body.classList.toggle('rp-on-status', tab === 'status');
-      root.appendChild(tabs(tab, acts.length + (!locked && moved.length ? 1 : 0)));
+      document.body.classList.toggle('rp-on-revision', tab === 'revision');
+      document.body.classList.toggle('rp-on-compare', tab === 'compare');
+      // แท็บ Revision / เปรียบเทียบ = สูงเท่าจอ ตารางเลื่อนภายในการ์ด (แท็บรายงาน / ติดตามสถานะ = เลื่อนหน้าตามเดิม)
+      document.body.classList.toggle('fit-screen', isRev);
+      root.appendChild(tabs(tab, acts.length + (!locked && moved.length ? 1 : 0), extra));
+      if (tab === 'revision') { SP.modules.summary.revisionTab(root, revEnv); return; }
+      if (tab === 'compare') { SP.modules.summary.compareTab(root, revEnv); return; }
       (tab === 'status' ? statusTab(live, acts, states, locked, moved) : reportTab(live, states, locked)).forEach(function (n) { root.appendChild(n); });
     }
 
     // ---------- แท็บ ----------
-    function tabs(tab, n) {
+    function tabs(tab, n, extra) {
       var T = page.tabs;
-      return h('div', { class: 'rp-tabs no-print' }, C.segmented({
-        label: page.tabLabel, value: tab,
-        options: [
-          { value: 'report', title: page.tabTips.report, label: T.report },
-          { value: 'status', title: (BL_ON ? page.tabTips.status : page.tabTips.statusLite) + (n ? ' · ' + fill(page.tabCountTip, { n: n }) : ''), label: n ? fill(T.statusCount, { n: n }) : T.status }
-        ],
-        onChange: function (v) { store.set('ui.summaryTab', v); draw(); window.scrollTo(0, 0); }
+      var opts = [
+        { value: 'report', title: page.tabTips.report, label: T.report },
+        { value: 'status', title: (BL_ON ? page.tabTips.status : page.tabTips.statusLite) + (n ? ' · ' + fill(page.tabCountTip, { n: n }) : ''), label: T.status, count: n || null }
+      ];
+      (extra || []).forEach(function (t) { opts.push({ value: t, title: page.tabTips[t], label: T[t] }); });
+      return h('div', { class: 'rp-tabs no-print' }, C.tabs({   // CR-40 แท็บขีดเส้นใต้ · ตัวนับเล็กสีเทา
+        label: page.tabLabel, value: tab, options: opts,
+        onChange: function (v) { goTab(v); }
       }));
     }
 
@@ -119,6 +155,8 @@
     // =====================================================================
     function statusTab(live, acts, states, locked, moved) {
       var Y = page.yearLines;
+      // CR-38: การ์ดสถานะของรอบที่เลือก (ข้อมูลเดียวกับ Revision List)
+      var revCard = REV.enabled() ? C.revisionCard(REV.overview(), { className: 'rp-rev-card no-print' }) : null;
       var versions = store.get(store.planKey('baselineVersions'));
       var ver = W.baselineVersion(versions, year, locked);
       var td = W.stateOf(states, 'topDown');
@@ -147,14 +185,14 @@
           return h('li', { class: l.details ? 'rp-year-detail' : null }, h('span', { class: 'rp-dot badge ' + l.tag, 'aria-hidden': 'true' }),
             h('span', { class: 'rp-year-text' }, l.entry ? link(l.entry, l.text) : h('span', { title: l.title || null }, l.text), l.details || null));
         })));
-      return [year1, statusTable(live, acts, states, locked), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)].filter(Boolean);
+      return [revCard, year1, statusTable(live, acts, states, locked), h('p', { class: 'print-only rp-noprint-note' }, page.statusNoPrint)].filter(Boolean);
     }
 
     // CR-16 §5.4: ร้านค้าย้ายเขตหลังอนุมัติเป้าหมาย (เป้าหมายของเขตไม่เปลี่ยน) + รายการร้าน + ลิงก์หน้าเขตการขายและร้านค้า
     function storesMovedLine(moved) {
       var Y = page.yearLines;
       var MAX = 8;
-      var data = store.data();
+      var data = REV.data();
       function zone(id) { var t = id ? calc.findById(data.territories, id) : null; return t ? String(t.name).split(' · ')[0] : Y.unassigned; }
       var amount = calc.sum(moved.map(function (m) { return m.salesRef; }));
       var items = moved.slice(0, MAX).map(function (m) {
@@ -196,11 +234,11 @@
         confirmLabel: WL.actions.lock
       }).then(function (r) {
         if (!r.ok) return;
-        var data = store.data();
+        var data = REV.data();
         var rep = R.build();
         var gp = {};
         rep.units.forEach(function (u) { gp[u.id] = calc.gpOf(data, u.id); });
-        var at = new Date().toISOString();
+        var at = SP.core.clock.now();
         var by = L.roles.director;
         var res = W.applyAction(store.workflowStates(), {
           step: 'baseline', unitId: null, action: 'lock', by: by, at: at,
@@ -223,7 +261,7 @@
         confirmLabel: page.unlockButton, danger: true
       }).then(function (r) {
         if (!r.ok) return;
-        var res = W.applyAction(store.workflowStates(), { step: 'baseline', unitId: null, action: 'unlock', by: L.roles.director, at: new Date().toISOString(), note: r.note });
+        var res = W.applyAction(store.workflowStates(), { step: 'baseline', unitId: null, action: 'unlock', by: L.roles.director, at: SP.core.clock.now(), note: r.note });
         if (!res.ok) return;
         store.saveWorkflowStates(res.states);
         store.set('ui.summaryTab', 'status');
@@ -356,8 +394,11 @@
       var cur = R.current(live);
       var M = model(cur.report);
       var ver = W.baselineVersion(store.get(store.planKey('baselineVersions')), year, locked);
+      // CR-38: ลายน้ำตามสถานะของรอบ (Lock แล้ว = ไม่มีลายน้ำ)
+      var rv = REV.enabled() ? REV.current() : null;
+      if (rv) ver = { code: rv.name, draft: rv.status !== 'locked', at: rv.lockedAt, by: rv.lockedBy };
       var wrap = h('div', { class: 'rp-report' + (ver.draft ? ' is-draft' : '') });
-      if (ver.draft) wrap.appendChild(watermark());
+      if (ver.draft) wrap.appendChild(watermark(rv ? (rv.status === 'submitted' ? L.revision.watermarkSubmitted : L.revision.watermarkDraft) : page.watermark));
       wrap.appendChild(docHead(M, states, locked, ver, cur.fromSnapshot));
       wrap.appendChild(toolbar(M));
       // CR-27 ลำดับ: KPI → ที่มาของการเติบโต : สัดส่วน Channel (55 : 45) → ตาราง Channel และหน่วยขาย → เป้าหมายเทียบแผนรายเดือน (เต็มความกว้าง)
@@ -392,9 +433,9 @@
     }
 
     // ลายน้ำฉบับร่าง: บนจอซ้ำตามความยาวรายงาน / ตอนพิมพ์ 1 ชิ้นกลางทุกหน้า (print.css)
-    function watermark() {
+    function watermark(text) {
       var w = h('div', { class: 'rp-watermark', 'aria-hidden': 'true' });
-      for (var i = 0; i < 8; i++) w.appendChild(h('span', { style: { top: (420 + i * 900) + 'px' } }, page.watermark));
+      for (var i = 0; i < 8; i++) w.appendChild(h('span', { style: { top: (420 + i * 900) + 'px' } }, text || page.watermark));
       return w;
     }
 
@@ -406,12 +447,18 @@
       var tdLine = td.status === 'approved' ? fill(TL.approved, { at: F.dateTime(td.approvedAt), by: td.approvedBy || '' })
         : td.status === 'submitted' ? fill(TL.submitted, { at: F.dateTime(td.submittedAt), by: td.submittedBy || '' })
         : fill(TL.other, { status: WL.status[td.status] });
-      printedAt = h('p', { class: 'rp-doc-printed print-only' }, fill(page.printedAt, { at: F.dateTime(new Date().toISOString()) }));
+      printedAt = h('p', { class: 'rp-doc-printed print-only' }, fill(page.printedAt, { at: F.dateTime(SP.core.clock.now()) }));
       var note = locked ? (fromSnapshot ? page.snapshotNote : null) : page.draftNote;
+      // CR-38: บรรทัดของรอบ (ร่าง / รอ MD Lock / Lock แล้ว วันที่ โดย MD)
+      var rv = REV.enabled() ? REV.current() : null;
+      var DL = L.revision.docLine;
+      var revLine = rv ? h('p', { class: 'rp-doc-status rp-doc-revision' }, fill(DL[rv.status], { name: rv.name, month: SP.core.clock.label(rv.effectiveMonth), at: F.date(String(rv.lockedAt || '').slice(0, 10)), by: rv.lockedBy || '' })) : null;
+      if (rv) note = rv.status === 'locked' ? page.snapshotNote : page.draftNote;
       return h('header', { class: 'card rp-doc-head' + (ver.draft ? ' is-draft' : ' is-locked') },
         h('div', { class: 'rp-doc-top' },
           h('h2', { class: 'rp-doc-title' }, fill(page.docTitle, { year: year })),
-          h('span', { class: 'rp-doc-version' }, fill(page.version, { code: ver.code }))),
+          rv ? C.revisionBadge(rv.status) : h('span', { class: 'rp-doc-version' }, fill(page.version, { code: ver.code }))),
+        revLine,
         // CR-17: ปิด approvalWorkflow = ไม่มีบรรทัดสถานะ / จัดสรรเป้าหมายประจำปี / การอนุมัติ (ลายน้ำฉบับร่างยังอยู่)
         AP_ON ? h('p', { class: 'rp-doc-status' }, locked ? fill(page.statusLocked, { at: F.dateTime(lk && lk.at), by: lk ? lk.by : '' }) : page.statusDraft) : null,
         AP_ON ? h('p', { class: 'rp-doc-td' }, tdLine) : null,
@@ -441,7 +488,7 @@
       var names = {};
       M.units.forEach(function (u) { names[u.id] = u.name; });
       var items = calc.planClearanceItems(M.rep.skuItems || [], M.units.map(function (u) { return u.id; })).map(function (it) {
-        return { text: fill(CK.item, { sku: calc.codeOf(store.master().products, it.key), name: it.name, unit: names[it.unitId] || it.unitId }), go: function () {
+        return { text: fill(CK.item, { sku: calc.codeOf(REV.master().products, it.key), name: it.name, unit: names[it.unitId] || it.unitId }), go: function () {
           store.set('ui.selection', { channel: it.channelId, unit: it.unitId });
           store.set('ui.skuSearchHandoff', it.key);
           location.href = SP.core.paths.to(reg.byId('skuPlanning').path);
@@ -484,7 +531,7 @@
           values: rows.map(function (r) { return typeValue(r, t); }) };
       });
       // CR-36: แผน Clearance (ไม่นับในเป้าหมาย) = ส่วนสีเทาลายจุดบนสุด · แถวส่วนต่างและสรุปทั้งปีไม่นับส่วนนี้
-      var clp = calc.clearancePlanMonthly(store.data(), { year: year, unitIds: M.units.map(function (u) { return u.id; }) }).map(function (x) { return x.netSales; });
+      var clp = calc.clearancePlanMonthly(REV.data(), { year: year, unitIds: M.units.map(function (u) { return u.id; }) }).map(function (x) { return x.netSales; });
       var clTotal = calc.sum(clp);
       if (clTotal > 0) stacks.push({ id: 'clearancePlan', label: PT.clearancePlan.label, colorToken: PT.clearancePlan.token, dots: true, legend: true, values: clp });
       function diffText(d) { return d.status === 'ok' ? page.monthlyDiffOk : d.status === 'empty' ? '–' : (d.diff < 0 ? '−' : '+') + m1(Math.abs(d.diff)); }
@@ -625,7 +672,7 @@
     function pivotSection(M, live) {
       var X = page.pivot;
       var box = h('section', { class: 'card rp-section rp-pivot' });
-      var master = store.master();
+      var master = REV.master();
       function save(cfg) { store.set('ui.summaryPivot', cfg); paint(); }
       function paint() {
         // คงตำแหน่งเลื่อนของตารางเมื่อพับ / กางแถว
@@ -729,7 +776,7 @@
       function row(n, visible) {
         var open = !!pivotOpen[n.path];
         var isSku = n.kind === 'sku';
-        var prod = isSku ? calc.findProduct(store.master().products, n.id) : null;   // CR-35: รหัสที่แสดง + ป้ายชื่อชั่วคราว (คำขอ NPD)
+        var prod = isSku ? calc.findProduct(REV.master().products, n.id) : null;   // CR-35: รหัสที่แสดง + ป้ายชื่อชั่วคราว (คำขอ NPD)
         var label = isSku ? h('span', { class: 'pv-sku' }, h('span', { class: 'pv-sku-name' }, n.label, ' ', C.tempNameTag(prod)), h('span', { class: 'pv-sku-code' }, prod ? calc.productCode(prod) : n.id))
           : h('button', { type: 'button', class: 'pv-toggle', 'aria-expanded': open ? 'true' : 'false', onClick: function () { pivotOpen[n.path] = !open; repaint(); } },
             h('span', { class: 'pv-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'), pivotRowLabel(cfg, n), h('span', { class: 'pv-count' }, fill(X.count, { n: countSku(n) })));
@@ -798,9 +845,9 @@
       var total = tm.total;
       function share(v) { return fill(page.mixText, { value: mb(v), pct: total ? F.pct(v / total, 1) : '–' }); }
       function part(t, v) { return { id: t, colorToken: PT[t].token, borderToken: PT[t].borderToken || null, hatch: PT[t].pattern === 'hatch', value: v }; }
-      var clMix = calc.clearancePlanMonthly(store.data(), { year: year, unitIds: ids });
+      var clMix = calc.clearancePlanMonthly(REV.data(), { year: year, unitIds: ids });
       var clValue = calc.sum(clMix.map(function (x) { return x.netSales; }));
-      var clSkus = store.master().products.filter(function (p) { return p.clearance && calc.sum(calc.clearancePlanMonthly(store.data(), { year: year, unitIds: ids, productKey: calc.productKey(p) }).map(function (x) { return x.units; })) > 0; }).length;
+      var clSkus = REV.master().products.filter(function (p) { return p.clearance && calc.sum(calc.clearancePlanMonthly(REV.data(), { year: year, unitIds: ids, productKey: calc.productKey(p) }).map(function (x) { return x.units; })) > 0; }).length;
       var typeRows = tm.rows.filter(function (r) { return r.type !== 'clearance'; }).map(function (r) {
         var sub = r.type === 'existing' && tm.listing.skus ? fill(page.mixListing, { n: r.skus, value: mb(tm.listing.value), m: tm.listing.skus }) : fill(page.mixSkus, { n: r.skus });
         return { label: PT[r.type].label, sub: sub, note: null, parts: [part(r.type, r.value)], text: share(r.value), title: PT[r.type].tip };
@@ -811,7 +858,7 @@
       var summary = h('p', { class: 'rp-mix-summary', title: page.mixNewTip }, fill(page.mixNewTotal, { value: mb(tm.newTotal), pct: F.pct(tm.newPct, 1) }),
         tm.gap > 0 ? h('span', { class: 'rp-mix-gap' }, ' · ' + fill(page.mixGap, { value: mb(tm.gap) })) : null);
       var kind = mixBy === 'category' ? 'category' : 'series';
-      var tax = store.master().taxonomy;
+      var tax = REV.master().taxonomy;
       var byGroup = SP.core.charts.partBars({ minPx: 4, rows: calc.planGroupByType(skuItems, ids, kind).map(function (g) {
         var label = g.key ? calc.taxonomyName(tax, kind, g.key) || g.key : kind === 'series' ? L.series.none : page.mixNoCategory;
         var parts = CHART_TYPES.map(function (t) { return part(t, t === 'existing' ? g.parts.existing + (g.parts.clearance || 0) : g.parts[t]); });
@@ -844,10 +891,10 @@
       var lcYear = Number(lc.slice(0, 4)), lcIdx = Number(lc.slice(5, 7)) - 1;
       var planUpto = lcYear === year ? lcIdx : lcYear > year ? 11 : -1;
       var Y = page.ytd;
-      var data = store.data();
+      var data = REV.data();
       var actualsPlan = {}, actualsCur = {};
       M.units.forEach(function (u) {
-        if (planUpto >= 0) actualsPlan[u.id] = calc.actualNetByUnit(data, store.master(), u.id, year, planUpto);
+        if (planUpto >= 0) actualsPlan[u.id] = calc.actualNetByUnit(data, REV.master(), u.id, year, planUpto);
         var hy = data.history && data.history.years[lcYear];
         actualsCur[u.id] = hy && hy.monthly && hy.monthly[u.id] ? hy.monthly[u.id] : [];
       });
@@ -945,7 +992,7 @@
 
     // เวลาที่พิมพ์ในหัวรายงาน = เวลาที่สั่งพิมพ์
     window.addEventListener('beforeprint', function () {
-      if (printedAt && document.body.contains(printedAt)) printedAt.textContent = fill(page.printedAt, { at: F.dateTime(new Date().toISOString()) });
+      if (printedAt && document.body.contains(printedAt)) printedAt.textContent = fill(page.printedAt, { at: F.dateTime(SP.core.clock.now()) });
     });
 
     draw();

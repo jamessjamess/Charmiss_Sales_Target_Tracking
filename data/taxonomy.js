@@ -9,7 +9,7 @@
  *
  * CR-11: หมวดสินค้าชุดนี้ใช้กับสินค้าจริงจาก data/seed/ (Excel ยังไม่มี Category) — สินค้าได้หมวดจากคำในชื่อ
  *   ตามกฎใน data/products.js (productImport.categoryRules) และมีเครื่องหมาย inferred: true (ระบบเดาให้ ควรตรวจสอบ)
- * series ว่างไว้: core/seed.js สร้าง Series จากค่า Campaign ที่พบใน data/seed/ (ยกเว้น Existing ซึ่งไม่ใช่ Series)
+ * series: core/seed.js สร้าง Series จากค่า Campaign ที่พบใน data/seed/ (ยกเว้น Existing ซึ่งไม่ใช่ Series) ต่อด้วยรายการในไฟล์นี้ (CR-37 Mix Series)
  */
 (function (SP) {
   'use strict';
@@ -47,8 +47,15 @@
       {"id":"type-palette","name":"Eyeshadow Palette","parentId":"sub-eye-shadow","level":"TYPE","active":true,"order":1},
       {"id":"cat-skin","name":"Skincare","parentId":null,"level":"CATEGORY","active":true,"order":5},
       {"id":"sub-skin-toner","name":"Toner","parentId":"cat-skin","level":"SUB_CATEGORY","active":true,"order":1},
-      {"id":"type-toner-pad","name":"Toner Pad","parentId":"sub-skin-toner","level":"TYPE","active":true,"order":1}
+      {"id":"type-toner-pad","name":"Toner Pad","parentId":"sub-skin-toner","level":"TYPE","active":true,"order":1},
+      // CR-37 Bundle: ระบบกำหนดหมวดนี้ให้สินค้าแบบ Bundle เสมอ (settings.BUNDLE) · เลขนำหน้า Product Code 90 · feature = Flag ปิดแล้วไม่โหลด (core/seed.js)
+      {"id":"cat-set-bundle","name":"Set & Bundle","parentId":null,"level":"CATEGORY","active":true,"order":6,"feature":"bundle"},
+      {"id":"sub-bundle","name":"Bundle","parentId":"cat-set-bundle","level":"SUB_CATEGORY","active":true,"order":1,"feature":"bundle"},
+      {"id":"type-bundle","name":"Bundle","parentId":"sub-bundle","level":"TYPE","active":true,"order":1,"codePrefix":"90","feature":"bundle"}
     ],
-    series: []
+    // CR-37: Mix Series = Series ของ Bundle ที่ชิ้นส่วนอยู่คนละ Series (calc.bundleSeries) · Series อื่นสร้างจาก data/seed/
+    series: [
+      {"id":"ser-mix","name":"Mix Series","parentId":null,"level":"SERIES","active":true,"order":99,"feature":"bundle"}
+    ]
   };
 })(window.SP);

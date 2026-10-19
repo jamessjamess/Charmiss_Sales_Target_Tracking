@@ -174,7 +174,7 @@
   // ตรวจความถูกต้องของช่วง: ช่วงทับกัน (อยู่ 2 หน่วยขายในเดือนเดียวกัน) · หน่วยขายต่าง Channel กับคู่ค้า · ไม่พบหน่วยขาย
   function validate(d) {
     var units = {};
-    salesUnits(d, SP.core.clock ? SP.core.clock.currentMonth() : '2026-09').forEach(function (u) { units[u.id] = u; });
+    salesUnits(d, SP.core.clock.currentMonth()).forEach(function (u) { units[u.id] = u; });
     var cust = {};
     customers(d).forEach(function (c) { cust[c.id] = c; });
     var byCust = {};

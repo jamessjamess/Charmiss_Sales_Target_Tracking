@@ -56,7 +56,8 @@
 .td-scroll { overflow-y: auto; overflow-x: hidden; max-height: 100%; }
 
 @media (min-width: 1024px) {
-  .page-topDown .module-body > .td-layout { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  /* CR-40: ตารางไม่ถูกบีบ (แถว Channel สูงพอ 2 บรรทัดเสมอ) · ความสูงที่ไม่พอให้การ์ดกราฟลดลงแทน */
+  .page-topDown .module-body > .td-layout { flex: 0 0 auto; min-height: 0; display: flex; flex-direction: column; }
   .td-tree { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
   .td-tree .td-scroll { flex: 0 1 auto; min-height: 0; }
 }
@@ -105,6 +106,8 @@
 .td-ch-row > * { font-weight: var(--fw-bold); }
 .td-ch-row:hover > * { background: var(--c-primary-soft); }
 .td-ch-name { cursor: help; border-bottom: 1px dotted var(--c-border-strong); }
+/* CR-40: แถว Channel สูงพอสำหรับชื่อ + ลิงก์ n หน่วยขาย 2 บรรทัดเสมอ (ไม่บีบ line-height) */
+.td-table .td-ch-row > th, .td-table .td-ch-row > td { height: max(var(--td-row-h), 44px); }
 .td-units-link { display: block; margin-top: 1px; font-size: 11px; font-weight: var(--fw-medium); color: var(--c-text-muted); }
 .td-units-link:hover { color: var(--c-primary-strong); }
 

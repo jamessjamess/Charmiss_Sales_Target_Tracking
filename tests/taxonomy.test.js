@@ -95,8 +95,8 @@
       }
     },
     {
-      name: 'tx-8. crossTab(products, "series", "category") → ผลรวมทุกช่อง = จำนวน SKU ที่มีทั้ง Series และ Category (120 · CR-30 รวม NPD ปี 2028 · CR-34 รวมคำขอ NPD 2 · CR-35 รวมตัวอย่าง Delete)',
-      expected: [120, 120, true],
+      name: 'tx-8. crossTab(products, "series", "category") → ผลรวมทุกช่อง = จำนวน SKU ที่มีทั้ง Series และ Category (122 · CR-30 รวม NPD ปี 2028 · CR-34 รวมคำขอ NPD 2 · CR-35 รวมตัวอย่าง Delete · CR-37 รวม Bundle ตัวอย่าง 2)',
+      expected: [122, 122, true],
       actual: function () {
         var ct = T().crossTab(products(), 'series', 'category', D().taxonomy);
         var cells = 0;

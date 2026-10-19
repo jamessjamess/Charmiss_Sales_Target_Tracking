@@ -83,14 +83,26 @@
         location.href = link(home);
       }
     });
-    select.title = current ? C.roleName(current) : '';
-    // ข้อความ (จำลองสำหรับการนำเสนอ) อยู่ใน Tooltip ของป้าย เพื่อให้ Dropdown แสดงชื่อได้ครบ
+    // CR-40: แสดงเป็น Avatar (ตัวอักษรแรกของชื่อ) + ชื่อ + บทบาท 2 บรรทัด · Dropdown เดิมวางทับโปร่งใส (เลือกได้เหมือนเดิม)
+    //   Tooltip = มุมมองผู้ใช้ (จำลองสำหรับการนำเสนอ) · ชื่อเต็มของตัวเลือก
+    var name = user.name || (current ? C.roleName(current) : '');
+    select.title = site.roleLabel + ' ' + site.roleNote + (current ? ' · ' + C.roleName(current) : '');
     return h('div', { class: 'role-picker' },
-      h('label', { class: 'role-field' }, h('span', { class: 'field-label has-tip', title: site.roleNote }, site.roleLabel), select));
+      h('label', { class: 'role-field' },
+        h('span', { class: 'role-avatar', 'aria-hidden': 'true' }, initialOf(name)),
+        h('span', { class: 'role-text', 'aria-hidden': 'true' }, h('span', { class: 'role-name' }, name), h('span', { class: 'role-title' }, P.roleTitle(user))),
+        C.icon('chevron-down', { className: 'role-caret' }),
+        select));
+  }
+  // ตัวอักษรแรกของชื่อ (ข้ามสระหน้า เ แ โ ใ ไ) → ตัวพิมพ์ใหญ่
+  function initialOf(name) {
+    var s = String(name || '').replace(/^[เ-ไ\s]+/, '');
+    return s ? s.charAt(0).toUpperCase() : '?';
   }
 
-  // CR-36: รีเซ็ตข้อมูล = ล้าง store ทั้งหมด (ตัด UAT · ไม่มี Key ที่ต้องคงไว้แล้ว)
-  function resetData() { SP.core.store.reset(); }
+  // CR-36: รีเซ็ตข้อมูล = ล้าง store ทั้งหมด · CR-41 = เริ่มสถานการณ์ Demo ปัจจุบันใหม่ (core/scenario.js load)
+  function resetData() { return SP.core.scenario.load(SP.core.clock.scenarioId()); }
+  function revisionOn() { return !!(SP.core.revision && SP.core.revision.enabled()); }
 
   // หน่วยขายแรกของ Channel ในแผนปีนี้ (ไม่มี = หน่วยแรกใน Master) → ui.selection (หน้าเป้าหมายรายเดือนและวางแผน SKU ใช้ร่วมกัน)
   function selectTeamUnit(channelId) {
@@ -103,11 +115,130 @@
     if (unit) store.set('ui.selection', { channel: channelId, unit: unit });
   }
 
-  function buildHeader() {
+  // ---------------------------------------------------------------------
+  // CR-41: สถานการณ์ Demo (data/scenarios.js · core/scenario.js) — แทนเมนู รีเซ็ตข้อมูล ▾ (CR-38)
+  //   ป้ายสถานการณ์ปัจจุบันถัดจาก Prototype + ปุ่ม สถานการณ์ Demo ▾ เปิดเมนูเดียวกัน · ทุกบทบาทเลือกได้ (เครื่องมือ Demo ไม่ใช่สิทธิ์ของระบบจริง)
+  //   เลือกสถานการณ์อื่น = Dialog ยืนยัน → ล้างข้อมูลใน Session + โหลดสถานการณ์ → หน้าแรกของสถานการณ์ (ไม่เห็นหน้านั้น = หน้าเริ่มต้นของบทบาท)
+  //   เริ่มสถานการณ์นี้ใหม่ = Dialog ยืนยัน → โหลดสถานการณ์ปัจจุบันใหม่ → อยู่หน้าเดิม
+  // ---------------------------------------------------------------------
+  function scenarioText(sc) {
+    var X = SP.data.content.site.scenario, K = SP.core.clock;
+    var vars = { month: K.label(sc.currentMonth), closed: K.label(K.addMonths(sc.currentMonth, -1)), year: sc.planYear };
+    return { name: C.fill((X.names || {})[sc.id] || sc.id, vars), note: C.fill((X.notes || {})[sc.id] || '', vars) };
+  }
+  function goScenarioHome(res) {
+    var e = res.home ? SP.core.registry.byId(res.home) : null;
+    if (!e || !allowed(e)) e = homeEntry();
+    if (!e) { location.reload(); return; }
+    location.href = link(e) + (res.homeTab && e.id === res.home ? '#' + res.homeTab : '');
+  }
+  function runScenario(id, stay) {
+    var X = SP.data.content.site.scenario;
+    C.guardUnsaved(null);
+    var res = SP.core.scenario.load(id);
+    if (!res.ok) { window.alert(C.fill(X.failed, { error: res.error || '' })); location.reload(); return; }
+    if (stay) location.reload(); else goScenarioHome(res);
+  }
+  function scenarioMenu(trigger, align) {
+    var X = SP.data.content.site.scenario;
+    var curId = SP.core.clock.scenarioId();
+    C.popover(trigger, function (close) {
+      var cur = SP.core.scenario.find(curId);
+      return h('div', { class: 'scenario-menu' },
+        h('h3', { class: 'popover-title scenario-menu-title' }, X.title),
+        h('ul', { class: 'menu-list', role: 'menu' }, SP.core.scenario.list().map(function (sc) {
+          var t = scenarioText(sc), on = sc.id === curId;
+          return h('li', null, h('button', { type: 'button', role: 'menuitemradio', 'aria-checked': on ? 'true' : 'false', class: 'menu-item scenario-option' + (on ? ' is-current' : ''), dataset: { scenario: sc.id },
+            onClick: function () {
+              close();
+              if (on) return;
+              C.dialog({ title: X.switchTitle, lines: [C.fill(X.switchText, { name: t.name })], confirmLabel: X.switchConfirm })
+                .then(function (r) { if (r.ok) runScenario(sc.id, false); });
+            } }, h('span', { class: 'scenario-dot', 'aria-hidden': 'true' }), h('span', { class: 'scenario-option-text' }, h('span', { class: 'scenario-option-name' }, t.name), h('small', { class: 'muted scenario-option-note' }, t.note))));
+        })),
+        h('div', { class: 'scenario-menu-sep', role: 'separator' }),
+        h('button', { type: 'button', class: 'menu-item scenario-restart', title: X.restartTip, onClick: function () {
+          close();
+          C.dialog({ title: X.restartTitle, lines: [C.fill(X.restartText, { name: cur ? scenarioText(cur).name : curId })], confirmLabel: X.restartConfirm })
+            .then(function (r) { if (r.ok) runScenario(curId, true); });
+        } }, X.restart));
+    }, { className: 'menu-popover scenario-popover', label: X.title, align: align });
+    return trigger;
+  }
+  function scenarioBadge() {
+    var X = SP.data.content.site.scenario;
+    var sc = SP.core.scenario.current();
+    if (!sc) return null;
+    var btn = h('button', { type: 'button', class: 'scenario-badge no-print', title: X.badgeTip, 'aria-label': X.title + ' · ' + scenarioText(sc).name, dataset: { scenario: sc.id } }, scenarioText(sc).name);
+    return scenarioMenu(btn, null);
+  }
+
+  // CR-40: ช่องค้นหาเมนูที่แถบบน — กรองรายการเมนูที่ผู้ใช้เห็น (ชื่อในเมนู · ชื่อเต็ม · ชื่อกลุ่ม)
+  //   ↑ ↓ เลือก · Enter / คลิก = ไปหน้า · Esc = ล้างและปิด
+  function buildMenuSearch() {
+    var site = SP.data.content.site;
+    var S = site.search;
+    var items = [];
+    SP.core.registry.menu(allowed).forEach(function (g) {
+      g.entries.forEach(function (e) { items.push({ entry: e, label: menuLabel(e), full: fullLabel(e), group: site.groups[g.id] || g.id }); });
+    });
+    var input = h('input', { type: 'search', class: 'input menu-search-input', placeholder: S.placeholder, 'aria-label': S.label, autocomplete: 'off',
+      role: 'combobox', 'aria-expanded': 'false', 'aria-controls': 'menu-search-list', 'aria-autocomplete': 'list' });
+    var list = h('ul', { class: 'menu-search-list', id: 'menu-search-list', role: 'listbox', 'aria-label': S.label, hidden: true });
+    var shown = [];
+    var active = 0;
+    function norm(s) { return String(s || '').toLowerCase(); }
+    function setOpen(v) { list.hidden = !v; input.setAttribute('aria-expanded', v ? 'true' : 'false'); }
+    function go(it) { location.href = link(it.entry); }
+    function render() {
+      var q = norm(input.value.trim());
+      shown = items.filter(function (it) { return !q || norm(it.label + ' ' + it.full + ' ' + it.group).indexOf(q) >= 0; });
+      if (active >= shown.length) active = 0;
+      C.clear(list);
+      if (!shown.length) list.appendChild(h('li', { class: 'menu-search-empty' }, S.empty));
+      shown.forEach(function (it, i) {
+        list.appendChild(h('li', {
+          role: 'option', class: 'menu-search-item' + (i === active ? ' is-active' : ''), 'aria-selected': i === active ? 'true' : 'false',
+          onMousedown: function (ev) { ev.preventDefault(); go(it); }
+        }, h('span', { class: 'side-icon' }, menuIcon(it.entry)), h('span', { class: 'menu-search-label' }, it.label), h('span', { class: 'menu-search-group' }, it.group)));
+      });
+      setOpen(true);
+    }
+    input.addEventListener('input', function () { active = 0; render(); });
+    input.addEventListener('focus', render);
+    input.addEventListener('blur', function () { setOpen(false); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!shown.length) return;
+        active = (active + (e.key === 'ArrowDown' ? 1 : shown.length - 1)) % shown.length;
+        render();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (shown[active]) go(shown[active]);
+      } else if (e.key === 'Escape') {
+        input.value = '';
+        setOpen(false);
+        input.blur();
+      }
+    });
+    return h('div', { class: 'menu-search no-print', role: 'search' }, C.icon('search', { className: 'menu-search-icon' }), input, list);
+  }
+
+  // CR-40: ไอคอนของรายการเมนู — Sales Planning = วงกลมเลขขั้น · หน้าอื่น = ไอคอนเส้นจาก registry icon
+  function menuIcon(e) {
+    if (e.group === 'sales-planning' && e.tour) return C.stepIcon(e.tour);
+    return e.icon && C.hasIcon(e.icon) ? C.icon(e.icon) : h('span', { class: 'side-letter' }, menuLabel(e).charAt(0));
+  }
+
+  // CR-40: แถบบน = ☰ (จอแคบ) · ค้นหาเมนู · ป้าย Prototype | มุมมองผู้ใช้ (Avatar) · คู่มือ · รีเซ็ตข้อมูล
+  //   withBrand = หน้าที่ไม่มีเมนูข้าง (เช่น หน้า Test) → ชื่อระบบที่แถบบนแทนกล่องโลโก้
+  function buildHeader(withBrand) {
     var site = SP.data.content.site;
     var store = SP.core.store;
 
-    var reset = h('button', {
+    // CR-41: Flag revision = เมนู สถานการณ์ Demo ▾ · ปิด = ปุ่มรีเซ็ตเดิม (เริ่มสถานการณ์ปัจจุบันใหม่)
+    var reset = revisionOn() ? scenarioMenu(h('button', { type: 'button', class: 'btn btn-ghost btn-sm header-reset header-scenario' }, site.scenario.title + ' ▾'), 'right') : h('button', {
       type: 'button', class: 'btn btn-ghost btn-sm header-reset',
       onClick: function () {
         if (window.confirm(site.resetConfirm)) { C.guardUnsaved(null); resetData(); location.reload(); }
@@ -129,11 +260,11 @@
     return h('header', { class: 'site-header' },
       h('div', { class: 'header-bar' },
         burger,
-        h('a', { class: 'brand', href: SP.core.paths.to('index.html') },
-          h('span', { class: 'brand-name' }, site.name),
-          h('span', { class: 'brand-badge' }, site.badge)),
+        withBrand ? h('a', { class: 'brand', href: SP.core.paths.to('index.html') }, h('span', { class: 'brand-name' }, site.name)) : buildMenuSearch(),
+        h('span', { class: 'brand-badge' }, site.badge),
+        revisionOn() ? scenarioBadge() : null,   // CR-41 ป้ายสถานการณ์ Demo ปัจจุบัน (คลิก = เมนูสถานการณ์)
         h('div', { class: 'header-actions' }, warning, buildRolePicker(),
-          about ? h('a', { class: 'header-link', href: link(about) }, site.aboutLink) : null, reset)));
+          about ? h('a', { class: 'header-link', href: link(about) }, C.icon('book-open'), h('span', null, site.aboutLink)) : null, reset)));
   }
 
   // ---------------------------------------------------------------------
@@ -166,6 +297,7 @@
     Object.keys(menuState.links).forEach(function (id) {
       var ref = menuState.links[id];
       if (id === 'summary' && ref.status) { scheduleCount(ref); return; }
+      if (id === 'approval' && ref.status) { approvalCount(ref); return; }
       var st = ref.status && SP.core.features.isOn('approvalWorkflow') ? workflowOfEntry(ref.entry) : null;
       ref.link.title = ref.label + (st ? ' · ' + W.status[st] : '');
       if (!ref.status) return;
@@ -188,6 +320,15 @@
     }, 0);
   }
 
+  // CR-39: ป้ายตัวเลขของ Approval = คำขอที่ผู้ใช้ปัจจุบันต้องดำเนินการ (รูปแบบเดียวกับป้ายของ Plan Summary)
+  function approvalCount(ref) {
+    var n = SP.core.approval ? SP.core.approval.waitingFor().length : 0;
+    var text = n ? C.fill(SP.data.content.site.approvalCount, { n: n }) : '';
+    ref.link.title = ref.label + (text ? ' · ' + text : '');
+    C.clear(ref.status);
+    if (n) ref.status.appendChild(h('span', { class: 'side-count', title: text, 'aria-label': text }, String(n)));
+  }
+
   // CR-21: หน้าที่ผู้ใช้ปัจจุบันเห็น (ระดับสิทธิ์สูงสุดของหน้า ≠ NONE)
   function allowed(entry) { return !entry || SP.core.permissions.pageVisible(SP.core.permissions.user(), entry.id); }
 
@@ -198,27 +339,10 @@
     menuState.entry = entry;
     menuState.links = {};
 
+    // CR-40: กล่องโลโก้ + ปุ่มพับเมนูแบบไอคอน (บนสุด) · กลุ่มเมนู (เลื่อนในตัว) · v<เวอร์ชัน> · Prototype (ล่างสุด)
     var nav = h('nav', { class: 'side-menu', id: 'side-menu', 'aria-label': site.menu });
-    registry.menu(allowed).forEach(function (g) {
-      var planning = g.id === 'sales-planning';
-      nav.appendChild(h('div', { class: 'side-group' },
-        h('div', { class: 'side-group-title' }, site.groups[g.id] || g.id),
-        h('ol', { class: 'side-list' + (planning ? ' is-steps' : '') }, g.entries.map(function (e) {
-          var current = e === entry;
-          var label = menuLabel(e);
-          var status = planning ? h('span', { class: 'side-status' }) : null;
-          var icon = planning ? String(e.tour) : (e.icon || label.charAt(0));   // CR-25: เลขขั้นคงที่
-          var a = h('a', { href: link(e), class: 'side-link' + (current ? ' is-current' : ''), 'aria-current': current ? 'page' : null, title: label },
-            h('span', { class: 'side-icon' + (planning ? ' is-step' : '') }, icon),
-            h('span', { class: 'side-label' }, label),
-            status);
-          menuState.links[e.id] = { entry: e, status: status, link: a, label: label, short: planning ? shortLabel(e) : null };
-          return h('li', null, a);
-        }))));
-    });
-
     var collapse = h('button', {
-      type: 'button', class: 'side-collapse no-print',
+      type: 'button', class: 'icon-btn side-collapse no-print',
       onClick: function () {
         var collapsed = !document.body.classList.contains('sidebar-collapsed');
         document.body.classList.toggle('sidebar-collapsed', collapsed);
@@ -227,13 +351,39 @@
         nav.fitLabels();
       }
     });
+    nav.appendChild(h('div', { class: 'side-brand' },
+      h('a', { class: 'side-logo', href: SP.core.paths.to('index.html'), title: site.name },
+        h('span', { class: 'side-logo-icon', 'aria-hidden': 'true' }, C.icon('target')),
+        h('span', { class: 'side-logo-text' }, h('strong', null, site.name), h('small', null, site.brandSub))),
+      collapse));
+    var groups = h('div', { class: 'side-groups' });
+    registry.menu(allowed).forEach(function (g) {
+      var planning = g.id === 'sales-planning';
+      groups.appendChild(h('div', { class: 'side-group' },
+        h('div', { class: 'side-group-title' }, site.groups[g.id] || g.id),
+        h('ol', { class: 'side-list' + (planning ? ' is-steps' : '') }, g.entries.map(function (e) {
+          var current = e === entry;
+          var label = menuLabel(e);
+          var status = planning || e.id === 'approval' ? h('span', { class: 'side-status' }) : null;   // CR-39 ป้ายตัวเลขของ Approval
+          // CR-25: เลขขั้นคงที่ · CR-40: ไอคอนเส้น (Lucide) แทนตัวอักษรในกรอบ
+          var a = h('a', { href: link(e), class: 'side-link' + (current ? ' is-current' : ''), 'aria-current': current ? 'page' : null, title: label },
+            h('span', { class: 'side-icon' + (planning ? ' is-step' : '') }, menuIcon(e)),
+            h('span', { class: 'side-label' }, label),
+            status);
+          menuState.links[e.id] = { entry: e, status: status, link: a, label: label, short: planning ? shortLabel(e) : null };
+          return h('li', null, a);
+        }))));
+    });
+    nav.appendChild(groups);
+    nav.appendChild(h('div', { class: 'side-foot' }, site.version));
+
     function setCollapseLabel() {
       var collapsed = document.body.classList.contains('sidebar-collapsed');
-      C.clear(collapse).appendChild(document.createTextNode(collapsed ? '»' : '« ' + site.collapse));
+      C.clear(collapse).appendChild(C.icon(collapsed ? 'panel-left-open' : 'panel-left-close'));
       collapse.title = collapsed ? site.expand : site.collapse;
       collapse.setAttribute('aria-label', collapse.title);
+      collapse.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
     }
-    nav.appendChild(collapse);
     nav.setCollapseLabel = setCollapseLabel;
     // ชื่อเต็มยาวเกินบรรทัดเดียว → ใช้ชื่อย่อ (เรียกหลังวางเมนูในหน้าแล้ว และเมื่อ Font โหลดเสร็จ)
     nav.fitLabels = function () {
@@ -260,8 +410,15 @@
     var line = h('div', { class: 'intro-line' },
       h('h1', { title: page.titleTip || null }, fillTitle(title)),
       help,
-      entry && entry.year ? C.planYearPicker() : null);
-    var intro = h('div', { class: 'page-intro' }, line, (page.lead || []).slice(0, 1).map(function (t) { return h('p', { class: 'lead' }, fillTitle(t)); }));
+      // CR-38: หน้าใน Sales Planning = ตัวเลือก Revision (แทนตัวเลือกปี) + แถบสถานะของรอบ 1 บรรทัด
+      entry && entry.year ? (revisionOn() && entry.group === 'sales-planning' ? C.revisionPicker() : C.planYearPicker()) : null);
+    // CR-40: ไม่มีแถบสถานะ Revision ในโหมดดู (ป้ายของรอบ + Tooltip ที่ตัวเลือก Revision · โหมดแก้ไข = แถบโหมดแก้ไขของหน้า components.editBanner revision)
+    // CR-40: หัวหน้า = การ์ดพื้นไล่สี (.page-head) · บรรทัดแรก Breadcrumb <กลุ่มเมนู> › <หน้า> · บรรทัดที่สอง ชื่อหน้า · ? · ตัวเลือกปี / Revision · ปุ่มของหน้าชิดขวา
+    //   ไม่มีคำอธิบายใต้หัวข้อ (ข้อความเดิมอยู่บรรทัดแรกของปุ่ม ? = content.pages.<id>.helpLead)
+    var crumb = entry && entry.group ? h('nav', { class: 'page-crumb', 'aria-label': site.crumb },
+      h('span', null, site.groups[entry.group] || entry.group), h('span', { class: 'page-crumb-sep', 'aria-hidden': 'true' }, '›'),
+      h('span', { 'aria-current': 'page' }, menuLabel(entry))) : null;
+    var intro = h('div', { class: 'page-intro' + (entry ? ' page-head' : '') }, crumb, line);
     intro.line = line;
     return intro;
   }
@@ -334,12 +491,12 @@
     // พับเมนู: ค่าที่ผู้ใช้จำไว้เท่านั้น (CR-24: เลิกพับเองในหน้าวางแผน SKU — เมนูเปิดเป็นค่าเริ่มต้นทุกหน้า)
     if (store.get('ui.sidebarCollapsed')) document.body.classList.add('sidebar-collapsed');
 
-    var header = buildHeader();
+    // CR-40: เมนูข้างเต็มความสูงทางซ้าย · แถบบนอยู่ในคอลัมน์เนื้อหา (เหนือหัวหน้า)
     var side = entry ? buildSideMenu(entry) : null;
-    var mainCol = h('div', { class: 'app-main' });
+    var header = buildHeader(!side);
+    var mainCol = h('div', { class: 'app-main' }, header);
     var shell = h('div', { class: 'app-shell' }, side, mainCol,
       side ? h('div', { class: 'side-backdrop', onClick: function () { document.body.classList.remove('sidebar-open'); } }) : null);
-    document.body.insertBefore(header, root);
     document.body.insertBefore(shell, root);
     mainCol.appendChild(root);
     if (side) {

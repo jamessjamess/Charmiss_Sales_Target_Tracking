@@ -69,3 +69,48 @@
 - **ผู้ใช้ ↔ บุคลากร** (CR-32): `person.userId` ที่เดียว (ผู้ใช้ไม่มี `salesPersonId` แล้ว · ค่าตั้งต้น `data/users.js` `personUsers` ผูกตอนโหลด) · `permissions.normalize`
   หา personId จาก `master.salespeople` (`personOfUser`) → ทีมและขอบเขต "เฉพาะทีม" · ผลสิทธิ์ของผู้ใช้ตัวอย่างทั้ง 18 คนเท่าเดิม · ผู้ใช้สมมติที่ส่ง `salesPersonId` มาเอง (Test) ใช้ค่านั้น ·
   `linkUser` (1:1 · ทีมผูกไม่ได้ · ผู้ใช้ที่ผูกคนอื่นแล้ว = taken) · `defaultRolesFor` (บทบาทตั้งต้นของบัญชีใหม่ตามบทบาทในทีม)
+
+## CR-37 หน้า Bundle
+
+- resource `bundle` (สิทธิ์หน้า · ไม่มีสิทธิ์ย่อย): `N V V V E V N E` (ทีม Product / ผู้ดูแลระบบ = แก้ไข · Sales Director / Sales Manager / Sales Officer / Supply Chain = ดู ·
+  Management / ผู้ดูรายงาน = ไม่เห็น เหมือน Product List — CR ระบุ "บทบาทอื่น = ดู" ตีความเป็นบทบาทที่เห็น Product Master)
+- registry `feature: 'bundle'` (CR-37): Flag ปิด = `pageLevel` NONE ทุกบทบาท · ไม่อยู่ใน `resources()` (เมทริกซ์ Permissions / Users) · ไม่อยู่ในเมนู (`registry.menu` · `permissions.menuFor`)
+
+## CR-38 Revision · บทบาท MD
+
+- บทบาทใหม่ `md` (MD · Managing Director · ลำดับ 9 · คอลัมน์สุดท้ายของ `ROLE_ORDER` · `system: true` · หน้าเริ่มต้น `revisionList`) · ผู้ใช้ตัวอย่าง `u-md` ธนวัฒน์ ศรีประเสริฐ (`data/users.js` · ผู้ใช้ตัวอย่าง 19 คน)
+- ค่าตั้งต้นของ MD: ดู Annual Target · Sub-channel Allocation · SKU Planning · Plan Summary · Revision Compare · แก้ไข Revision List + `revision.lock` · หน้าอื่นไม่เห็น
+- resource ใหม่ (registry `feature: 'revision'` · Flag ปิด = ไม่เห็นทุกบทบาท ไม่อยู่ในเมทริกซ์):
+
+  | สิทธิ์ | Mgmt | Director | Manager | Officer | Product | Supply | ผู้ดูรายงาน | ผู้ดูแลระบบ | MD |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Revision List (`revisionList`) | แก้ไข | ดู | ดู | ดู | ดู | ดู | ดู | แก้ไข | แก้ไข ★ |
+  | ปุ่ม เปิด Revision (`revision.open`) | ✓ | – | – | – | – | – | – | – | – |
+  | ปุ่ม เสนอ Lock / ถอนการเสนอ (`revision.submit`) | ✓ | – | – | – | – | – | – | – | – |
+  | ปุ่ม Lock / ส่งกลับแก้ไข (`revision.lock`) | – | – | – | – | – | – | – | – | ✓ |
+  | Revision Compare (`revisionCompare`) | ดู | ดู | ดู | ดู | ดู | ดู | ดู | แก้ไข | ดู |
+
+- ผู้ดูแลระบบไม่ได้รับปุ่ม Revision ทั้ง 3 ตามค่าตั้งต้น (ให้สิทธิ์ได้ที่หน้า Permissions) · ปุ่มเฉพาะยังอยู่ใต้กฎสิทธิ์ย่อยเดิม (อนุญาตได้เมื่อหน้า Revision List เป็นแก้ไข)
+- `core/revision.js` ตรวจสิทธิ์ของคำสั่งด้วย `permissions.can` (open → `revision.open` · submit / withdraw → `revision.submit` · lock / return → `revision.lock`)
+- ระหว่างรอบร่างใช้สิทธิ์แก้ Sales Planning เดิม (Management Annual Target · Sales Director Sub-channel Allocation · Sales ทีมของตน SKU Planning) จำกัดเฉพาะเดือนที่เปิด ·
+  ข้อบังคับห้ามแก้ย้อนหลังที่ Store ไม่ขึ้นกับสิทธิ์ (ทุกบทบาทรวมผู้ดูแลระบบ · [revision.md](revision.md))
+
+## CR-39 Revision เป็นแท็บของ Plan Summary · Module Approval
+
+- หน้า Revision List / Revision Compare เดิม: registry `visible: false` · `perm: 'summary'` (ทางผ่าน) · สิทธิ์ `revisionList` / `revisionCompare` เป็นสิทธิ์ส่วนของหน้า Plan Summary (`pages.summary`) ·
+  ค่าเดิมคงไว้ ยกเว้นผู้ดูแลระบบ = ดู (Plan Summary ของผู้ดูแลระบบ = ดู ตาม CR-25 · แท็บไม่มีอะไรให้ผู้ดูแลระบบแก้) · สิทธิ์ย่อยที่ไม่ใช่ปุ่มสูงกว่าหน้าหลักได้
+- `data/permissions.js` สิทธิ์ย่อยมีฟิลด์ใหม่ `parent` (สิทธิ์ย่อยต้นทาง · `revision.open` อยู่ใต้ `revisionList` = ปุ่มอนุญาตได้เมื่อแท็บ Revision เป็นแก้ไข) และ
+  `feature` (`'!approval'` = แสดงเมื่อ Flag ปิด · `revision.submit` / `revision.lock` ของ CR-38) · `core/permissions.js` resources รองรับทั้ง 2 ฟิลด์ (ไม่ระบุ = ผลเดิม)
+- หน้า `approval` (Flag `approval`) + ปุ่มเฉพาะ:
+
+  | สิทธิ์ | Mgmt | Director | Manager | Officer | Product | Supply | ผู้ดูรายงาน | ผู้ดูแลระบบ | MD |
+  |---|---|---|---|---|---|---|---|---|---|
+  | Approval (`approval`) | แก้ไข | แก้ไข | ดู | ดู | ดู | ดู | ดู | แก้ไข | แก้ไข ★ |
+  | ส่งขออนุมัติ / ถอนคำขอ (`approval.submit`) | ✓ | – | – | – | – | – | – | – | – |
+  | ยืนยันขั้น Sales Director (`approval.sdConfirm`) | – | ✓ | – | – | – | – | – | – | – |
+  | อนุมัติและ Lock (`approval.mdLock`) | – | – | – | – | – | – | – | – | ✓ |
+  | ตั้งค่าขั้นอนุมัติ (`approval.config`) | ✓ | – | – | – | – | – | – | ✓ | – |
+
+- ดำเนินการขั้นต้องมีทั้งบทบาทของขั้น (Management · Sales Director · MD) และสิทธิ์ย่อย (`approval.canStep`) → ผู้ดูแลระบบทำขั้นแทนไม่ได้แม้ให้สิทธิ์ย่อยในเมทริกซ์ ·
+  ตั้งค่า = Management + ผู้ดูแลระบบ (ผู้ใช้เลือก ตาม CR ข้อ 2.2) · หน้า Approval แก้ไข = เพิ่มความคิดเห็นได้
+- หน้าเริ่มต้นของ MD = Approval · คำอธิบายบทบาท MD = อนุมัติและ Lock / ส่งกลับแก้ไขคำขออนุมัติ Revision

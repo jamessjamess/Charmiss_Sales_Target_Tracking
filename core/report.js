@@ -19,6 +19,9 @@
  *                      owner: { id, name, vacant, title }, mix: { status, series, category: [{ key, label, value }] } }],
  *            approvals: W.approvalRows (Top-down + Phasing/SKU ทุกหน่วยขาย), assignments, salespeople,
  *            skuItems: calc.skuPlanItems ทุกหน่วยขาย [{ key, name, unitId, channelId, seriesId, categoryId, subCategoryId, status, units, sale, net }] (CR-26) }
+ * CR-38 Revision (Flag revision): build(opts) อ่านข้อมูลของรอบ opts.revisionId (ไม่ระบุ = รอบที่เลือก) ผ่าน core/revision.js (read · data · master) ·
+ *   เดือนล็อกใช้ค่าของรอบก่อน (revision.phasing · revision.gridLock) · opts.year = ปีที่ยังไม่มีรอบ (Key plan.<ปี>.*) ·
+ *   current() ของรอบ Lock แล้ว = Snapshot.report (ไม่คำนวณใหม่จาก Master) · ส่วนอื่นของไฟล์เดิม
  * อ่านจาก data/: content (labels) + Master ผ่าน store.data()
  * store อ่าน: app.planYear, plan.<ปี>.topDown, plan.<ปี>.phasing.<unitId>, plan.<ปี>.sku.<unitId>, plan.<ปี>.workflow.*, master.*, ui.currentMonth
  * store เขียน: ไม่มี
@@ -26,19 +29,25 @@
 (function (SP) {
   'use strict';
 
-  function build() {
+  function build(opts) {
+    opts = opts || {};
     var calc = SP.core.calc;
     var W = SP.core.workflow;
     var C = SP.core.components;
     var store = SP.core.store;
-    var year = store.year();
-    var data = store.data();
-    var master = store.master();
+    // CR-38: ข้อมูลของรอบ (ไม่เปิด Flag / ระบุปีที่ยังไม่มีรอบ = Key ของปีนั้นใน store แบบเดิม)
+    var R = SP.core.revision && SP.core.revision.enabled() && !opts.year ? SP.core.revision : null;
+    var rid = R ? opts.revisionId || R.selectedId() : null;
+    var year = R && rid ? R.yearOf(rid) : opts.year || store.year();
+    var data = R ? R.data(rid) : store.data();
+    var master = R ? R.master(rid) : store.master();
+    function read(suffix) { return R ? R.read(suffix, rid) : store.get('plan.' + year + '.' + suffix); }
+    function monthly(u) { return R ? R.phasing(u.id, u.amount, read('phasing.' + u.id).monthPct, rid).amounts : calc.phasingTotals(u.amount, read('phasing.' + u.id).monthPct).amounts; }
     var states = store.workflowStates();
     var bs = W.stateOf(states, 'baseline');
     // หลังล็อก Baseline แผนครั้งแรกคำนวณด้วยราคา GP และ Promotion ตอนล็อก
     var snap = locked(states) && bs.snapshot && bs.snapshot.basePrices ? bs.snapshot : null;
-    var tree = calc.topDown(data, store.get(store.planKey('topDown')), year);
+    var tree = calc.topDown(data, read('topDown'), year);
     var nowKey = store.currentKey();
     var tax = master.taxonomy;
     function labelled(list, kind) {
@@ -48,12 +57,12 @@
     var skuItems = [];
     var channels = tree.children.map(function (ch) {
       ch.children.forEach(function (u) {
-        var grid = calc.skuPlanGrid(data, master, u.id, store.get(store.planKey('sku.' + u.id)), { year: year, mode: 'initial', snapshot: snap, target: u.amount });
+        var grid = calc.skuPlanGrid(data, master, u.id, read('sku.' + u.id), { year: year, mode: 'initial', snapshot: snap, target: u.amount, revisionLock: R ? R.gridLock(u.id, rid) : null });
         var owner = C.ownerInfo(data, u.id, nowKey);
         Array.prototype.push.apply(skuItems, calc.skuPlanItems(grid, u.id, ch.id));
         units.push({
           id: u.id, name: u.name, channelId: ch.id, target: u.amount, prior: u.prior, pctOfTotal: u.pctOfTotal,
-          targetM: calc.phasingTotals(u.amount, store.get(store.planKey('phasing.' + u.id)).monthPct).amounts,
+          targetM: monthly(u),
           priorM: calc.priorMonthly(data.history, year, u.id),
           plan: grid.yearTotal.net, planM: grid.totals.net,
           phasing: W.stateOf(states, 'phasing', u.id).status,
@@ -72,7 +81,8 @@
     units.forEach(function (u) { items.push({ step: 'phasing', unitId: u.id }, { step: 'sku', unitId: u.id }); });
     return {
       year: year,
-      builtAt: new Date().toISOString(),
+      revisionId: rid,   // CR-38
+      builtAt: SP.core.clock.now(),
       total: { amount: tree.amount, prior: tree.prior, remaining: tree.remaining },
       topDown: W.stateOf(states, 'topDown').status,
       channels: channels,
@@ -96,6 +106,10 @@
   }
 
   function current(live) {
+    // CR-38: รอบที่เลือก Lock แล้ว = ตัวเลขทั้งหมดจาก Snapshot ตอน Lock
+    var R = SP.core.revision;
+    var rs = R && R.enabled() ? R.snapshotOf(R.selectedId()) : null;
+    if (rs && rs.report) return { report: JSON.parse(JSON.stringify(rs.report)), fromSnapshot: true, revision: true };
     var snap = snapshotReport();
     return snap ? { report: snap, fromSnapshot: true } : { report: live || build(), fromSnapshot: false };
   }

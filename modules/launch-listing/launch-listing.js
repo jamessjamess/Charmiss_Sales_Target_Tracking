@@ -132,7 +132,7 @@
       function startEdit() { editing = true; draft = clone(saved); draw(); }
 
       function save() {
-        var by = byName(), at = new Date().toISOString();
+        var by = byName(), at = SP.core.clock.now();
         var entries = [];
         var applyNow = [];
         draft.npdPlans.forEach(function (d) {
@@ -208,7 +208,7 @@
         var p = calc.findProduct(m.products, n.productKey);
         C.confirmRequestDialog(p, m).then(function (v) {
           if (!v) return;
-          var at = new Date().toISOString(), by = byName();
+          var at = SP.core.clock.now(), by = byName();
           var res = SP.core.catalog.confirmRequest(m, n.productKey, v, { by: by, at: at });
           if (!res.ok) { C.toast(L.confirmRequest.errors[res.error] || res.error); return; }
           store.set('master.products', res.master.products);
@@ -737,7 +737,7 @@
             h('button', { type: 'button', class: 'btn btn-ghost', onClick: function () { drawerCtl.close(); } }, L.dialog.cancel),
             h('button', { type: 'button', class: 'btn btn-primary npd-create-submit', onClick: function () {
               var key = pick.value;
-              var at = new Date().toISOString();
+              var at = SP.core.clock.now();
               var seriesId = null;
               var launchDate = launch.value ? launch.value + '-01' : null;
               if (!key) {
@@ -872,7 +872,7 @@
       if (ctx.addHelp) ctx.addHelp(page.rulesHelp, function () { return C.rulesPanel(); });
 
       function save() {
-        var by = C.roleName(store.role()), at = new Date().toISOString();
+        var by = C.roleName(store.role()), at = SP.core.clock.now();
         var entries = [];
         draft.products.forEach(function (p) {
           var o = calc.findProduct(saved.products, calc.productKey(p));
@@ -1261,7 +1261,7 @@
     }
     function drawTabs() {
       C.clear(tabSlot);
-      tabSlot.appendChild(C.segmented({ label: page.tabLabel, value: tab, className: 'll-tab-seg',
+      tabSlot.appendChild(C.tabs({ label: page.tabLabel, value: tab, className: 'll-tab-seg',   // CR-40 แท็บขีดเส้นใต้
         options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }), onChange: function (v) { show(v); } }));
     }
     function show(t, force) {

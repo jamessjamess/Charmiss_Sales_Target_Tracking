@@ -49,8 +49,18 @@
     function chip(id, text) { return h('span', { class: 'role-chip', style: { '--c': C.tokenVar(roleToken(id)) } }, text || roleName(id)); }
     function hrefOf(id) { var e = reg.byId(id); return e && P.pageVisible(me, id) ? SP.core.paths.to(e.path) : null; }
     function isMine(list) { return list.some(function (r) { return (me.roleIds || []).indexOf(r.id) >= 0; }); }
+    // CR-41: ชื่อสถานการณ์ Demo ({s1} · {s2}) · ปีแผน · เดือนปิดล่าสุด · ช่วงยอดจริงตัวอย่าง (นาฬิกากลาง + data/scenarios.js)
+    var scenarioVars = (function () {
+      var X = SP.data.content.site.scenario, out = { year: String(K.planYear()), closed: K.label(K.lastClosedMonth()), sampleRange: '' };
+      SP.core.scenario.list().forEach(function (sc) {
+        out[sc.id.toLowerCase()] = fill((X.names || {})[sc.id] || sc.id, { month: K.label(sc.currentMonth), year: sc.planYear });
+        if (sc.build && sc.build.sampleFrom) out.sampleRange = K.label(sc.build.sampleFrom) + ' – ' + K.label(K.addMonths(sc.currentMonth, -1));
+      });
+      return out;
+    })();
     function text(t, extra) {
       var vars = {};
+      Object.keys(scenarioVars).forEach(function (k) { vars[k] = scenarioVars[k]; });
       Object.keys(tv).forEach(function (k) { vars[k] = tv[k]; });
       Object.keys(extra || {}).forEach(function (k) { vars[k] = extra[k]; });
       return fill(t, vars);
@@ -62,7 +72,7 @@
     root.appendChild(panel);
 
     function draw() {
-      C.clear(tabsBox).appendChild(C.segmented({
+      C.clear(tabsBox).appendChild(C.tabs({   // CR-40 แท็บขีดเส้นใต้
         label: page.tabLabel, value: tab,
         options: TABS.map(function (id) { return { value: id, label: page.tabs[id] }; }),
         onChange: function (v) { tab = v; store.set('ui.guideTab', v); panel.scrollTop = 0; draw(); }
@@ -92,7 +102,8 @@
       var masters = D.flow.masters.map(function (m) {
         return {
           title: (site.groups && site.groups[m.group]) || m.group,
-          lines: m.pages.filter(function (id) { return !!reg.byId(id); }).map(function (id) {
+          // CR-37: หน้าที่ปิดด้วย Feature Flag (Bundle) ไม่แสดง
+          lines: m.pages.filter(function (id) { return !!reg.byId(id) && reg.featureOn(reg.byId(id)); }).map(function (id) {
             return { title: pageName(id), roles: G.pageEditors(id).map(function (r) { return r.name; }).join(' · '), href: hrefOf(id),
               goTip: fill(FL.goTip, { page: pageName(id) }), disabledTip: FL.noAccess };
           })
@@ -122,14 +133,31 @@
             h('td', { class: 'num gd-users' }, fill(page.usersCount, { n: r.users })));
         })));
 
-      var month = K.label(K.currentMonth());
+      var asOf = K.asOfLabel();   // CR-41 วันที่ของข้อมูลของสถานการณ์
       return h('div', { class: 'gd-overview' },
         h('section', { class: 'gd-block gd-intro' }, h('p', { class: 'gd-overview-text' }, h('strong', { class: 'gd-overview-label' }, page.overviewTitle), text(D.overview))),
-        h('section', { class: 'gd-block' }, h('h2', null, page.flowTitle), flow),
+        h('section', { class: 'gd-block' }, h('h2', null, page.flowTitle), flow, revisionFlow()),
         h('div', { class: 'gd-bottom' },
           h('section', { class: 'gd-block gd-roles-box' }, h('h2', null, page.rolesTitle, h('span', { class: 'gd-sub' }, fill(page.rolesNote, tv))), h('div', { class: 'table-scroll' }, table)),
           h('section', { class: 'gd-block callout callout-info gd-test-notes' }, h('h2', null, page.testTitle),
-            h('ul', { class: 'ab-list' }, D.testNotes.map(function (t) { return h('li', null, text(t, { month: month })); })))));
+            h('ul', { class: 'ab-list' }, D.testNotes.map(function (t) {
+              // CR-41: รายการที่มี steps = ลำดับขั้นทดลองของสถานการณ์ (ข้อความสั้น · ลูกศรคั่น)
+              if (t && t.steps) return h('li', { class: 'gd-test-scenario' }, h('strong', null, text(t.text, { asOf: asOf })), h('span', { class: 'gd-test-steps' }, t.steps.map(function (s, i) { return (i ? ' → ' : ' ') + (i + 1) + ') ' + text(s); }).join('')));
+              return h('li', null, text(t, { asOf: asOf }));
+            })))));
+    }
+
+    // CR-38: บรรทัด รอบ Revision ใต้การ์ดลำดับงาน (Flag revision · ลิงก์ไปหน้า Revision ที่ผู้ใช้เห็น)
+    function revisionFlow() {
+      var RF = D.revisionFlow;
+      if (!RF || (RF.feature && !SP.core.features.isOn(RF.feature))) return null;
+      // CR-39: ปิด Flag approval = ลำดับของ CR-38 (stepsLite)
+      var steps = SP.core.features.isOn('approval') ? RF.steps : (RF.stepsLite || RF.steps);
+      var links = (RF.pages || []).filter(function (id) { return reg.byId(id) && reg.featureOn(reg.byId(id)); }).map(function (id) {
+        return h('a', { class: 'gd-rev-link', href: hrefOf(id) }, pageName(id));
+      });
+      return h('p', { class: 'gd-rev-flow' }, h('strong', null, RF.title + ': '), steps.map(function (s, i) { return [i ? h('span', { class: 'gd-rev-arrow', 'aria-hidden': 'true' }, ' → ') : null, h('span', null, fill(s, tv))]; }),
+        links.length ? h('span', { class: 'gd-rev-links' }, ' · ', links.map(function (a, i) { return [i ? ' · ' : '', a]; })) : null);
     }
 
     // =====================================================================
@@ -151,7 +179,7 @@
       }).concat([fill(page.formulaClearance, { vat: vat, gp: gpLabels })]);   // CR-36
       // CR-36: คำศัพท์ตามกลุ่ม (แถวหัวกลุ่ม + คำในกลุ่ม)
       var body = h('tbody');
-      D.glossaryGroups.forEach(function (g) {
+      D.glossaryGroups.filter(function (g) { return !g.feature || SP.core.features.isOn(g.feature); }).forEach(function (g) {   // CR-37: กลุ่มที่ผูก Flag (Bundle)
         body.appendChild(h('tr', { class: 'gd-term-group' }, h('th', { scope: 'colgroup', colspan: '2' }, g.title)));
         g.terms.forEach(function (t) { body.appendChild(h('tr', null, h('th', { scope: 'row' }, text(t.term, vars)), h('td', null, text(t.meaning, vars)))); });
       });

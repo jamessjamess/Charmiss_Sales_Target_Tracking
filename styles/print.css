@@ -22,6 +22,9 @@ button,
 .segmented { display: none !important; }
 
 .print-only { display: block !important; }
+/* CR-40 หัวหน้าแบบการ์ดไล่สี → ชื่อหน้าธรรมดา (ไม่มี Breadcrumb) */
+.page-head { background: none; border: 0; padding: 0; }
+.page-crumb { display: none !important; }
 
 .page { padding-top: 0; padding-bottom: 0; max-width: none; }
 body.fit-screen { height: auto !important; }

@@ -59,7 +59,7 @@
     },
     {
       name: 'cr36-4. Product Level = ส่วนของหน้า Product List (key เดิม taxonomy · ค่าสิทธิ์เดิม: ทีม Product / ผู้ดูแลระบบ แก้ไข · บทบาทอื่นไม่เห็น) · หน้า Category & Series เดิมซ่อน (perm productList) · เมนู Product Master 3 หน้า',
-      expected: [['productList', 'taxonomy'], ['EDIT', 'NONE', 'NONE', 'EDIT'], [false, 'productList'], ['productList', 'launchListing', 'promotionPrice']],
+      expected: [['productList', 'taxonomy'], ['EDIT', 'NONE', 'NONE', 'EDIT'], [false, 'productList'], ['productList', 'bundle', 'launchListing', 'promotionPrice']],   // CR-37 + หน้า Bundle
       actual: function () {
         var list = SP.core.registry.list;
         var res = P().resources(list).filter(function (r) { return r.pageId === 'productList'; }).map(function (r) { return r.id; });
@@ -170,8 +170,8 @@
       }
     },
     {
-      name: 'cr36-12. (เบราว์เซอร์) Net Sales รวมแผนทุกหน่วยขาย (ข้อมูลตั้งต้น) เท่ากับก่อน CR 111,046,508 บาท (ก่อน CR-36 ไม่มีสินค้าที่มีช่วง Clearance · 32090 ไม่อยู่ในแผน SKU · แผน Clearance ไม่นับ)',
-      expected: [111046508, true],
+      name: 'cr36-12. (เบราว์เซอร์) Net Sales รวมแผนทุกหน่วยขาย (ข้อมูลตั้งต้น) เท่ากับก่อน CR 111,046,508 บาท (ก่อน CR-36 ไม่มีสินค้าที่มีช่วง Clearance · 32090 ไม่อยู่ในแผน SKU · แผน Clearance ไม่นับ) · CR-37 + แถว Bundle ตัวอย่าง (90100 Watsons · 90200 Shopee) = 111,310,349 (Flag bundle ปิด = เท่าเดิม ดู cr37-11)',
+      expected: [111310349, true],
       actual: function () {
         // เบราว์เซอร์เท่านั้น: ใช้ SP.core.store และ document. ของหน้า Test (Node ข้ามข้อนี้) · ตัวเลขเดียวกับ Plan Summary (report.build)
         var rep = SP.core.report.build(), c = calc();

@@ -57,3 +57,9 @@ CR-35 แท็บ Clearance = สิทธิ์ย่อย `listing.clearance
 - RSP / ราคา Dealer เดิม → ราคาหลัก (`priceImport.baseFrom` 2024-01 + รอบเปลี่ยนราคาใน `data/pricing.js`)
 - ราคาต่อ Account เดิม → Promotion Price ระดับหน่วยขายทุกเดือนของปี 2027 (เช่น 33400 ที่ 7-Eleven = 149)
 - ตรวจแล้วราคาใหม่เท่าราคาเดิมทุกช่อง SKU × หน่วยขาย × เดือน (2025–2027) → ตัวเลข SKU Planning เท่าเดิม
+
+## CR-37 Bundle
+
+- ทุกแท็บ: แถว Bundle มีป้าย `Bundle` (`components.bundleTag`) · Bundle ตั้งราคาหลัก Promotion และ Clearance ได้เหมือนสินค้าทั่วไป (ราคาของตัวเอง)
+- แท็บราคาหลัก: ข้อความเทาเล็กใต้ชื่อ `รวมชิ้นส่วน X บาท · ส่วนลด Z%` (RSP ณ เดือนที่ดู · `calc.bundleComponentPrice` / `calc.bundleDiscount`)
+- Flag `bundle` ปิด = ไม่มีแถว Bundle ในทุกแท็บและไฟล์ส่งออก

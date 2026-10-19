@@ -102,7 +102,7 @@
     C.guardUnsaved(dirty);
 
     function save() {
-      var by = byName(), at = new Date().toISOString();
+      var by = byName(), at = SP.core.clock.now();
       var entries = [];
       baseDiff().forEach(function (d) {
         var r = d.after || d.before;
@@ -181,12 +181,22 @@
       out.sort(function (a, b) { return (order.indexOf(a.id) + 1 || 999) - (order.indexOf(b.id) + 1 || 999); });
       return out;
     }
-    function skuHead(p) {
+    // CR-37: extra = บรรทัดเพิ่ม (แท็บราคาหลัก: รวมชิ้นส่วน X บาท · ส่วนลด Z% ของ Bundle) · ป้าย Bundle ต่อท้ายชื่อ
+    function skuHead(p, extra) {
       var key = calc.productKey(p);
       return h('th', { class: 'pr-sku', scope: 'row' }, h('span', { class: 'pr-sku-line' }, C.productThumb(p, tax(), { size: 'sm' }),
-        h('span', { class: 'pr-sku-text' }, h('span', { class: 'pr-code' }, calc.productCode(p)), h('span', { class: 'pr-name', title: p.name }, calc.displayName(p), ' ', C.tempNameTag(p)),
+        h('span', { class: 'pr-sku-text' }, h('span', { class: 'pr-code' }, calc.productCode(p)), h('span', { class: 'pr-name', title: p.name }, calc.displayName(p), ' ', C.tempNameTag(p), C.bundleTag(p, cur().products)),
+          extra || null,
           // CR-35: SKU ที่มีช่วง Clearance = ป้าย Clearance + ใช้ราคา Clearance {ช่วงเดือน}
           p.clearance && p.clearance.fromMonth ? clTag(p.clearance) : null)));
+    }
+    // CR-37: Bundle ในแท็บราคาหลัก = ข้อความเทาเล็ก รวมชิ้นส่วน X บาท · ส่วนลด Z% (RSP ณ เดือนที่ดู · calc.bundleComponentPrice / bundleDiscount)
+    function bundleNote(p, month) {
+      if (!calc.isBundle(p) || !calc.bundleOn()) return null;
+      var pd = { basePrices: cur().basePrices };
+      var parts = calc.bundleComponentPrice(pd, p, 'RSP', month);
+      var disc = calc.bundleDiscount(pd, p, 'RSP', month);
+      return h('span', { class: 'pr-bundle-note' }, fill(page.base.bundleLine, { parts: parts == null ? '–' : F.baht(parts, 2), pct: disc == null ? '–' : (disc < 0 ? '−' : '') + F.pct(Math.abs(disc), 1) }));
     }
     // ช่วงเดือนไม่ตัดบรรทัดกลางคำ (ข้อความก่อน / หลัง {range} จาก content)
     function clTag(cl) {
@@ -202,7 +212,7 @@
       bar.update();
       refs = { cells: {} };
       root.appendChild(h('div', { class: 'tool-row pr-tabs' },
-        C.segmented({ label: page.title, value: tab, className: 'pr-tab-seg', options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }),
+        C.tabs({ label: page.title, value: tab, className: 'pr-tab-seg', options: TABS.map(function (t) { return { value: t, label: page.tabs[t] }; }),   // CR-40 แท็บขีดเส้นใต้
           onChange: function (v) { tab = v; store.set('ui.pricesTab', v); draw(); } }),
         h('span', { class: 'muted small pr-tab-lead' }, page.tabLead[tab])));
       if (tab === 'base') drawBase(); else if (tab === 'clearance') drawClearance(); else drawPromo();
@@ -214,7 +224,7 @@
       var d = store.data();
       var products = cur().products;
       var edit = canClearance();
-      var rows = calc.clearanceRows(products, d.basePrices).filter(function (r) { return searchOk(r.product); });
+      var rows = calc.clearanceRows(products, d.basePrices).filter(function (r) { return searchOk(r.product) && calc.bundleVisible(r.product); });   // CR-37 Flag bundle
       // ข้อมูลสำหรับคำนวณ Net Sales แผน = สินค้าของแท็บนี้ (ร่างเมื่อแก้ไข)
       var dd = {};
       Object.keys(d).forEach(function (k) { dd[k] = d[k]; });
@@ -308,12 +318,16 @@
         us.forEach(function (u) { perUnit[u] = calc.clearancePlanMonthly(dd, { year: year, productKey: r.key, unitId: u }); });
         var tot = calc.clearancePlanMonthly(dd, { year: year, productKey: r.key });
         function mi(k) { return Number(k.slice(5, 7)) - 1; }
+        // CR-41: เดือนที่ปิดแล้ว (≤ เดือนปิดล่าสุดของนาฬิกากลาง) อ่านอย่างเดียวในโหมดแก้ไข · กระจายเฉพาะเดือนที่ยังไม่ปิด
+        var lastClosed = SP.core.clock.lastClosedMonth();
+        function closed(k) { return k <= lastClosed; }
         var thead = h('thead', null, h('tr', null, h('th', { scope: 'col' }, X.plan.unit), ms.map(function (k) { return h('th', { scope: 'col', class: 'num' }, F.date(k)); }), h('th', { scope: 'col', class: 'num' }, X.plan.total)));
         var tbody = h('tbody', null, us.map(function (u) {
           var row = perUnit[u];
           var sumU = calc.sum(ms.map(function (k) { return row[mi(k)].units; }));
           return h('tr', { dataset: { unit: u } }, h('th', { scope: 'row' }, unitName(u)), ms.map(function (k) {
             var q = calc.clearanceQty(cl, u, k);
+            if (edit && closed(k)) return h('td', { class: 'num pr-cl-closed', title: X.plan.closedTip }, F.units(q));
             return h('td', { class: 'num' }, edit ? C.numberInput({ value: q, min: 0, grouping: true, commit: true, className: 'cell pr-cl-qty', label: unitName(u) + ' ' + F.date(k), onChange: function (v) { setQty(u, k, v); } }) : F.units(q));
           }), h('td', { class: 'num' }, F.units(sumU)));
         }));
@@ -325,7 +339,7 @@
         return h('div', { class: 'pr-cl-plan' },
           h('div', { class: 'tool-row pr-cl-plan-bar' }, h('strong', null, fill(X.plan.title, { year: year })), h('span', { class: 'muted small' }, X.plan.note),
             edit ? h('span', { class: 'tool-right' }, h('button', { type: 'button', class: 'btn btn-secondary btn-sm pr-cl-distribute', title: X.plan.distributeTip,
-              onClick: function () { var dp = prod(r.key).clearance; dp.plan = calc.clearanceDistribute(dp, us, ms); draw(); } }, X.plan.distribute)) : null),
+              onClick: function () { var dp = prod(r.key).clearance; dp.plan = calc.clearanceDistribute(dp, us, ms.filter(function (k) { return !closed(k); })); draw(); } }, X.plan.distribute)) : null),
           h('table', { class: 'data-grid pr-cl-plan-table' }, thead, tbody, tfoot));
       }
       root.appendChild(h('div', { class: 'card fit-card pr-card' }, h('div', { class: 'fit-scroll' }, h('table', { class: 'data-grid pr-cl-table' },
@@ -356,7 +370,7 @@
     function drawBase() {
       var B = page.base;
       var d = store.data();
-      var products = d.products;
+      var products = d.products.filter(calc.bundleVisible);   // CR-37: Flag bundle ปิด = ไม่มี Bundle
       var ss = seriesState(products);
       var shown = products.filter(function (p) { return calc.inSeries(p, ss.value) && searchOk(p); });
       var viewMonth = pending || baseMonth;
@@ -413,7 +427,7 @@
             paintBase(td, key, t, month);
             return td;
           });
-          tbody.appendChild(h('tr', { 'data-row': key }, skuHead(p), tds));
+          tbody.appendChild(h('tr', { 'data-row': key }, skuHead(p, bundleNote(p, month)), tds));
         });
       });
       var tbl = h('table', { class: 'data-grid pr-table pr-base-table', style: { '--ap-cols': String(TYPES.length) } }, thead, tbody);
@@ -598,6 +612,7 @@
       allUnits.forEach(function (u) { listedIn[u.id] = 0; });
       var products = d.products.filter(function (p) {
         var key = calc.productKey(p);
+        if (!calc.bundleVisible(p)) return false;   // CR-37
         if (!calc.soldInYear(p, year)) return false;
         var any = false;
         allUnits.forEach(function (u) { if (calc.isListed(d.listings, key, u.id)) { any = true; listedIn[u.id] += 1; } });
@@ -900,7 +915,7 @@
       }
       if (tab === 'base') {
         var month = pending || baseMonth;
-        var products = store.get('master.products').filter(function (p) { return calc.inSeries(p, seriesState(store.get('master.products')).value) && searchOk(p); });
+        var products = store.get('master.products').filter(function (p) { return calc.bundleVisible(p) && calc.inSeries(p, seriesState(store.get('master.products')).value) && searchOk(p); });
         return {
           filename: fill(page.exportFile, { tab: C.fileSafe(page.tabs.base), date: st.date }),
           sheets: [{ name: page.tabs.base, header: C.exportHeader(year, null, [[page.base.month, F.date(month)]]),

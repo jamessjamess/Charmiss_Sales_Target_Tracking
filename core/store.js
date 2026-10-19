@@ -47,6 +47,7 @@
  *   ui.summaryTab                     แท็บล่าสุดของขั้นที่ 4: 'status' ติดตามสถานะ | 'report' รายงานสรุปแผน   default: null
  *                                     (null = ตามสถานะ: ยังไม่ล็อก Baseline → ติดตามสถานะ / ล็อกแล้ว → รายงานสรุปแผน)
  *   app.dataVersion                   รุ่นโครงข้อมูลของค่าที่เก็บไว้ (เปลี่ยนรุ่น = ล้างค่าที่ลองแก้ไว้ครั้งเดียว)
+ *   revision.list · revision.snap.<id> · ui.revision   CR-38 Revision (core/revision.js) · plan.<ปี>.* = ข้อมูลของรอบล่าสุดของปี · set / remove ผ่าน guardWrite
  *
  * API: get(key) / set(key, value) / remove(key) กลับไปใช้ค่าตั้งต้น / reset() ล้างทุก Key
  *      isSet(key) / keys() / onChange(fn) / status { persistent, crossPage }
@@ -79,7 +80,10 @@
   // 13 = CR-32 ผูกผู้ใช้กับบุคลากรที่ person.userId ที่เดียว (master.users ไม่มี salesPersonId แล้ว)
   // 14 = CR-30 รอบ 3 Listing ตามช่วงเวลาและสถานะ (master.listings: status · fromMonth · toMonth)
   // ค่าที่เก็บจากรุ่นก่อนใช้ต่อไม่ได้ (ล้างครั้งเดียวตอนโหลด · CR-32 แจ้งผู้ใช้ 1 ครั้งด้วย ui.toast = content.site.dataVersionToast)
-  var DATA_VERSION = 15;   // CR-35: 15 = รหัสคู่ค้าไม่ซ้ำ (ร้าน TT ที่รหัสซ้ำรวมเป็นรายการเดียว) · วงจรสถานะสินค้า · รหัสชั่วคราวคำขอ NPD
+  // 15 = CR-35 รหัสคู่ค้าไม่ซ้ำ (ร้าน TT ที่รหัสซ้ำรวมเป็นรายการเดียว) · วงจรสถานะสินค้า · รหัสชั่วคราวคำขอ NPD
+  // 16 = CR-37 สินค้าแบบ Bundle (kind · components) + ตัวอย่าง 90100 / 90200
+  var DATA_VERSION = 19;   // CR-38: 17 = Revision (revision.list · revision.snap.<id> · ui.revision) + บทบาท / ผู้ใช้ MD · CR-39: 18 = Approval (approval.requests · approvalConfig.*) + ประวัติ R1
+                          // CR-41: 19 = สถานการณ์ Demo (app.scenario · นาฬิกากลาง) · ล้างแล้วกลับ S1 (สถานการณ์ไม่คงไว้เพราะข้อมูลของสถานการณ์ถูกล้างด้วย)
 
   function sessionAdapter() {
     var ss;
@@ -132,7 +136,7 @@
     { match: /^master\.channels$/, make: function () { return clone(BASE_CHANNELS); } },
     {
       match: /^app\.planYear$/,
-      make: function () { return SP.data.settings.DEFAULT_PLAN_YEAR; }
+      make: function () { return SP.core.clock.planYear(); }   // CR-41 ปีแผนของสถานการณ์ (ไม่มี = DEFAULT_PLAN_YEAR)
     },
     {
       match: /^plan\.(\d{4})\.topDown$/,
@@ -206,7 +210,15 @@
     { match: /^ui\.productMoreFilters$/, make: function () { return false; } },
     { match: /^ui\.skuShowLastYear$/, make: function () { return false; } },
     { match: /^ui\.summaryTab$/, make: function () { return null; } },
-    { match: /^app\.dataVersion$/, make: function () { return DATA_VERSION; } }
+    { match: /^app\.dataVersion$/, make: function () { return DATA_VERSION; } },
+    // CR-38 Revision: รายการรอบ (ค่าตั้งต้น = data/revisions.js defaults · core/revision.js) · รอบที่เลือก (null = ตามสถานะ)
+    { match: /^revision\.list$/, make: function () { return SP.core.revision ? SP.core.revision.defaultList() : []; } },
+    { match: /^ui\.revision$/, make: function () { return null; } },
+    // CR-39 Approval: คำขออนุมัติ (ไม่มี = []) · ตั้งค่าขั้นอนุมัติ (data/approvals.js config) · แท็บ / คำขอที่เปิดของหน้า Approval
+    { match: /^approval\.requests$/, make: function () { return []; } },
+    { match: /^approvalConfig\.revisionLock$/, make: function () { return SP.core.approval ? SP.core.approval.defaultConfig() : { sdConfirm: false }; } },
+    { match: /^ui\.approvalTab$/, make: function () { return null; } },
+    { match: /^ui\.approvalOpen$/, make: function () { return null; } }
   ];
 
   function defaultFor(key) {
@@ -240,6 +252,7 @@
       // CR-32: แจ้ง 1 ครั้งว่าโหลดข้อมูลตั้งต้นใหม่ (layout แสดง ui.toast แล้วล้าง)
       var note = SP.data.content && SP.data.content.site && SP.data.content.site.dataVersionToast;
       if (note) put('ui.toast', note);
+      if (SP.core.clock) SP.core.clock.refresh();   // CR-41 สถานการณ์ถูกล้างด้วย → นาฬิกากลับสถานการณ์ตั้งต้น
     }
     if (values['app.dataVersion'] !== DATA_VERSION) put('app.dataVersion', DATA_VERSION);
     function put(k, v) { values[k] = v; changed.push(k); }
@@ -292,8 +305,35 @@
     if (dup) throw new Error(String(SP.data.content.pages.salesUnits.errors.duplicateCode).replace('{code}', dup.code).replace('{name}', dup.name));
   }
 
+  // CR-37: กติกาของ Bundle — ปฏิเสธที่ Store ไม่ใช่แค่หน้าจอ (calc.normalizeBundles: ชิ้นส่วนรวม ≥ 2 · ห้าม Bundle ซ้อน · ห้ามชิ้นส่วน Request / Delete)
+  //   ผ่านแล้วคืนค่าที่ปรับแล้ว (รวม skuId ซ้ำ · หมวดสินค้า · Series จากชิ้นส่วน) / ไม่ผ่าน = Error (error.bundle = { code, key, skuId, status })
+  function checkBundles(key, value) {
+    if (key !== 'master.products' || !Array.isArray(value) || !SP.core.calc.normalizeBundles) return value;
+    var calc = SP.core.calc;
+    var res = calc.normalizeBundles(value, get('master.products'), SP.core.clock.currentMonth());
+    if (res.ok) return res.products;
+    var E = (SP.data.content.pages.bundle || {}).errors || {};
+    var L = (SP.data.content.labels || {}).status || {};
+    var err = new Error(String(E[res.error.code] || E.invalid || res.error.code)
+      .replace('{bundle}', calc.codeOf(value, res.error.key)).replace('{code}', res.error.skuId ? calc.codeOf(value, res.error.skuId) : '')
+      .replace('{status}', L[res.error.status] || res.error.status || ''));
+    err.bundle = res.error;
+    throw err;
+  }
+
+  // CR-38: ข้อบังคับห้ามแก้ย้อนหลังของ Revision (core/revision.js guardWrite · ไม่มีบทบาทใดข้ามได้ · ค่าไม่เปลี่ยน = ผ่าน)
+  function checkRevision(key, value) {
+    var R = SP.core.revision;
+    if (R && R.guardWrite) R.guardWrite(key, value, get(key), Object.prototype.hasOwnProperty.call(values, key));
+    // CR-39: กติกาของคำขออนุมัติ (core/approval.js guardWrite · คำขอที่ปิดแล้วแก้ไม่ได้ · 1 รอบมีคำขอรอดำเนินการได้ 1 รายการ · ขั้นเดินหน้าอย่างเดียว)
+    var A = SP.core.approval;
+    if (A && A.guardWrite) A.guardWrite(key, value, get(key), Object.prototype.hasOwnProperty.call(values, key));
+  }
+
   function set(key, value) {
     checkCustomerCodes(key, value);
+    value = checkBundles(key, value);
+    checkRevision(key, value);
     values[key] = clone(value);
     adapter.save(key, values[key]);
     if (key === 'master.channels' && Array.isArray(value)) SP.data.channels = clone(value);   // CR-29
@@ -349,9 +389,11 @@
     return r;
   }
 
-  function currentKey() { return SP.core.calc.monthKey(year(), Number(get('ui.currentMonth')) || 0); }
+  // CR-41: เดือนปัจจุบัน = นาฬิกากลาง (core/clock.js) — ผู้รับผิดชอบ · ทีมขาย · สิทธิ์ขอบเขตทีม · Role Management · รายงาน (ผู้ใช้เลือก)
+  //   ui.currentMonth (DEMO_FORECAST_MONTH) เหลือใช้เฉพาะโหมดปรับแผน [Phase 2] ของ SKU Planning
+  function currentKey() { return SP.core.clock.currentMonth(); }
 
-  // วันที่ "วันนี้" จำลอง = วันแรกของเดือนปัจจุบันจำลอง (ใช้ตัดสินราคาปัจจุบัน Status ของรายการสินค้า และวันที่มีผลตั้งต้น)
+  // วันที่ "วันนี้" = วันแรกของเดือนปัจจุบันของนาฬิกากลาง (ใช้ตัดสินราคาปัจจุบัน Status ของรายการสินค้า และวันที่มีผลตั้งต้น)
   function today() { return currentKey() + '-01'; }
 
   // ต่อท้าย Audit log (master.audit) entries จาก calc.auditDiff
@@ -390,6 +432,7 @@
     getDefault: function (key) { return clone(defaultFor(key)); },
     set: set,
     remove: function (key) {
+      checkRevision(key, undefined);   // CR-38
       delete values[key];
       adapter.remove(key);
       emit(key);
@@ -401,6 +444,7 @@
       // เก็บรุ่นข้อมูลไว้ ไม่อย่างนั้นค่าที่ตั้งหลังรีเซ็ต (เช่น มุมมองผู้ใช้) ถูกล้างอีกครั้งตอนเปิดหน้าถัดไป
       values['app.dataVersion'] = DATA_VERSION;
       adapter.save('app.dataVersion', DATA_VERSION);
+      if (SP.core.clock) SP.core.clock.refresh();   // CR-41 app.scenario ถูกล้าง → สถานการณ์ตั้งต้น (core/scenario.js load ตั้งค่าใหม่ทันที)
       emit(null);
     },
     isSet: function (key) { return Object.prototype.hasOwnProperty.call(values, key); },

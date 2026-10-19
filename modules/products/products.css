@@ -1,6 +1,7 @@
 /* modules/products/products.css — รายการสินค้า: KPI · ตัวกรอง 2 แถว + Chip · ตาราง (Product Code และชื่อติดซ้าย เลื่อนภายในการ์ด) · Drawer รายละเอียด */
 /* CR-36: แท็บ สินค้า | Product Level · จัดกลุ่มพับได้ทุกชั้น · Drawer 50% (ขั้นต่ำ 720px) 2 คอลัมน์ · รูปอยู่ขวาของรหัสและชื่อ */
 .pl-page-tabs { margin-bottom: var(--sp-1); }
+.pl-page-tabs > .page-tabs { flex: 1 1 auto; }   /* CR-40 แท็บระดับหน้า: เส้นฐานเต็มความกว้าง */
 .pl-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; gap: var(--sp-2); }
 .pl-intro { display: contents; }
 .pl-body > * { flex: 0 0 auto; }

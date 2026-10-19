@@ -25,6 +25,9 @@
  *
  * ตัวเลขทุกตัว (บาท ↔ %, ผลรวม, คงเหลือ, การเติบโต, Seasonality, ยอดขายย้อนหลัง) มาจาก SP.core.calc / สิทธิ์จาก SP.core.permissions
  * การกระจายยอดคงเหลือต้องกดเองเท่านั้น (ไม่ทำอัตโนมัติ)
+ * CR-38:          ข้อมูลของรอบที่เลือก (core/revision.js read · data · master) · รอบรอ Lock / Lock แล้ว = อ่านอย่างเดียว (workflowBar readOnly) ·
+ *                 เดือนก่อนเดือนที่มีผล = บาทของรอบก่อน (revision.phasing) พื้นเทาลายเส้น + หัวคอลัมน์ ล็อก ช่องอ่านอย่างเดียว ·
+ *                 ค่าตั้งต้น / รูปแบบของ Channel กระจายเฉพาะเดือนที่เปิด (calc.fillOpenMonths) · บันทึกคงค่าเดือนล็อก · เป้าหมายห้ามต่ำกว่าส่วนที่ล็อก
  */
 (function (SP) {
   'use strict';
@@ -36,6 +39,7 @@
   var W = SP.core.workflow;
   var P = SP.core.permissions;
   var store = SP.core.store;
+  var REV = SP.core.revision;   // CR-38
   var h = C.h;
   var fill = C.fill;
 
@@ -58,22 +62,33 @@
     var R = page.rows;
     var cols = page.columns;
     var year = store.year();
-    var K = SP.core.clock;
+    var data = REV.data();
+    // CR-41: นาฬิกาของข้อมูลที่แสดง (รอบที่ Lock แล้ว = เดือนตอน Lock · calc.refClock) → ปีของยอดอ้างอิง · ช่วง L12M ตรงกับตัวเลขของรอบ
+    var K = calc.refClock(data.history) || SP.core.clock;
     var fullYears = K.fullYears();   // CR-24: ยอดขายปีเต็ม 2 ปี + L12M
     var nHist = fullYears.length + 1;
     var lastClosed = K.parse(K.lastClosedMonth());
-    var data = store.data();
+    // CR-41: ยอดจริงของเดือนที่ปิดแล้วในปีแผน (ข้อมูลปัจจุบัน ไม่ขึ้นกับรอบ) → บรรทัดเล็ก จริง <ค่า> ใต้เป้าหมายรายเดือน
+    var live = store.data();
+    function actualNode(id, i, target) {
+      var a = calc.actualMonthly(live, id, year)[i];
+      return a == null ? null : C.actualLine(a, target, { sample: SP.core.scenario.isSample(year, i) });
+    }
     var nowKey = store.currentKey();
-    var tdKey = store.planKey('topDown');
-    var savedTD = normalizeTD(store.get(tdKey));
+    var tdKey = REV.planKey('topDown');
+    var savedTD = normalizeTD(REV.read('topDown'));
+    // CR-38: เดือนที่ล็อกของรอบ (0 = ทุกเดือนแก้ได้)
+    var lockN = REV.lockIdx();
+    var RV = L.revision;
+    var baseName = (REV.current() && REV.current().basedOn && REV.get(REV.current().basedOn)) ? REV.get(REV.current().basedOn).name : '';
     var draftTD = clone(savedTD);
     var editing = false;
     var draftPhasing = {};   // หน่วยขายที่แก้รายเดือนในรอบนี้ → monthPct
     // CR-27: หมายเหตุต่อหน่วยขาย plan.<ปี>.unitNotes = { <unitId>: ข้อความ } (ไม่บังคับ · บันทึกพร้อมหน้า)
-    var notesKey = store.planKey('unitNotes');
-    var savedNotes = store.get(notesKey) || {};
+    var notesKey = REV.planKey('unitNotes');
+    var savedNotes = REV.read('unitNotes') || {};
     var draftNotes = clone(savedNotes);
-    var master = store.master();
+    var master = REV.master();
     var removed = [];        // หน่วยขายที่นำออกในรอบนี้ (ลบเป้าหมายรายเดือนตอนบันทึก)
     var chartMode = 'stack';
     var unitsOpen = false;
@@ -83,8 +98,10 @@
 
     function curTD() { return editing ? draftTD : savedTD; }
     function tree() { return P.teamFirst(calc.topDown(data, curTD(), year), P.user()); }
-    function phasingKey(id) { return store.planKey('phasing.' + id); }
-    function savedPhasing(id) { return store.get(phasingKey(id)).monthPct; }
+    function phasingKey(id) { return REV.planKey('phasing.' + id); }
+    function savedPhasing(id) { return REV.read('phasing.' + id).monthPct; }
+    // CR-38: เป้ารายเดือนของหน่วยขายในรอบนี้ (เดือนล็อก = บาทของรอบก่อน · ไม่มีเดือนล็อก = calc.phasingTotals เดิม)
+    function totalsOf(id, annual, monthPct) { return REV.phasing(id, annual, monthPct); }
     function phasingOf(id) { return editing && draftPhasing[id] ? draftPhasing[id] : savedPhasing(id); }
     function defaultsOf(id) { return store.getDefault(phasingKey(id)).monthPct; }
 
@@ -155,7 +172,7 @@
       var toolbar = h('div', { class: 'ctx-bar sa-ctx' }, chSeg);
       C.contextStats([
         { label: page.stats.target, value: h('span', null, F.baht(ch.amount) + ' ' + L.baht + ' ', h('span', { class: 'muted sa-target-by' }, page.stats.targetBy)) },
-        { label: C.priorLabel(t.priorYear), value: F.baht(ch.prior) + ' ' + L.baht },
+        { label: C.priorLabel(t.priorYear, null, C.priorNote(t.priorYear, K)), value: F.baht(ch.prior) + ' ' + L.baht },
         { label: L.context.growth, value: C.targetGrowth(ch.growth) }
       ]).forEach(function (el) { toolbar.appendChild(el); });
       root.appendChild(toolbar);
@@ -183,17 +200,18 @@
         title: function () { return fill(page.workflowTitle, { unit: unit ? unit.name : ch.name }); },
         editing: function () { return editing; },
         editBlocked: function () { return block === 'noTarget' ? fill(page.editBlocked, { channel: ch.name }) : null; },
-        facts: function () { return { remaining: unit ? calc.phasingTotals(unit.amount, savedPhasing(unit.id)).remaining.status : 'empty' }; },
+        readOnly: function () { return REV.readOnlyReason(); },   // CR-38 รอบรอ Lock / Lock แล้ว
+        facts: function () { return { remaining: unit ? totalsOf(unit.id, unit.amount, savedPhasing(unit.id)).remaining.status : 'empty' }; },
         summary: function () {
           if (!unit) return [];
-          var tt = calc.phasingTotals(unit.amount, savedPhasing(unit.id));
+          var tt = totalsOf(unit.id, unit.amount, savedPhasing(unit.id));
           return [fill(page.summaryLines.annual, { amount: F.baht(unit.amount) }),
             fill(page.summaryLines.months, { pct: F.pct(tt.pctSum, 2), sum: F.baht(tt.amountSum) }),
             fill(page.summaryLines.remaining, { remaining: C.remainingText(tt.remaining) })];
         },
         snapshot: function () {
           var out = {};
-          if (unit) out[unit.id] = calc.phasingTotals(unit.amount, savedPhasing(unit.id)).amounts.map(Math.round);
+          if (unit) out[unit.id] = totalsOf(unit.id, unit.amount, savedPhasing(unit.id)).amounts.map(Math.round);
           return out;
         },
         onEdit: function () { editing = true; draftTD = clone(savedTD); draftPhasing = {}; removed = []; draw(); },
@@ -204,7 +222,7 @@
       if (ctx.intro) ctx.intro.appendChild(bar);
 
       // แถบโหมดแก้ไขอยู่ท้ายแถบบริบท (แถวเดียวกัน · จอแคบขึ้นบรรทัดใหม่)
-      var banner = editing ? C.editBanner() : null;
+      var banner = editing ? C.editBanner({ revision: true }) : null;   // CR-40 แถบโหมดแก้ไขรวมข้อความของรอบ
       if (banner) { banner.update(dirty()); banner.classList.add('sa-banner'); toolbar.appendChild(banner); }
 
       var partB = null;
@@ -226,12 +244,23 @@
     }
 
     function save() {
+      // CR-38: เป้าหมายห้ามต่ำกว่าส่วนที่ล็อก · Store ปฏิเสธซ้ำ (แจ้งแล้วอยู่ในโหมดแก้ไข)
+      var low = calc.lockedTargetIssues(calc.topDown(data, draftTD, year), REV.lockedMap());
+      if (low.length) { window.alert(fill(RV.belowLockedSave, { name: low[0].name || RV.total, locked: F.monthRange(0, lockN - 1), amount: F.baht(low[0].locked) })); return; }
+      try { saveAll(); } catch (e) { window.alert(e.message); return; }
+      savedNotes = REV.read('unitNotes') || {};
+      savedTD = normalizeTD(REV.read('topDown'));
+      leaveEdit();
+      draw();
+      ctx.refreshMenu();
+    }
+    function saveAll() {
       if (JSON.stringify(draftTD) !== JSON.stringify(savedTD)) store.set(tdKey, draftTD);
       var inPlan = {};
       draftTD.channels.forEach(function (c) { (draftTD.units[c] || []).forEach(function (id) { inPlan[id] = true; }); });
       Object.keys(draftPhasing).forEach(function (id) {
         if (!inPlan[id] || !differs(draftPhasing[id], savedPhasing(id))) return;
-        var next = draftPhasing[id].slice();
+        var next = calc.keepLockedShares(draftPhasing[id].slice(), savedPhasing(id), lockN);   // CR-38 เดือนล็อกคงเดิม
         store.set(phasingKey(id), { monthPct: next, edited: calc.sharesDiffer(next, defaultsOf(id)) });
       });
       removed.forEach(function (id) { if (!inPlan[id]) store.remove(phasingKey(id)); });
@@ -239,11 +268,6 @@
       var notes = {};
       Object.keys(draftNotes).forEach(function (id) { var v = String(draftNotes[id] || '').trim(); if (v && inPlan[id]) notes[id] = v; });
       if (JSON.stringify(notes) !== JSON.stringify(savedNotes)) store.set(notesKey, notes);
-      savedNotes = store.get(notesKey) || {};
-      savedTD = normalizeTD(store.get(tdKey));
-      leaveEdit();
-      draw();
-      ctx.refreshMenu();
     }
 
     // ---------------------------------------------------------------------
@@ -280,7 +304,7 @@
       }
       // CR-27: แผน SKU ของหน่วยขาย (Net Sales ทั้งปี · calc.skuPlanNet) + ลิงก์ไป SKU Planning
       var skuEntry = SP.core.registry.byId('skuPlanning');
-      function planNet(id) { return calc.skuPlanNet(data, master, id, store.get(store.planKey('sku.' + id)), year); }
+      function planNet(id) { return REV.planNet(id, data, master); }   // CR-38 เดือนล็อกของแผน SKU = ค่าของรอบก่อน
       function goSku(unitId) {
         return function (e) { e.preventDefault(); e.stopPropagation(); store.set('ui.selection', { channel: ch.id, unit: unitId }); location.href = SP.core.paths.to(skuEntry.path); };
       }
@@ -411,7 +435,7 @@
         var tip = y === lastClosed.year - 1 && lastClosed.month < 12
           ? fill(L.priorInfo.overlapTip, { year: y, months: F.monthRange(lastClosed.month, 11) }) : fill(L.priorInfo.fullYearTip, { year: y });
         return h('th', { scope: 'col', class: 'num sa-hist', title: tip }, h('span', { class: 'has-tip' }, String(y)));
-      }).concat([h('th', { scope: 'col', class: 'num sa-hist sa-l12m', title: K.rangeLabel(false) }, C.priorLabel(null, L.priorInfo.short))]));
+      }).concat([h('th', { scope: 'col', class: 'num sa-hist sa-l12m', title: K.rangeLabel(false) }, C.priorLabel(null, L.priorInfo.short, C.priorNote(null, K)))]));
       var table = h('table', { class: 'sa-table' + (editing ? ' is-editing' : '') },
         h('colgroup', null, h('col', { class: 'col-name' }), fullYears.concat(['l12m']).map(function () { return h('col', { class: 'col-hist' }); }),
           h('col', { class: 'col-pct' }), h('col', { class: 'col-amount' }), h('col', { class: 'col-pct-total' }), h('col', { class: 'col-growth' }),
@@ -443,7 +467,7 @@
           C.clear(r.compare).appendChild(G.vsLastYearBar(u.amount, u.prior, scaleMax, { colorToken: c.color, year: t.priorYear }));
           C.clear(r.gap).appendChild(gapNode(u.amount, plans[u.id] || 0));
           // จุดสถานะคงเหลือของเป้าหมายรายเดือน (ข้อความใน Tooltip — ไม่สื่อด้วยสีอย่างเดียว)
-          var mrem = calc.phasingTotals(u.amount, phasingOf(u.id)).remaining;
+          var mrem = totalsOf(u.id, u.amount, phasingOf(u.id)).remaining;
           var st = fill(page.monthlyStatus, { status: C.remainingText(mrem) });
           r.dot.className = 'dot dot-' + mrem.status + ' sa-dot';
           r.dot.title = st;
@@ -502,14 +526,16 @@
 
     // CR-24: หัวเดือน + ปีของยอดอ้างอิง (บรรทัดเล็ก 26 / 25) · เส้นแบ่งจางก่อนเดือนแรกที่ใช้ปีก่อนหน้า (ก.ย.) — ใช้ทั้งหน่วยขายและมุมมองรวม
     function cellAt(i, cls, content, title) {
-      return h('div', { class: 'ph-cell ' + (cls || '') + (i === lastClosed.month && lastClosed.month < 12 ? ' sa-split' : ''), title: title, role: 'cell' }, content);
+      // CR-38: เดือนล็อกของรอบ = พื้นเทาลายเส้น (ทุกแถวของเดือนนั้น)
+      return h('div', { class: 'ph-cell ' + (cls || '') + (i === lastClosed.month && lastClosed.month < 12 ? ' sa-split' : '') + (i < lockN ? ' is-rev-locked' : ''), title: title, role: 'cell' }, content);
     }
     function monthHeads(table, cell) {
       var RI = SP.data.content.labels.referenceInfo;
       table.appendChild(cell('ph-head ph-label', R.month));
       F.MONTHS.forEach(function (m, i) {
         var y = K.referenceYear(i);
-        table.appendChild(cellAt(i, 'ph-head num sa-month-head', [h('span', null, m), h('small', { class: 'sa-ref-year' + (y !== lastClosed.year ? ' is-older' : '') }, String(y).slice(-2))], fill(RI.yearTip, { year: y })));
+        table.appendChild(cellAt(i, 'ph-head num sa-month-head', [h('span', null, m), h('small', { class: 'sa-ref-year' + (y !== lastClosed.year ? ' is-older' : '') }, String(y).slice(-2),
+          i < lockN ? h('span', { class: 'rev-locked-tag' }, RV.lockedHead) : null)], i < lockN ? fill(RV.lockedTip, { base: baseName }) : fill(RI.yearTip, { year: y })));
       });
       table.appendChild(cell('ph-head num ph-total', page.totalColumn));
     }
@@ -528,7 +554,7 @@
       function draftOf() { if (!draftPhasing[unit.id]) draftPhasing[unit.id] = saved.slice(); return draftPhasing[unit.id]; }
 
       var chart = C.barChart({
-        values: calc.phasingTotals(annual, monthPct).amounts, ghost: prior, showValues: false, showMonths: false, legend: false,
+        values: totalsOf(unit.id, annual, monthPct).amounts, ghost: prior, showValues: false, showMonths: false, legend: false,
         lead: h('span'), trail: h('span'), className: 'ph-chart',
         tooltip: function (i, v, g) {
           return F.monthFull(i) + ' · ' + page.legendTarget + ' ' + F.baht(v) + ' ' + L.baht + (g != null ? ' · ' + page.legendPrior + ' ' + F.baht(g) + ' ' + L.baht : '');
@@ -545,14 +571,14 @@
       var table = h('div', { class: 'ph-table sa-ref-table' + (canEditHere ? ' is-editing' : ''), role: 'table' });
       function cell(cls, content, title) { return h('div', { class: 'ph-cell ' + (cls || ''), title: title, role: 'cell' }, content); }
       monthHeads(table, cell);
-      table.appendChild(cell('ph-label', C.priorLabel(null, SP.data.content.labels.referenceInfo.rowBaht, C.referenceNote())));
+      table.appendChild(cell('ph-label', C.priorLabel(null, SP.data.content.labels.referenceInfo.rowBaht, C.referenceNote(K))));
       F.MONTHS.forEach(function (m, i) { table.appendChild(cellAt(i, 'num ph-prior', F.baht(prior ? prior[i] : null))); });
       cells.totalPrior = cell('num ph-total');
       table.appendChild(cells.totalPrior);
       var pctRow = [cell('ph-label', R.pct)];
       var amtRow = [cell('ph-label', R.amount)];
       F.MONTHS.forEach(function (m, i) {
-        if (canEditHere) {
+        if (canEditHere && i >= lockN) {
           var pa = C.percentAmountInput({ pct: monthPct[i], base: annual, label: F.monthFull(i), onCommit: function (p) { draftOf()[i] = p; update(); } });
           cells.pa.push(pa);
           pa.parts[0].classList.add('ph-cell', 'num');
@@ -564,6 +590,8 @@
           amtRow.push(pa.parts[1]);
         } else {
           var pc = cellAt(i, 'num ph-value'), am = cellAt(i, 'num ph-value');
+          if (i < lockN) { pc.title = fill(RV.lockedCell, { base: baseName }); am.title = pc.title; }
+          cells.pa.push(null);
           cells.pct.push(pc); cells.amount.push(am);
           pctRow.push(pc); amtRow.push(am);
         }
@@ -584,8 +612,8 @@
       cells.remRow = h('div');
       table.appendChild(cells.remRow);
       if (canEditHere) {
-        C.bindArrowNav(cells.pa.map(function (p) { return p.inputs.pct; }));
-        C.bindArrowNav(cells.pa.map(function (p) { return p.inputs.amount; }));
+        C.bindArrowNav(cells.pa.filter(Boolean).map(function (p) { return p.inputs.pct; }));
+        C.bindArrowNav(cells.pa.filter(Boolean).map(function (p) { return p.inputs.amount; }));
       }
 
       var card = h('section', { class: 'card ph-card sa-monthly' + (showChart ? '' : ' is-chart-hidden') });
@@ -598,7 +626,7 @@
           chartToggle(function () { draw(); }),
           canEditHere ? h('button', { type: 'button', class: 'btn btn-sm btn-secondary no-print ph-reset', onClick: function () {
             var d = draftOf();
-            defaults.forEach(function (p, i) { d[i] = p; });
+            calc.fillOpenMonths(annual, defaults, REV.lockedTargets(unit.id)).forEach(function (p, i) { if (i >= lockN) d[i] = p; });   // CR-38 เฉพาะเดือนที่เปิด
             update();
           } }, page.resetButton) : null,
           // CR-27: ใช้รูปแบบรายเดือนของ Channel (สัดส่วนยอดอ้างอิงรวมของทั้ง Channel) — ยืนยันก่อน
@@ -606,7 +634,7 @@
             C.dialog({ title: fill(page.channelPatternConfirm, { channel: ch.name, unit: unit.name }), lines: [page.channelPatternLine], confirmLabel: page.channelPatternButton }).then(function (r) {
               if (!r.ok) return;
               var d = draftOf();
-              chShares.forEach(function (p, i) { d[i] = p; });
+              calc.fillOpenMonths(annual, chShares, REV.lockedTargets(unit.id)).forEach(function (p, i) { if (i >= lockN) d[i] = p; });   // CR-38 เฉพาะเดือนที่เปิด
               update();
             });
           } }, page.channelPatternButton) : null));
@@ -615,17 +643,19 @@
 
       function update() {
         var current = phasingOf(unit.id);
-        var totals = calc.phasingTotals(annual, current);
+        var totals = totalsOf(unit.id, annual, current);
         chart.update(totals.amounts, prior);
         totals.amounts.forEach(function (amount, i) {
-          var changed = canEditHere && Math.abs(current[i] - saved[i]) > 1e-12;
-          var diff = calc.sharesDiffer([current[i]], [defaults[i]]);
-          if (canEditHere) {
+          var changed = canEditHere && i >= lockN && Math.abs(current[i] - saved[i]) > 1e-12;
+          var diff = i >= lockN && calc.sharesDiffer([current[i]], [defaults[i]]);
+          if (cells.pa[i]) {
             cells.pa[i].update(current[i], annual);
             cells.pa[i].parts.forEach(function (p) { p.classList.toggle('is-dirty-cell', changed); });
           } else {
-            cells.pct[i].textContent = F.number(current[i] * 100, 2);
+            cells.pct[i].textContent = F.number(totals.pcts[i] * 100, 2);
             cells.amount[i].textContent = F.baht(amount);
+            var act = actualNode(unit.id, i, amount);
+            if (act) cells.amount[i].appendChild(act);
           }
           cells.pct[i].classList.toggle('has-default-dot', diff);
           cells.pct[i].title = diff ? fill(page.defaultTip, { pct: F.pct(defaults[i], 2) }) : '';
@@ -669,7 +699,7 @@
       var A = page.aggregate;
       var ids = ch.children.map(function (u) { return u.id; });
       var map = {};
-      ids.forEach(function (id) { map[id] = { monthPct: phasingOf(id) }; });
+      ids.forEach(function (id) { map[id] = { monthPct: phasingOf(id), locked: REV.lockedTargets(id) }; });   // CR-38 เดือนล็อก
       var agg = calc.aggregatePhasing(data, t, map, ids, year);
       var title = fill(page.aggregateRow, { channel: ch.name });
       var showChart = store.get('ui.phasingChart') !== false;
@@ -697,16 +727,16 @@
 
       var table = h('div', { class: 'ph-table ph-agg-table sa-ref-table', role: 'table' });
       function cell(cls, content, tip) { return h('div', { class: 'ph-cell ' + (cls || ''), title: tip, role: 'cell' }, content); }
-      function monthsRow(label, values, total, cls, fmt) {
+      function monthsRow(label, values, total, cls, fmt, extra) {
         table.appendChild(label);
-        values.forEach(function (v, i) { table.appendChild(cellAt(i, 'num ' + (cls || ''), fmt(v))); });
+        values.forEach(function (v, i) { table.appendChild(cellAt(i, 'num ' + (cls || ''), [fmt(v), extra ? extra(v, i) : null])); });
         table.appendChild(cell('num ph-total', total));
       }
       monthHeads(table, cell);
       var noValues = F.MONTHS.map(function () { return null; });
-      monthsRow(cell('ph-label', C.priorLabel(null, SP.data.content.labels.referenceInfo.rowBaht, C.referenceNote())), agg.prior || noValues, F.baht(agg.priorTotal), 'ph-prior', F.baht);
+      monthsRow(cell('ph-label', C.priorLabel(null, SP.data.content.labels.referenceInfo.rowBaht, C.referenceNote(K))), agg.prior || noValues, F.baht(agg.priorTotal), 'ph-prior', F.baht);
       monthsRow(cell('ph-label', R.pct), agg.monthPct, agg.total ? F.number(calc.sum(agg.monthPct) * 100, 2) : '–', 'ph-value', function (v) { return F.number(v * 100, 2); });
-      monthsRow(cell('ph-label', R.amount), agg.amounts, F.baht(agg.total), 'ph-value', F.baht);
+      monthsRow(cell('ph-label', R.amount), agg.amounts, F.baht(agg.total), 'ph-value', F.baht, function (v, i) { return actualNode(ch.id, i, v); });
       table.appendChild(cell('ph-label', R.growth));
       agg.growth.forEach(function (g, i) { table.appendChild(cellAt(i, 'num', C.growthText(g))); });
       table.appendChild(cell('num ph-total', C.growthText(agg.growthTotal)));
@@ -748,7 +778,7 @@
       var rows1 = calc.topDownRows(t, { channelId: channelId }).map(function (r) {
         if (r.kind === 'remaining') return { r: r, unit: fill(X.remaining, { channel: r.channel, status: L.alert[r.status] }), hist: fullYears.map(function () { return null; }) };
         var nt = (useDraft ? draftNotes : savedNotes)[r.unitId] || '';
-        var pl = r.kind === 'unit' ? calc.skuPlanNet(data, master, r.unitId, store.get(store.planKey('sku.' + r.unitId)), year) : null;
+        var pl = r.kind === 'unit' ? REV.planNet(r.unitId, data, master) : null;
         return { r: r, unit: r.unit, owner: C.ownerInfo(data, r.unitId, nowKey).name, hist: calc.salesHistory(data, r.unitId, fullYears), plan: pl, note: nt };
       });
       var columns1 = [{ key: 'unit', label: Cl.unit, width: 24 }, { key: 'owner', label: Cl.owner, width: 22 }]
@@ -767,7 +797,7 @@
         ]);
       var rows2 = (ch ? ch.children : []).map(function (u) {
         var pct = useDraft && draftPhasing[u.id] ? draftPhasing[u.id] : savedPhasing(u.id);
-        var tt = calc.phasingTotals(u.amount, pct);
+        var tt = totalsOf(u.id, u.amount, pct);
         var row = { unit: u.name, total: tt.amountSum, remaining: tt.remaining.amount };
         tt.amounts.forEach(function (v, i) { row['m' + i] = v; });
         return row;

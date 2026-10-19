@@ -543,6 +543,11 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 
 /* ---------------- ไอคอน / ปุ่มลบ ---------------- */
 .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+/* CR-40 ไอคอนเส้นของ Lucide (assets/icons.js): เส้น 1.75 · 18px · currentColor · ใช้เฉพาะเมนู แถบบน และปุ่ม (ห้ามแทนสถานะในตาราง) */
+.icon-lucide { width: 18px; height: 18px; flex: 0 0 auto; stroke-width: 1.75; }
+/* CR-40 วงกลมเลขขั้นแบบเส้น (ขั้น 1–4 ของ Sales Planning) สีตาม currentColor */
+.step-icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border: 1.75px solid currentColor; border-radius: 50%;
+  font-size: 11px; font-weight: var(--fw-bold); line-height: 1; font-variant-numeric: tabular-nums; }
 .trash-btn { border-radius: var(--radius-sm); min-width: 28px; height: 26px; }
 .trash-btn:hover:not(:disabled) { color: var(--c-danger-fg); border-color: var(--c-danger-bd); background: var(--c-danger-bg); }
 .trash-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -668,6 +673,8 @@ details.rules-panel[open] > summary { margin-bottom: var(--sp-2); }
 /* CR-35: ป้ายชื่อชั่วคราว / รหัสชั่วคราว (Status Request) · ป้าย จาก Sales ไม่ถูกตัดข้อความ */
 .temp-name-tag, .temp-code-tag { display: inline-block; flex: none; white-space: nowrap; font-size: 11px; line-height: 1.45; padding: 0 6px; border-radius: 999px; border: 1px dashed var(--c-type-request-bd); color: var(--c-st-request-fg); background: var(--c-surface); font-weight: var(--fw-medium); vertical-align: 1px; }
 .pl-from-sales, .sp-from-sales { flex: none; white-space: nowrap; }
+/* CR-37 ป้าย Bundle ต่อท้ายชื่อสินค้า (components.bundleTag) */
+.bundle-tag { display: inline-block; flex: none; white-space: nowrap; font-size: 11px; line-height: 1.45; padding: 0 6px; border-radius: 999px; border: 1px solid var(--c-bundle-bd); color: var(--c-bundle-fg); background: var(--c-bundle-bg); font-weight: var(--fw-medium); vertical-align: 1px; margin-left: 4px; }
 .cr-body { display: grid; gap: var(--sp-2); }
 .cr-body .pd-field { display: grid; grid-template-columns: 11em minmax(0, 1fr); align-items: center; gap: var(--sp-2); }
 .cr-code { font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
@@ -1093,3 +1100,174 @@ body.perm-no-export .export-btn, body.perm-no-export .pl-csv, body.perm-no-expor
 .type-swatch.is-npdConfirmed { background: var(--c-type-npd); }
 .type-swatch.is-npdRequest { background: repeating-linear-gradient(135deg, var(--c-type-request) 0 3px, var(--c-surface) 3px 5px); box-shadow: inset 0 0 0 1px var(--c-type-request-bd); }
 .type-swatch.is-clearance { background: var(--c-type-clearance); }
+
+/* CR-38 Revision: ป้ายสถานะ · ตัวเลือกรอบ · แถบสถานะ 1 บรรทัด · การ์ดสถานะ · เดือนที่ล็อก (พื้นเทาลายเส้นบาง) */
+.rev-badge { display: inline-block; flex: none; white-space: nowrap; font-size: 12px; line-height: 1.45; padding: 0 7px; border-radius: 999px; font-weight: var(--fw-medium); border: 1px solid transparent; vertical-align: 2px; }
+.rev-badge.rev-draft { background: var(--c-surface-2); color: var(--c-text-muted); border-color: var(--c-border); }
+.rev-badge.rev-submitted { background: var(--c-warn-bg); color: var(--c-warn-fg); border-color: var(--c-warn-bd); }
+.rev-badge.rev-locked { background: var(--c-success-bg); color: var(--c-success-fg); border-color: var(--c-success-bd); }
+.rev-picker { align-items: center; gap: 6px; }
+.rev-picker .rev-picker-sep { color: var(--c-text-muted); }
+.rev-picker .rev-badge { font-size: 13px; vertical-align: 4px; }
+.rev-popover .rev-picker-year + .rev-picker-year { margin-top: var(--sp-2); border-top: 1px solid var(--c-border); padding-top: var(--sp-1); }
+.rev-picker-year-head { font-size: 12px; color: var(--c-text-muted); font-weight: var(--fw-bold); padding: 2px var(--sp-2); }
+.rev-option { display: flex; align-items: center; gap: var(--sp-2); width: 100%; }
+.rev-option .rev-option-eff { margin-left: auto; }
+.rev-bar { display: flex; align-items: center; gap: var(--sp-2); min-height: 26px; max-height: 26px; overflow: hidden; margin: 4px 0 0; padding: 0 var(--sp-3); border-radius: var(--radius-sm, 6px); border: 1px solid var(--c-rev-draft-bd); background: var(--c-rev-draft-bg); font-size: 13px; white-space: nowrap; }
+.rev-bar .rev-bar-text { overflow: hidden; text-overflow: ellipsis; }
+.rev-bar-submitted { background: var(--c-rev-submitted-bg); border-color: var(--c-rev-submitted-bd); }
+.rev-bar-locked { background: var(--c-rev-locked-bg); border-color: var(--c-rev-locked-bd); }
+.rev-bar .rev-bar-note { color: var(--c-warn-fg); font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; }
+.rev-bar .rev-bar-link { margin-left: auto; flex: none; }
+.rev-card { display: flex; flex-direction: column; gap: 4px; padding: var(--sp-3) var(--sp-4); }
+.rev-card-draft { border-left: 4px solid var(--c-rev-draft-bd); }
+.rev-card-submitted { border-left: 4px solid var(--c-rev-submitted-bd); }
+.rev-card-locked { border-left: 4px solid var(--c-success-bd); }
+.rev-card-title { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); font-size: 16px; }
+.rev-card-line { margin: 0; }
+.rev-card-returned { color: var(--c-warn-fg); font-weight: var(--fw-medium); }
+.rev-card-checks { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-3); }
+.rev-check { color: inherit; text-decoration: none; white-space: nowrap; }
+.rev-check:hover { text-decoration: underline; }
+.rev-check-chip { display: inline-block; font-size: 12px; padding: 0 7px; border-radius: 999px; font-weight: var(--fw-medium); }
+.rev-check-chip.is-ok { background: var(--c-success-bg); color: var(--c-success-fg); }
+.rev-check-chip.is-bad { background: var(--c-danger-bg); color: var(--c-danger-fg); }
+.rev-check-chip.is-warn { background: var(--c-warn-bg); color: var(--c-warn-fg); }
+.is-rev-locked, .sku-grid td.cell-rev-locked, .sku-grid th.head-rev-locked { background-image: repeating-linear-gradient(135deg, var(--c-rev-hatch) 0, var(--c-rev-hatch) 1px, transparent 1px, transparent 6px); background-color: var(--c-rev-locked-bg); }
+.sku-grid td.cell-rev-locked { color: var(--c-text-muted); }
+.rev-locked-tag { display: block; font-size: 10px; color: var(--c-text-muted); font-weight: var(--fw-medium); }
+.sa-ref-year .rev-locked-tag { display: inline; margin-left: 3px; font-size: inherit; }
+.td-locked { display: block; font-size: 11px; color: var(--c-text-muted); font-weight: normal; white-space: nowrap; }
+.td-total-locked { flex-basis: 100%; }
+.wf-readonly-revision { font-weight: var(--fw-medium); }
+.reset-option { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.reset-option-tip { font-size: 11px; }
+
+/* CR-38 กราฟ Revision Compare (charts.compareLines · ใช้โครงของ barLine) */
+.cmp-line-a { stroke: var(--c-border-strong); stroke-width: 2; stroke-dasharray: 6 4; }
+.cmp-line-b { stroke: var(--c-primary); stroke-width: 2.5; }
+.cmp-dot-b { background: var(--c-primary); }
+.cmp-locked-band { position: absolute; top: 0; bottom: 0; background-image: repeating-linear-gradient(135deg, var(--c-rev-hatch) 0, var(--c-rev-hatch) 1px, transparent 1px, transparent 6px); background-color: var(--c-rev-locked-bg); opacity: 0.7; pointer-events: none; }
+.cmp-effective { position: absolute; top: 0; bottom: 0; border-left: 2px dashed var(--c-text-muted); pointer-events: none; }
+.cmp-effective-label { position: absolute; top: 2px; left: 4px; font-size: 11px; color: var(--c-text-muted); white-space: nowrap; background: var(--c-surface); padding: 0 3px; }
+.cmp-diff { position: relative; height: 34px; border-bottom: 1px solid var(--c-border); }
+/* ไม่มีคอลัมน์ป้ายท้ายเส้น · แกน Y สูงเท่าพื้นที่กราฟ (เว้นแถบส่วนต่าง 35px + ชื่อเดือน 20px) */
+.cmp-chart .barline-body { grid-template-columns: 2.8em minmax(0, 1fr); }
+.cmp-chart .barline-yaxis { margin-bottom: 55px; }
+.cmp-diff-base { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--c-border-strong); }
+.cmp-diff-bar { position: absolute; border-radius: 1px; }
+.cmp-diff-bar.is-up, .cmp-diff-sym.is-up { background: var(--c-success-bd); }
+.cmp-diff-bar.is-down, .cmp-diff-sym.is-down { background: var(--c-danger-bd); }
+.cmp-diff-sym { display: inline-block; width: 4px; height: 12px; margin-right: 2px; vertical-align: -1px; }
+
+/* CR-40 ป้ายรอบที่หัวหน้า: Tooltip (title) · ลิงก์ ไปรอบปัจจุบัน */
+.rev-picker-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.rev-go-current { font-size: 12px; white-space: nowrap; }
+.rev-picker-badge { cursor: help; }
+
+/* =====================================================================
+ * CR-40 ธีมตามแนว KOL Management (docs/spec/ui-theme.md) — อยู่ท้ายไฟล์เพื่อแทนค่าเดิมของ Component
+ * ===================================================================== */
+
+/* ---------- แท็บระดับหน้าแบบขีดเส้นใต้ (components.tabs) ---------- */
+.page-tabs { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+  line-height: 1.4;
+  padding: 7px var(--sp-3) 8px;
+  margin-bottom: -1px;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.page-tab:hover { color: var(--text); }
+.page-tab.is-active { color: var(--primary); border-bottom-color: var(--primary); }
+.page-tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.page-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.page-tab-count { font-size: var(--fs-xs); font-weight: var(--fw-medium); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* แท็บที่อยู่แถวเดียวกับตัวกรอง (Partner List · Sales Person Management · Price & Promotion) ไม่ยืดเต็มแถว */
+.tool-row > .page-tabs { flex: 0 0 auto; }
+
+/* ---------- ปุ่มกลุ่มสลับค่า: ตัวที่เลือก = พื้นสีหลักอ่อน ตัวอักษรสีหลัก ---------- */
+.segmented { border-color: var(--border-strong); border-radius: var(--radius-control); background: var(--surface); }
+.seg { color: var(--text-2); border-right-color: var(--border); }
+.seg:hover { background: var(--surface-2); color: var(--text); }
+.seg.is-active { background: var(--primary-soft); color: var(--primary); font-weight: var(--fw-bold); }
+
+/* ---------- การ์ด · Popover · Drawer ---------- */
+.card { border-color: var(--border); border-radius: var(--radius-card); box-shadow: var(--shadow-card); }
+.popover { border-radius: var(--radius-card); box-shadow: var(--shadow-pop); }
+.sp-dialog { border-radius: var(--radius-card); box-shadow: var(--shadow-pop); }
+
+/* ---------- ตาราง: หัวตารางพื้นขาว ตัวอักษรรองตัวหนา + เส้นใต้ · เส้นคั่นบาง · Hover ---------- */
+.data-table th { background: var(--surface); color: var(--text-muted); font-weight: var(--fw-bold); }
+.data-table thead th { border-bottom: 1px solid var(--border-strong); }
+.data-table td { border-bottom-color: var(--border); }
+.data-table > tbody > tr:hover > td, .data-table > tbody > tr:hover > th { background-image: linear-gradient(var(--row-hover-overlay), var(--row-hover-overlay)); }
+
+/* ---------- ปุ่ม ---------- */
+.btn { border-radius: var(--radius-control); border-color: var(--border-strong); color: var(--text-2); }
+.btn:hover { background: var(--surface-2); color: var(--text); }
+.btn-primary, .btn-primary:hover { color: var(--on-primary); }
+.btn-primary { background: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+.btn-primary:disabled:hover { background: var(--primary); border-color: var(--primary); }
+.btn-ghost { border-color: transparent; }
+.link-btn { color: var(--primary); }
+.link-btn:hover { color: var(--primary-hover); }
+
+/* ---------- ป้ายสถานะ = Pill พื้นอ่อน ตัวอักษรเข้มของกลุ่มเดียวกัน ไม่มีเส้นขอบ (ข้อ 3.3) ---------- */
+.badge.tag-ok, .badge.tag-warn, .badge.tag-danger, .badge.tag-muted,
+.badge.alert-ok, .badge.alert-short, .badge.alert-over, .badge.alert-empty { border-color: transparent; }
+.tag-muted { background: var(--neutral-soft); color: var(--neutral); border-color: var(--border); }
+.badge.tag-primary, .tag-primary { background: var(--primary-soft); color: var(--primary); border-color: transparent; }
+.st-planned { border: 0; }
+.status-cell.st-planned { outline: 1px dashed var(--primary); outline-offset: -1px; }   /* เส้นเวลา Status: Planned ต่างจาก New ด้วยขอบประ */
+.st-request { border: 1px dashed var(--primary); }
+.rev-badge { border-color: transparent; }
+.rev-badge.rev-draft { background: var(--neutral-soft); color: var(--neutral); border-color: transparent; }
+.rev-badge.rev-submitted { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
+.rev-badge.rev-locked { background: var(--success-soft); color: var(--success); border-color: transparent; }
+.type-badge.is-newListing { color: var(--primary); background: var(--primary-soft); border-color: transparent; }
+.type-badge.is-npdConfirmed { color: var(--primary); background: var(--primary-soft); }
+.type-badge.is-npdRequest { color: var(--primary); background: var(--surface); border: 1px dashed var(--primary); }
+.temp-name-tag, .temp-code-tag { border-color: var(--primary); color: var(--primary); }
+.history-tag { background: var(--neutral-soft); color: var(--neutral); border-color: transparent; }
+.wf-badge { border-color: transparent; }
+/* ข้อมูลที่ต้องตรวจ: มีรายการ = warning · ข้อมูลครบ = success */
+.checks-chip, .data-check { border-color: transparent; background: var(--success-soft); color: var(--success); }
+.checks-chip.has-issues, .data-check.has-issues { border-color: transparent; background: var(--warning-soft); color: var(--warning); }
+.filter-chip { background: var(--primary-soft); color: var(--primary); }
+
+/* ---------- ช่องกรอก / Dropdown ---------- */
+input.num, .select { border-color: var(--border-strong); border-radius: var(--radius-control); }
+input.num:focus, .select:focus { border-color: var(--primary); outline: 2px solid var(--primary-soft); }
+
+/* ---------- CR-41 สถานการณ์ Demo: ป้ายที่แถบบน + เมนู ---------- */
+.scenario-badge { flex: 0 1 auto; min-width: 0; font: inherit; font-size: 12px; font-weight: var(--fw-bold); line-height: 1.4; padding: 2px 10px; border: 1px dashed var(--primary); border-radius: var(--radius-pill);
+  color: var(--primary); background: var(--surface); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scenario-badge:hover, .scenario-badge[aria-expanded='true'] { background: var(--primary-soft); }
+.scenario-popover { width: min(380px, calc(100vw - 32px)); }
+.scenario-menu-title { margin: 2px var(--sp-2) var(--sp-1); }
+.scenario-option { display: flex; align-items: flex-start; gap: var(--sp-2); white-space: normal; }
+.scenario-dot { flex: 0 0 auto; width: 14px; height: 14px; margin-top: 4px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); }
+.scenario-option.is-current .scenario-dot { border-color: var(--primary); background: radial-gradient(circle, var(--primary) 0 3.5px, var(--surface) 4px); }
+.scenario-option.is-current::before { content: none; }
+.scenario-option-text { display: flex; flex-direction: column; min-width: 0; }
+.scenario-option-name { font-weight: var(--fw-bold); }
+.scenario-option-note { font-size: var(--fs-xs); line-height: 1.4; }
+.scenario-menu-sep { height: 1px; margin: var(--sp-1) var(--sp-2); background: var(--border); }
+.scenario-restart { color: var(--primary); }
+@media (max-width: 1100px) { .scenario-badge { max-width: 14em; } }
+
+/* ---------- CR-41 ยอดจริงของเดือนที่ปิดแล้ว (components.actualLine) · ยอดจริงสะสมใน Annual Target ---------- */
+.actual-line { display: block; font-size: 10.5px; line-height: 1.2; font-weight: var(--fw-medium); white-space: nowrap; cursor: help; }
+.td-table .td-ytd, .td-table .td-ytd-pct { white-space: nowrap; }

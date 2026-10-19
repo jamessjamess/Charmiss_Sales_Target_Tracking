@@ -151,7 +151,7 @@
       name: 'cr29-9. สิทธิ์: ค่าที่บันทึกไว้ของหน้าผู้รับผิดชอบ + ทีมขายเดิม → people (ระดับสูงสุด) แล้วลบ Key เดิม · เมนู Account Master ของแต่ละบทบาทตามตารางส่วน 5',
       expected: [{ level: 'EDIT', scope: 'ALL' }, false, false,
         // CR-32: Account & Platform + เขตและร้านค้า (TT) รวมเป็น salesUnits
-        { management: [], director: ['salesUnits', 'people'], manager: ['salesUnits', 'people'], officer: ['salesUnits'], product: [], supply: [], viewer: [], admin: ['salesUnits', 'people'] },
+        { management: [], director: ['salesUnits', 'people'], manager: ['salesUnits', 'people'], officer: ['salesUnits'], product: [], supply: [], viewer: [], admin: ['salesUnits', 'people'], md: [] },   // CR-38 + MD
         ['EDIT', 'VIEW', 'NONE'], ['EDIT', 'NONE', 'NONE']],
       actual: function () {
         var old = { manager: { salespeople: { level: 'VIEW', scope: 'ALL' }, salesTeam: { level: 'EDIT', scope: 'ALL' } } };

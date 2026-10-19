@@ -16,8 +16,19 @@
       baseline: false,           // ล็อก Baseline, Snapshot, เลขฉบับ, ช่องลงนาม
       reforecast: false,         // โหมดปรับแผน, ล็อก M+1–M+3, Actual ในตาราง
       sellIn: false,             // ข้อความและมุมมอง Sell-in (TT ยังคำนวณด้วยราคา Dealer)
-      npdApproval: false         // การอนุมัติแผน NPD โดย Sales Director (ปิด = บันทึกแล้วมีผลทันที)
+      npdApproval: false,        // การอนุมัติแผน NPD โดย Sales Director (ปิด = บันทึกแล้วมีผลทันที)
       // CR-30: ตัด promotionCalendar (ปฏิทิน Promotion รายวัน) — ใช้ Promotion Price รายเดือนแทน
+      bundle: true,              // CR-37 สินค้าแบบ Bundle (ปิด = ซ่อนเมนู หน้า ป้าย ตัวกรอง และแถว Bundle · แผนไม่นับ Bundle · ข้อมูลยังอยู่ใน Store)
+      approval: true,            // CR-39 Module Approval: ส่งขออนุมัติ → (Sales Director ยืนยัน) → MD อนุมัติและ Lock · ปิด = วงจรของ CR-38 ในแท็บ Revision
+      revision: true             // CR-38 Revision ของ Sales Planning (เปิดรอบ · เสนอ Lock · MD Lock · ห้ามแก้ย้อนหลัง · เปรียบเทียบ) · ปิด = Phase 1 เดิม
+      // CR-38 ใช้ Flag ใหม่นี้แทนการเปิด approvalWorkflow / baseline / reforecast (โค้ดเดิมยังอยู่หลัง Flag เดิม)
+    },
+
+    // CR-37 Bundle: หมวดสินค้าที่ระบบกำหนดให้ Bundle (data/taxonomy.js · Type Bundle เลขนำหน้ารหัส 90) · Series ของ Bundle ที่ชิ้นส่วนต่าง Series
+    //   ชิ้นส่วนรวมอย่างน้อย BUNDLE_MIN_QTY ชิ้น · สถานะชิ้นส่วนที่ห้ามใช้ตอนสร้าง / แก้ (blocked) · สถานะที่ขึ้นในข้อมูลที่ต้องตรวจ (check)
+    BUNDLE: {
+      categoryId: 'cat-set-bundle', subCategoryId: 'sub-bundle', typeId: 'type-bundle', mixSeriesId: 'ser-mix',
+      minQty: 2, blockedStatuses: ['request', 'delete'], checkStatuses: ['discontinued', 'clearance', 'delete']
     },
 
     VAT: 0.07,
@@ -124,9 +135,7 @@
     //   ผู้รับผิดชอบ → แก้ได้ตั้งแต่เดือนนี้ เดือนก่อนหน้าเป็นประวัติ / Performance นับ Actual ถึงเดือนนี้
     DEMO_FORECAST_MONTH: 2,
 
-    // CR-24: เดือนปัจจุบันกลาง (core/clock.js) — ยอดขาย L12M = 12 เดือนที่ปิดแล้วก่อนเดือนนี้ (ก.ย. 2025 – ส.ค. 2026) ·
-    //   ยอดอ้างอิงรายเดือน (ม.ค.–ส.ค. ปี 2026 · ก.ย.–ธ.ค. ปี 2025) · หน้าร้านค้า TT "ข้อมูล ณ เดือน" / ลบค่า = ใช้เดือนจริงของเครื่อง
-    DEMO_CURRENT_MONTH: '2026-09',
+    // CR-41: เดือนปัจจุบันกลางย้ายไปที่ data/scenarios.js (สถานการณ์ Demo · core/clock.js) — ไม่มี DEMO_CURRENT_MONTH แล้ว
 
     // CR-32: คอลัมน์ของตารางคู่ค้า (หน้า Account Master · components.columnPicker) รหัสคู่ค้าและชื่อแสดงเสมอ
     //   standard = ค่าตั้งต้นของแท็บทั้งหมด / Channel ที่แบ่งเป้าตาม Account · territory = ค่าตั้งต้นของ Channel ที่แบ่งเป้าตามเขต (+ คอลัมน์ของหน้าเขตเดิม)

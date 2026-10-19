@@ -7,7 +7,8 @@
  *   defaultLevel = ระดับของรายการที่ไม่ได้ระบุ (ไม่มี = VIEW สำหรับหน้า · NONE สำหรับปุ่มเฉพาะ) — ผู้ดูแลระบบ = EDIT ทุกรายการ
  *   id ของบทบาทตั้งต้นตรงกับ ui.role.type เดิม (management · director · manager · officer · product · supply · viewer) + admin
  * SP.data.permissionResources = สิทธิ์ย่อยของหน้า (หน้าอื่น 1 รายการต่อหน้า id = id ของหน้าใน core/registry.js สร้างอัตโนมัติ ห้ามพิมพ์ซ้ำ)
- *   pages.<pageId> = [{ id, label, main (สิทธิ์ของหน้า), scopable (เลือกทุก Channel / เฉพาะทีมได้), action (ปุ่มเฉพาะ อนุญาต / ไม่อนุญาต) }]
+ *   pages.<pageId> = [{ id, label, main (สิทธิ์ของหน้า), scopable (เลือกทุก Channel / เฉพาะทีมได้), action (ปุ่มเฉพาะ อนุญาต / ไม่อนุญาต),
+ *                      parent (CR-39 สิทธิ์ย่อยต้นทาง · ไม่ระบุ = สิทธิ์หลักของหน้า) }]
  *   global = สิทธิ์ที่ใช้ทุกหน้า (ส่งออก Excel / CSV / พิมพ์)
  * SP.data.permissions = { <roleId>: { <resourceId>: { level: 'NONE' | 'VIEW' | 'EDIT', scope: 'ALL' | 'TEAM' } } }
  *   CR-25: ระบุครบทุกช่องตามตาราง CR-25 ข้อ 3 (ไม่เห็น → NONE · ดู → VIEW · แก้ไข → EDIT · แก้ไข·ทีม → EDIT + TEAM · ✓ → EDIT · – → NONE)
@@ -27,7 +28,9 @@
     { id: 'product',    name: 'ทีม Product',    description: 'จัดการ Product Master (ยกเว้น Clearance)', system: true, order: 5, homePageId: 'productList' },
     { id: 'supply',     name: 'Supply Chain',   description: 'จัดการ Clearance', system: true, order: 6, homePageId: 'productList' },
     { id: 'viewer',     name: 'ผู้ดูรายงาน',     description: 'ดูรายงานสรุปแผน แก้ไขไม่ได้', system: true, order: 7, homePageId: 'summary' },
-    { id: 'admin',      name: 'ผู้ดูแลระบบ',     description: 'กำหนดบทบาทและสิทธิ์ของผู้ใช้ แก้ไขได้ทุกหน้า (ยกเว้น Plan Summary = ดู)', system: true, order: 8, defaultLevel: 'EDIT', homePageId: 'roleManagement' }
+    { id: 'admin',      name: 'ผู้ดูแลระบบ',     description: 'กำหนดบทบาทและสิทธิ์ของผู้ใช้ แก้ไขได้ทุกหน้า (ยกเว้น Plan Summary = ดู)', system: true, order: 8, defaultLevel: 'EDIT', homePageId: 'roleManagement' },
+    // CR-38: Managing Director = ดู Sales Planning และ Revision · Lock / ส่งกลับแก้ไข Revision (ผู้ Lock คนเดียว)
+    { id: 'md',         name: 'MD',             description: 'Managing Director · ดูแผนทุกขั้น · อนุมัติและ Lock / ส่งกลับแก้ไขคำขออนุมัติ Revision', system: true, order: 9, homePageId: 'approval' }
   ];
 
   SP.data.permissionResources = {
@@ -68,6 +71,26 @@
       // CR-25: Permissions · Roles · Users ใช้สิทธิ์เดียวกัน (registry perm: 'roleManagement') · CR-31 หน้า Roles ซ่อน
       roleManagement: [
         { id: 'roleManagement', label: 'Permissions / Users', main: true }
+      ],
+      // CR-39: หน้า Approval + ปุ่มเฉพาะ (ไม่สูงกว่าสิทธิ์หน้า) · ดำเนินการขั้นได้เมื่อมีบทบาทของขั้นด้วย (core/approval.js)
+      approval: [
+        { id: 'approval', label: 'Approval', main: true },
+        { id: 'approval.submit', label: 'ส่งขออนุมัติ / ถอนคำขอ', action: true },
+        { id: 'approval.sdConfirm', label: 'ยืนยันขั้น Sales Director', action: true },
+        { id: 'approval.mdLock', label: 'อนุมัติและ Lock', action: true },
+        { id: 'approval.config', label: 'ตั้งค่าขั้นอนุมัติ', action: true }
+      ],
+      // CR-38: Revision List + ปุ่มเฉพาะ · Revision Compare
+      // CR-39: 2 หน้าเดิมเป็นแท็บของ Plan Summary → สิทธิ์ส่วนของหน้า (id และค่าเดิมคงไว้ · สูงกว่าหน้าหลักได้) ·
+      //   ปุ่มเฉพาะ เปิด Revision อยู่ใต้แท็บ Revision (parent = ไม่สูงกว่าสิทธิ์ของแท็บ Revision)
+      summary: [
+        { id: 'summary', label: 'Plan Summary', main: true },
+        { id: 'revisionList', label: 'แท็บ Revision' },
+        { id: 'revision.open', label: 'เปิด Revision', action: true, parent: 'revisionList' },
+        // CR-39: เปิด Module Approval (Flag approval) = ส่งขออนุมัติ / Lock ย้ายไปสิทธิ์ของหน้า Approval → 2 รายการนี้ไม่แสดง
+        { id: 'revision.submit', label: 'เสนอ Lock / ถอนการเสนอ', action: true, parent: 'revisionList', feature: '!approval' },
+        { id: 'revision.lock', label: 'Lock / ส่งกลับแก้ไข', action: true, parent: 'revisionList', feature: '!approval' },
+        { id: 'revisionCompare', label: 'แท็บเปรียบเทียบ' }
       ]
     },
     global: [
@@ -75,29 +98,44 @@
     ]
   };
 
-  // ตาราง CR-25 ข้อ 3: 1 แถวต่อ resource ตามลำดับเมนู · คอลัมน์ = บทบาทตามลำดับ (management · director · manager · officer · product · supply · viewer · admin)
+  // ตาราง CR-25 ข้อ 3: 1 แถวต่อ resource ตามลำดับเมนู · คอลัมน์ = บทบาทตามลำดับ (management · director · manager · officer · product · supply · viewer · admin · md)
+   //   CR-38 คอลัมน์ที่ 9 = MD (ดู Sales Planning · Revision · Lock)
   //   N = ไม่เห็น / – · V = ดู · E = แก้ไข / ✓ · T = แก้ไข·ทีม / ✓·ทีม
-  var ROLE_ORDER = ['management', 'director', 'manager', 'officer', 'product', 'supply', 'viewer', 'admin'];
+  var ROLE_ORDER = ['management', 'director', 'manager', 'officer', 'product', 'supply', 'viewer', 'admin', 'md'];
   var TABLE = {
-    annualTarget:        'E V N N N N N E',
-    unitTargets:         'V E V V N N N E',
-    skuPlan:             'V V T T N N N E',
-    'skuPlan.createNpd': 'N N T T N N N E',
-    summary:             'V V V V V V V V',
-    productList:         'N V V V E V N E',
-    launchListing:       'N V V V E V N E',   // CR-35 = สูงสุดของ npdPlan และ listing เดิม (เท่ากันทุกบทบาท)
-    prices:              'N V V V V N N E',
-    'prices.base':       'N V V V E N N E',
-    'prices.promo':      'N E T T V N N E',
-    'listing.clearance': 'N V V V V E N E',
-    taxonomy:            'N N N N E N N E',   // CR-36 ส่วนของหน้า Product List (แท็บ Product Level)
+    annualTarget:        'E V N N N N N E V',
+    unitTargets:         'V E V V N N N E V',
+    skuPlan:             'V V T T N N N E V',
+    'skuPlan.createNpd': 'N N T T N N N E N',
+    summary:             'V V V V V V V V V',
+    productList:         'N V V V E V N E N',
+    launchListing:       'N V V V E V N E N',   // CR-35 = สูงสุดของ npdPlan และ listing เดิม (เท่ากันทุกบทบาท)
+    prices:              'N V V V V N N E N',
+    'prices.base':       'N V V V E N N E N',
+    'prices.promo':      'N E T T V N N E N',
+    'listing.clearance': 'N V V V V E N E N',
+    taxonomy:            'N N N N E N N E N',   // CR-36 ส่วนของหน้า Product List (แท็บ Product Level)
+    bundle:              'N V V V E V N E N',   // CR-37 หน้า Bundle: ทีม Product = แก้ไข · บทบาทอื่นที่เห็น Product Master = ดู (Management · ผู้ดูรายงาน ไม่เห็นเหมือน Product List)
     // CR-32: salesUnits = สิทธิ์สูงสุดของ accounts (N E V N N N N E) และ territories (N E V V N N N E) เดิม · สิทธิ์ย่อยคงค่าเดิม
-    salesUnits:          'N E V V N N N E',
-    'salesUnits.gp':     'N E V N N N N E',
-    'salesUnits.channelSettings': 'N E N N N N N E',
-    people:              'N E V N N N N E',
-    roleManagement:      'N N N N N N N E',
-    'export':            'E E E E E E E E'
+    salesUnits:          'N E V V N N N E N',
+    'salesUnits.gp':     'N E V N N N N E N',
+    'salesUnits.channelSettings': 'N E N N N N N E N',
+    people:              'N E V N N N N E N',
+    roleManagement:      'N N N N N N N E N',
+    // CR-38 Revision: หน้า Revision List ทุกบทบาทดู · Management / MD แก้ไข · Revision Compare ทุกบทบาทดู
+    //   ปุ่มเฉพาะ: เปิด Revision · เสนอ Lock / ถอนการเสนอ = Management · Lock / ส่งกลับแก้ไข = MD (ผู้ดูแลระบบไม่ได้รับสิทธิ์ปุ่มเหล่านี้)
+    revisionList:        'E V V V V V V V E',   // CR-39 แท็บของ Plan Summary · ผู้ดูแลระบบ = ดู (Plan Summary ของผู้ดูแลระบบ = ดู ตาม CR-25)
+    'revision.open':     'E N N N N N N N N',
+    'revision.submit':   'E N N N N N N N N',
+    'revision.lock':     'N N N N N N N N E',
+    revisionCompare:     'V V V V V V V V V',   // CR-39 แท็บของ Plan Summary
+    // CR-39 Approval: ทุกบทบาทดู · Management / Sales Director / MD แก้ไข (ความคิดเห็น) · ผู้ดูแลระบบแก้ไข (ตั้งค่า · ทำขั้นแทนไม่ได้)
+    approval:            'E E V V V V V E E',
+    'approval.submit':   'E N N N N N N N N',
+    'approval.sdConfirm': 'N E N N N N N N N',
+    'approval.mdLock':   'N N N N N N N N E',
+    'approval.config':   'E N N N N N N E N',
+    'export':            'E E E E E E E E E'
   };
   var CELL = { N: { level: 'NONE', scope: 'ALL' }, V: { level: 'VIEW', scope: 'ALL' }, E: { level: 'EDIT', scope: 'ALL' }, T: { level: 'EDIT', scope: 'TEAM' } };
 

@@ -12,7 +12,6 @@
 .rp-owner.is-vacant { color: var(--c-vacant-fg); font-weight: var(--fw-bold); }
 
 /* ---------- แท็บ (รายงานสรุปแผน | ติดตามสถานะ (n)) ---------- */
-.rp-tabs .seg { display: inline-flex; align-items: center; gap: var(--sp-2); font-variant-numeric: tabular-nums; }
 
 /* =====================================================================
    แท็บติดตามสถานะ

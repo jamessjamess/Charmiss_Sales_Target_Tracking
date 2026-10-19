@@ -219,7 +219,7 @@
     },
     {
       name: 'cr35-13. ราคา Clearance ลำดับแรก: ในช่วง Clearance ใช้ราคา Clearance แม้มี Promotion Price ของหน่วยขาย · ก่อนช่วงใช้ลำดับเดิม · สิ้นสุดว่าง = จนสินค้าหมด (ปีแผนสุดท้ายยังเป็น Clearance) · เลือกหน่วยขายได้ · ไม่มีราคา Clearance = ลำดับเดิม · SKU อื่นราคาเท่าเดิมทุกตัว · ส่วนลด · SKU ที่เริ่ม Clearance ได้ = Active / Discontinued',
-      expected: [[149, 'promoUnit'], [99, 'clearance'], [99, 'clearance'], ['active', 'clearance', 'clearance'], [[149, 'promoUnit'], [99, 'clearance']], [149, 'promoUnit'], 0, 0.25, [true, 116]],   // CR-36: 32090 มีช่วง Clearance ตัวอย่างแล้ว (เริ่มไม่ได้อีก)
+      expected: [[149, 'promoUnit'], [99, 'clearance'], [99, 'clearance'], ['active', 'clearance', 'clearance'], [[149, 'promoUnit'], [99, 'clearance']], [149, 'promoUnit'], 0, 0.25, [true, 118]],   // CR-36: 32090 มีช่วง Clearance ตัวอย่างแล้ว (เริ่มไม่ได้อีก) · CR-37 + Bundle ตัวอย่าง 2 (Active)
       actual: function () {
         var c = calc(), d0 = data();
         function withCl(cl) { var d = data(); d.products = D().products.map(function (p) { if (c.productKey(p) !== '33400') return p; var x = clone(p); x.clearance = cl; return x; }); return d; }

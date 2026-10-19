@@ -32,7 +32,8 @@
     { id: 'u-product',  name: 'ชนิดา พรหมมา',      roleIds: ['product'],  active: true },
     { id: 'u-supply',   name: 'ธีรพล แสงทอง',      roleIds: ['supply'],   active: true },
     { id: 'u-viewer',   name: 'กมลวรรณ ศรีสุข',     roleIds: ['viewer'],   active: true },
-    { id: 'u-admin',    name: 'ศิริพร ใจมั่น',      roleIds: ['admin'],    active: true }
+    { id: 'u-admin',    name: 'ศิริพร ใจมั่น',      roleIds: ['admin'],    active: true },
+    { id: 'u-md',       name: 'ธนวัฒน์ ศรีประเสริฐ', roleIds: ['md'],       active: true }   // CR-38 Managing Director (ผู้ Lock Revision)
   ];
 
   // CR-32: ค่าตั้งต้นของ person.userId (บุคลากร → ผู้ใช้) · แก้ได้ที่หน้า Sales Person Management (บัญชีผู้ใช้) และหน้า Users (บุคลากร)

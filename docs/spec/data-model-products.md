@@ -49,3 +49,16 @@ CR-35 แยกจาก [data-model.md](data-model.md) (ไฟล์เดิ�
 - แผน NPD (`data/npd.js`) = `{ id, productKey, seriesId, stage: plan | concept | production | ready, plannedLaunchDate, launchQuarter, stageTargets: { <ขั้น>: 'YYYY-MM' },
   plannedAccounts: [{ accountId, plannedStartMonth }], expectedRsp, owner, source: PRODUCT | SALES, note, workflow }` · CR-34 `requestedBy` · `reason` · `confirmedAt` · `confirmedBy`
 - ข้อมูล ERP ตัวอย่าง (`data/erp-snapshot.js`) ใช้กับปุ่มเปรียบเทียบกับ ERP ในหน้ารายการสินค้า
+
+## สินค้าแบบ Bundle (CR-37)
+
+- ฟิลด์เพิ่มของสินค้า: `kind` = `'bundle'` (ไม่มี = สินค้าเดี่ยว `single` · สินค้าเดิมไม่ต้องเพิ่มฟิลด์) · `components` = `[{ skuId (productKey ของ SKU เดี่ยว), qty (จำนวนเต็ม ≥ 1) }]` ·
+  `seriesManual` (true = ทีม Product แก้ Series เอง · false / ไม่มี = Series จากชิ้นส่วน `calc.bundleSeries`)
+- Store (`master.products`) กำหนดให้ทุก Bundle ตอนบันทึก (`calc.normalizeBundles`): รวม `skuId` ซ้ำ · `categoryId / subCategoryId / typeId` = `settings.BUNDLE` (Set & Bundle › Bundle › Bundle · `inferred: false`) ·
+  `seriesId` = Series ของชิ้นส่วน หรือ `ser-mix` (Mix Series · `data/taxonomy.js`) เมื่อชิ้นส่วนต่าง Series · `subSeriesId: null`
+- ราคา / Listing / แผน SKU / Promotion / Clearance ของ Bundle = ระเบียนปกติของสินค้านั้น (Key = Product Code ของ Bundle) · ราคารวมชิ้นส่วนคำนวณทุกครั้ง ไม่เก็บ
+- ตัวอย่าง (ไม่แก้ `data/seed/`): `data/products.js` `productImport.bundles` → `core/seed.js addSampleBundle` สร้างสินค้า + RSP + ราคาหลักประเภทอื่นตามสัดส่วนของ `priceRatioOf` + Listing + แผนตั้งต้น (`planSeeds`) + `codeCounters` + ERP
+  - 90100 Matte All Day Cushion 5g -01 Twin Set = 12130 × 2 · RSP 109 · TT Dealer 65 (109 × 35 ÷ 59) · Watsons ตั้งแต่ ม.ค. 2027 · 150 ชุด / เดือน
+  - 90200 Matte All Day Cushion 5g Duo -01/-02 = 12130 × 1 + 12140 × 1 · RSP 109 · TT Dealer 65 · Shopee ตั้งแต่ มี.ค. 2027 · 200 ชุด / เดือน (มี.ค.–ธ.ค.)
+  - เปิดตัว ม.ค. 2026 (Active ณ เดือนปัจจุบันกลาง) · `isSample: true` · `inTrcloud: true` · สินค้ารวม 127 รายการ
+- `store.js` `DATA_VERSION` 16 (ค่าที่เก็บไว้จากรุ่นก่อนล้างครั้งเดียว ให้เห็นตัวอย่าง Bundle)

@@ -737,7 +737,7 @@
       });
     }
     function commit(sum) {
-      var by = C.roleName(store.role()), at = new Date().toISOString();
+      var by = C.roleName(store.role()), at = SP.core.clock.now();
       var entries = [];
       var res = P.resources(list);
       sum.diffs.forEach(function (d) {

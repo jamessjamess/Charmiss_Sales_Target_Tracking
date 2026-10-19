@@ -61,3 +61,11 @@ Product Master · fit · ผู้แก้ไขตั้งต้น: ที�
 - `นำเข้าด้วยรหัสเดิม` (รายการที่มีใน TRCLOUD แต่ไม่มีใน Master): เดาหมวดจากชื่อ · Series และเดือนเปิดตัวว่าง → ขาดข้อมูลจำเป็นจนกว่าจะเติม
 - ลบได้เฉพาะ SKU ที่ไม่มี Listing ราคา หรือแผน NPD
 - ความครบถ้วน: จำเป็น = `PRODUCT_REQUIRED` (Product Code · ชื่อ · หมวด 3 ระดับ · Series · RSP · เดือนเปิดตัวหรือไตรมาส) · ควรมี = `PRODUCT_RECOMMENDED` (Barcode · รูป) · Sub Series ไม่บังคับ
+
+## CR-37 Bundle
+
+- สินค้าแบบ Bundle แสดงในตารางเหมือนสินค้าทั่วไป + ป้าย `Bundle` ต่อท้ายชื่อ (`components.bundleTag`) · KPI นับรวม Bundle
+- ตัวกรองเพิ่มเติม `ประเภทสินค้า` (สินค้าเดี่ยว / Bundle · `filters.kind` · `calc.productKind`) · Chip ตัวกรอง
+- `›` ของแถว Bundle เปิด Drawer เดียวกับหน้า [Bundle](bundle.md) (ส่วนประกอบในแท็บข้อมูลทั่วไป · แก้ได้ในโหมดแก้ไขของ Product List)
+- Drawer SKU เดี่ยว: บรรทัด `อยู่ใน Bundle: 90100 (×2) · 90200 (×1)` (`calc.bundlesContaining`) ลิงก์ไปหน้า Bundle (`ui.bundleFocus`)
+- Flag `bundle` ปิด = ไม่มีแถว ป้าย ตัวกรอง และบรรทัด อยู่ใน Bundle

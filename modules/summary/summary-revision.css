@@ -1,0 +1,59 @@
+/* modules/summary/summary-revision.css — CR-39 แท็บ Revision / เปรียบเทียบ ของ Plan Summary (เดิม revision-list.css · revision-compare.css ของ CR-38)
+   2 แท็บนี้สูงเท่าจอ (body.fit-screen · summary.js) ตารางเลื่อนภายในการ์ด */
+@media (min-width: 1024px) {
+  .rp-on-revision .module-body > .rl-card-table,
+  .rp-on-compare .module-body > .rc-table-card { flex: 1 1 auto; min-height: 160px; display: flex; flex-direction: column; }
+}
+.rp-on-revision .module-body > * + * { margin-top: var(--sp-3); }
+.rp-on-compare .module-body > * + * { margin-top: var(--sp-2); }
+.rv-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.rv-toolbar .tool-spacer, .rc-toolbar .tool-spacer { flex: 1 1 auto; }
+
+/* ---------- แท็บ Revision ---------- */
+.rl-table th.rl-name { white-space: nowrap; text-align: left; }
+.rl-caret { display: inline-block; width: 1.2em; color: var(--c-text-muted); }
+.rl-table .rl-reason { max-width: 320px; }
+.rl-table .rl-change { white-space: nowrap; }
+.rl-table tr.is-open > * { background: var(--c-primary-soft); }
+/* ปุ่มของแถว: รูปแบบเดียวกัน เรียงชิดขวาเท่ากันทุกแถว */
+.rl-table th.rl-manage, .rl-table td.rl-manage { text-align: right; white-space: nowrap; }
+.rl-manage-group { display: inline-flex; justify-content: flex-end; align-items: center; gap: var(--sp-1); }
+.btn.is-disabled, .btn.is-disabled:hover { opacity: 0.5; cursor: not-allowed; background: var(--c-surface-2); color: var(--c-text-muted); border-color: var(--c-border); }
+.rl-history-row > td { background: var(--c-surface-2); padding: var(--sp-2) var(--sp-4); }
+.rl-history-title { display: block; margin-bottom: var(--sp-1); }
+.rl-timeline { list-style: none; margin: 0; padding: 0 0 0 var(--sp-3); border-left: 2px solid var(--c-border-strong); display: flex; flex-direction: column; gap: 6px; }
+.rl-ev { display: flex; flex-wrap: wrap; gap: var(--sp-2); align-items: baseline; position: relative; }
+.rl-ev::before { content: ''; position: absolute; left: calc(-1 * var(--sp-3) - 6px); top: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--c-border-strong); }
+.rl-ev-lock::before { background: var(--c-success-bd); }
+.rl-ev-return::before { background: var(--c-warn-bd); }
+.rl-ev-what { font-weight: var(--fw-bold); min-width: 90px; }
+.rl-ev-who { color: var(--c-text-muted); }
+.rl-ev-note { font-style: italic; }
+.rl-dlg { display: flex; flex-direction: column; gap: var(--sp-2); }
+.rl-dlg-field { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); margin: 0; }
+.rl-dlg-sub { font-weight: var(--fw-medium); margin: 0; }
+.rl-dlg-warn { color: var(--c-warn-fg); margin: 0; }
+.rl-lock-name { min-width: 220px; }
+.rl-dlg-steps { margin: 0; padding-left: 1.4em; }
+.rl-view-request { text-decoration: none; }
+.rl-empty { padding: var(--sp-4); color: var(--c-text-muted); }
+
+/* ---------- แท็บเปรียบเทียบ ---------- */
+.rc-toolbar { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); align-items: center; }
+.rc-pair { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); max-width: 100%; }
+.rc-pair .select, .rc-toolbar .field .select { max-width: 100%; }
+.rc-basis { margin: 0; }
+.rc-chart-card { padding: var(--sp-2) var(--sp-3); }
+.rc-chart-title { font-size: 14px; margin: 0 0 var(--sp-1); }
+.rc-chart-card .barline-plot { height: 150px; }
+.rc-table th.rc-name { text-align: left; white-space: nowrap; min-width: 160px; }
+.rc-table .rc-line { white-space: nowrap; color: var(--c-text-muted); font-size: 12px; }
+.rc-table tr.rc-m-d td { border-bottom: 2px solid var(--c-border); }
+.rc-table tr.rc-total th, .rc-table tr.rc-total td { font-weight: var(--fw-bold); background: var(--c-surface-2); }
+.rc-bars-head { min-width: 220px; }
+.rc-bars { position: relative; height: 16px; min-width: 200px; }
+.rc-bar-a, .rc-bar-b { position: absolute; left: 0; border-radius: 2px; }
+.rc-bar-a { top: 0; height: 16px; background: var(--c-border-strong); opacity: 0.6; }
+.rc-bar-b { top: 4px; height: 8px; background: var(--c-primary); }
+.rc-empty { padding: var(--sp-4); color: var(--c-text-muted); }
+.rc-go-revision { font-size: inherit; }

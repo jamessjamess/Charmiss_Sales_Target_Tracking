@@ -310,6 +310,14 @@
     };
   }
 
+  // CR-37: หมวดสินค้า / Series ที่ผูก Feature Flag (Set & Bundle · Mix Series) ไม่โหลดเมื่อ Flag ปิด (ไม่มีร่องรอย Bundle บนหน้าจอ)
+  (function () {
+    var F = SP.core.features, T = SP.data.taxonomy;
+    if (!F || !T) return;
+    function on(n) { return !n.feature || F.isOn(n.feature); }
+    T.category = (T.category || []).filter(on);
+    T.series = (T.series || []).filter(on);
+  })();
   var result = build(SP.data);
   if (result) {
     SP.data.products = result.products;
@@ -356,6 +364,41 @@
         return o;
       });
     });
+    // CR-37: ตัวอย่างสินค้าแบบ Bundle (productImport.bundles · ไม่แก้ data/seed/) → สินค้า + ราคาหลัก + Listing + แผน SKU ตั้งต้น + เลขรหัสล่าสุด + ERP
+    ((SP.data.productImport || {}).bundles || []).forEach(addSampleBundle);
+  }
+
+  // CR-37: สินค้าแบบ Bundle ตัวอย่าง 1 รายการ (หมวดสินค้าและ Series ระบบกำหนดผ่าน calc.normalizeBundles เหมือนตอนบันทึก)
+  //   ราคาหลัก RSP = b.rsp มีผลเดือนเปิดตัว · ประเภทอื่น = ราคาประเภทนั้นของ b.priceRatioOf × (b.rsp ÷ RSP ของ priceRatioOf) ปัดเป็นบาท
+  function addSampleBundle(b) {
+    var calc = SP.core.calc, cat = SP.core.catalog;
+    var month = String(b.launchDate).slice(0, 7);
+    var by = (SP.data.productImport || {}).importedBy || '';
+    var at = b.createdAt || '';
+    var product = {
+      trCode: b.trCode, barcode: '', name: b.name, nameEn: '', shortName: b.shortName || b.name,
+      categoryId: null, subCategoryId: null, typeId: null, inferred: false, seriesId: null, subSeriesId: null,
+      packSize: null, uom: '', image: null, inTrcloud: true, launchDate: b.launchDate, discontinueMonth: null, clearance: null,
+      kind: 'bundle', components: JSON.parse(JSON.stringify(b.components)), seriesManual: false,
+      note: b.note || '', isSample: !!b.isSample, createdAt: at, updatedAt: at
+    };
+    var res = calc.normalizeBundles(SP.data.products.concat([product]), SP.data.products, month);
+    if (!res.ok) return;
+    SP.data.products = res.products;
+    var refRsp = calc.rspAt(SP.data.basePrices, b.priceRatioOf, month);
+    (SP.data.settings.PRICE_TYPES || ['RSP']).forEach(function (type) {
+      var ref = type === 'RSP' ? null : calc.basePriceAt(SP.data.basePrices, b.priceRatioOf, type, month);
+      var price = type === 'RSP' ? b.rsp : ref && refRsp ? Math.round(b.rsp * ref / refRsp) : null;
+      if (price) SP.data.basePrices.push({ productKey: b.trCode, priceType: type, effectiveMonth: month, price: price, by: by, at: at });
+    });
+    (b.units || []).forEach(function (u) { SP.data.listings.push({ productKey: b.trCode, accountId: u.unitId, status: 'listed', fromMonth: u.fromMonth, toMonth: null }); });
+    var seeds = SP.data.planSeeds && SP.data.planSeeds.years;
+    if (seeds && b.plan && b.planYear) {
+      var y = seeds[b.planYear] || (seeds[b.planYear] = {});
+      Object.keys(b.plan).forEach(function (u) { (y[u] || (y[u] = {}))[b.trCode] = JSON.parse(JSON.stringify(b.plan[u])); });
+    }
+    SP.data.codeCounters = cat.takeCode(SP.data.codeCounters, b.trCode);
+    if (SP.data.erpSnapshot) SP.data.erpSnapshot.push({ trCode: b.trCode, name: b.name, barcode: '', rsp: b.rsp });
   }
 
   SP.core.seed = { build: build, imported: !!result, packOf: packOf, seriesIdOf: seriesIdOf, startMonths: startMonths, priorSkuQty: priorSkuQty };

@@ -15,6 +15,8 @@
  *                 ส่งออก ▾ (Excel / CSV) 1 แถวต่อ Channel + Total + คงเหลือ พร้อมยอดขาย 3 ปี (calc.topDownRows level 'channel')
  *                 สิทธิ์ (permissions resource annualTarget ผ่าน workflowBar step topDown): Management แก้ไข · บทบาทอื่นอ่านอย่างเดียว
  *                 [Phase 2] Workflow ทั้งหน้า (workflowBar step topDown) ส่งอนุมัติได้เมื่อคงเหลือระดับ Total จัดสรรครบ
+ * CR-38:          ข้อมูลของรอบที่เลือก (core/revision.js read · data) · รอบรอ Lock / Lock แล้ว = อ่านอย่างเดียว (workflowBar readOnly) ·
+ *                 รอบที่มีเดือนล็อก: บรรทัดเล็ก ส่วนที่ล็อก (ม.ค.–มี.ค.) X บาท · ปรับได้ใน เม.ย.–ธ.ค. ใต้ Total และเป้าหมาย Channel · บันทึกต่ำกว่าส่วนที่ล็อกไม่ได้
  * อ่านจาก data/:  channels, history, targets, content (pages.topDown, pages.phasing.title, labels) + Master ผ่าน store.data()
  * store อ่าน:     app.planYear, plan.<ปี>.topDown, plan.<ปี>.workflow.*, ui.role, ui.currentMonth
  * store เขียน:    plan.<ปี>.topDown { total, channels, pct, units } + master.audit (ตอนกด บันทึก) · ui.selection (ลิงก์ {n} หน่วยขาย) ·
@@ -32,6 +34,7 @@
   var calc = SP.core.calc;
   var W = SP.core.workflow;
   var store = SP.core.store;
+  var REV = SP.core.revision;   // CR-38
   var h = C.h;
   var fill = C.fill;
 
@@ -60,13 +63,22 @@
     var L = SP.data.content.labels;
     var cols = page.columns;
     var year = store.year();
-    var K = SP.core.clock;
+    var data = REV.data();
+    // CR-41: นาฬิกาของข้อมูลที่แสดง (รอบที่ Lock แล้ว = เดือนตอน Lock · calc.refClock) → ปีเต็ม · ช่วง L12M ตรงกับตัวเลขของรอบ
+    var K = calc.refClock(data.history) || SP.core.clock;
     var fullYears = K.fullYears();   // CR-24: ปีเต็ม 2 ปีก่อนปีของเดือนปิดล่าสุด (2024 · 2025) + คอลัมน์ L12M
     var nHist = fullYears.length + 1;
     var charts = null;
-    var key = store.planKey('topDown');
-    var data = store.data();
-    var saved = normalize(store.get(key));
+    var key = REV.planKey('topDown');
+    // CR-41: ยอดจริงสะสมของปีแผน (ข้อมูลปัจจุบัน ไม่ขึ้นกับรอบ) — มีเดือนที่ปิดแล้วในปีแผน = เพิ่ม 2 คอลัมน์ต่อจากเป้าหมาย
+    var live = store.data();
+    var ytdAll = calc.actualToDate(live, null, year);
+    var ytdSample = ytdAll ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].slice(0, ytdAll.months).some(function (m) { return SP.core.scenario.isSample(year, m); }) : false;
+    var revName = (REV.current() || {}).name || String(year);
+    var saved = normalize(REV.read('topDown'));
+    // CR-38: ส่วนที่ล็อกของรอบ (เดือนก่อนเดือนที่มีผล) · ไม่มี = {}
+    var lockN = REV.lockIdx();
+    var lockedMap = REV.lockedMap();
     var draft = clone(saved);
     var editing = false;
     var refs;
@@ -98,11 +110,15 @@
         calc.planUnits(savedTree()).forEach(function (u) { out[u.id] = Math.round(u.amount); });
         return out;
       },
+      readOnly: function () { return REV.readOnlyReason(); },   // CR-38 รอบรอ Lock / Lock แล้ว
       onEdit: function () { editing = true; draft = clone(saved); draw(); },
       onSave: function () {
+        // CR-38: เป้าหมายห้ามต่ำกว่าส่วนที่ล็อก (Store ปฏิเสธซ้ำ)
+        var low = calc.lockedTargetIssues(tree(), lockedMap);
+        if (low.length) { window.alert(lockedText(low[0])); return; }
         // Audit การเปลี่ยนเป้าหมายของ Channel (Sub-channel Allocation แสดงบรรทัดแจ้งจนกว่าจะกดปิด)
-        var entries = calc.channelTargetAudit(savedTree(), tree(), { by: C.roleName(store.role()), at: new Date().toISOString(), year: year });
-        store.set(key, draft);
+        var entries = calc.channelTargetAudit(savedTree(), tree(), { by: C.roleName(store.role()), at: SP.core.clock.now(), year: year });
+        try { store.set(key, draft); } catch (e) { window.alert(e.message); return; }
         if (entries.length) store.appendAudit(entries);
         saved = clone(draft);
         editing = false;
@@ -112,6 +128,19 @@
       onChange: function () { draw(); ctx.refreshMenu(); }
     });
     if (ctx.intro) ctx.intro.appendChild(bar);
+
+    // CR-38: บรรทัดส่วนที่ล็อก / ข้อความเป้าต่ำกว่าส่วนที่ล็อก
+    var RV = L.revision;
+    function lockedRanges() { return { locked: F.monthRange(0, lockN - 1), open: F.monthRange(lockN, 11) }; }
+    function lockedLine(amount) { var r = lockedRanges(); return fill(RV.lockedLine, { locked: r.locked, amount: F.baht(amount), open: r.open }); }
+    function lockedText(x) { return fill(RV.belowLockedSave, { name: x.name || RV.total, locked: lockedRanges().locked, amount: F.baht(x.locked) }); }
+    function lockedSums(t) { return lockN ? calc.lockedTargetSums(t, lockedMap) : null; }
+    function putLocked(td, amount) {
+      var old = td.querySelector('.td-locked');
+      if (old) old.parentNode.removeChild(old);
+      // แถว Channel = ข้อความสั้น (ล็อก ม.ค.–มี.ค. X) · Tooltip เต็ม
+      if (amount > 0) td.appendChild(h('small', { class: 'td-locked', title: lockedLine(amount) }, fill(RV.lockedShort, { locked: lockedRanges().locked, amount: F.baht(amount) })));
+    }
 
     function setShares(ids, shares) {
       ids.forEach(function (id, i) { draft.pct[id] = shares[i]; });
@@ -145,6 +174,8 @@
         tdAmt: h('td', { class: 'num td-amount' }),
         growth: h('td', { class: 'num td-growth' }),
         compare: h('td', { class: 'td-compare' }),
+        ytd: ytdAll ? h('td', { class: 'num td-ytd' }) : null,
+        ytdPct: ytdAll ? h('td', { class: 'num td-ytd-pct' }) : null,
         pa: null
       };
       if (editing) {
@@ -174,7 +205,7 @@
           h('span', { class: 'td-ch-name', title: ch.fullName + ' · ' + ch.unitLabel }, ch.name),
           unitsLink(ch)),
         hist.map(function (v, k) { return h('td', { class: 'num td-hist' + (k === hist.length - 1 ? ' is-latest' : '') }, F.millionPlain(v)); }),
-        ref.tdPct, ref.tdAmt, ref.growth, ref.compare,
+        ref.tdPct, ref.tdAmt, ref.ytd, ref.ytdPct, ref.growth, ref.compare,
         editing ? h('td', { class: 'td-manage' }, menu) : null);
       tr.addEventListener('mouseenter', function () { highlightChannel(ch.id, 'table'); });
       tr.addEventListener('mouseleave', function () { highlightChannel(null, 'table'); });
@@ -203,30 +234,33 @@
       refs.totalGrowth = h('span', { class: 'td-total-growth' });
       root.appendChild(h('section', { class: 'card td-total' },
         h('span', { class: 'td-total-field' }, h('span', { class: 'td-total-label' }, page.totalLabel), refs.totalValue, h('span', { class: 'muted' }, L.baht)),
-        h('span', { class: 'td-total-item' }, h('span', { class: 'muted' }, C.priorLabel(t.priorYear)), h('strong', null, F.baht(t.prior)), h('span', { class: 'muted' }, L.baht)),
-        h('span', { class: 'td-total-item' }, h('span', { class: 'muted' }, L.growth), refs.totalGrowth)));
+        h('span', { class: 'td-total-item' }, h('span', { class: 'muted' }, C.priorLabel(t.priorYear, null, C.priorNote(t.priorYear, K))), h('strong', null, F.baht(t.prior)), h('span', { class: 'muted' }, L.baht)),
+        h('span', { class: 'td-total-item' }, h('span', { class: 'muted' }, L.growth), refs.totalGrowth),
+        lockN ? (refs.totalLocked = h('small', { class: 'td-locked td-total-locked' })) : null));
 
       if (editing) {
-        refs.banner = C.editBanner();
+        refs.banner = C.editBanner({ revision: true });   // CR-40 แถบโหมดแก้ไขรวมข้อความของรอบ
         root.appendChild(refs.banner);
       }
 
       // ตาราง: หัว 2 ชั้น (ยอดขาย 3 ปีอยู่ใต้หัวกลุ่ม)
       refs.totalRem = h('tr');
       refs.axis = h('span');
-      var nCols = 1 + nHist + 4 + (editing ? 1 : 0);   // Channel · ยอดขาย 2 ปี + L12M · % · เป้าหมาย · การเติบโต · เทียบปีก่อน · (จัดการ)
+      var nCols = 1 + nHist + 4 + (ytdAll ? 2 : 0) + (editing ? 1 : 0);   // Channel · ยอดขาย 2 ปี + L12M · % · เป้าหมาย · (ยอดจริงสะสม · % ของเป้า) · การเติบโต · เทียบปีก่อน · (จัดการ)
       var head1 = h('tr', null,
         h('th', { scope: 'col', rowspan: '2' }, cols.name),
         h('th', { scope: 'colgroup', colspan: String(nHist), class: 'td-hist-group', title: cols.historyTip }, h('span', { class: 'has-tip' }, cols.history)),
         h('th', { scope: 'col', rowspan: '2', class: 'num', title: cols.pctTotalTip }, h('span', { class: 'has-tip' }, cols.pctTotal)),
         h('th', { scope: 'col', rowspan: '2', class: 'num', title: cols.amountTip }, h('span', { class: 'has-tip' }, fill(cols.amount, { year: year }))),
+        ytdAll ? [h('th', { scope: 'col', rowspan: '2', class: 'num td-ytd', title: cols.ytdTip + (ytdSample ? ' · ' + cols.ytdSample : '') }, h('span', { class: 'has-tip' }, fill(cols.ytd, { range: ytdRange() }))),
+          h('th', { scope: 'col', rowspan: '2', class: 'num td-ytd-pct', title: cols.ytdPctTip }, h('span', { class: 'has-tip' }, fill(cols.ytdPct, { name: revName })))] : null,
         h('th', { scope: 'col', rowspan: '2', class: 'num' }, cols.growth),
         h('th', { scope: 'col', rowspan: '2', class: 'td-vly-head', title: L.vsLastYear.headerTip }, h('span', { class: 'has-tip' }, L.vsLastYear.header), refs.axis),
         editing ? h('th', { scope: 'col', rowspan: '2' }, cols.manage) : null);
       var head2 = h('tr', { class: 'td-head-years' }, historyHeads());
       refs.table = h('table', { class: 'td-table' + (editing ? ' is-editing' : '') },
         h('colgroup', null, h('col', { class: 'col-name' }), fullYears.map(function () { return h('col', { class: 'col-hist' }); }), h('col', { class: 'col-hist col-l12m' }),
-          h('col', { class: 'col-pct' }), h('col', { class: 'col-amount' }), h('col', { class: 'col-growth' }), h('col', { class: 'col-compare' }),
+          h('col', { class: 'col-pct' }), h('col', { class: 'col-amount' }), ytdAll ? [h('col', { class: 'col-ytd' }), h('col', { class: 'col-ytd-pct' })] : null, h('col', { class: 'col-growth' }), h('col', { class: 'col-compare' }),
           editing ? h('col', { class: 'col-manage' }) : null),
         h('thead', null, head1, head2),
         h('tbody', null, t.children.map(channelRow)),
@@ -249,6 +283,11 @@
     }
 
     // หัวคอลัมน์ยอดขาย: ปีเต็ม (ปีที่ซ้อนกับ L12M มี Tooltip บอกช่วง) + L12M ⓘ + ช่วงเดือนบรรทัดเล็ก
+    // ช่วงของยอดจริงสะสม: เดือนเดียว = 'ม.ค. 2027' · หลายเดือน = 'ม.ค.–มี.ค. 2027'
+    function ytdRange() {
+      if (!ytdAll) return '';
+      return ytdAll.months === 1 ? SP.core.clock.label(ytdAll.to) : F.monthRange(0, ytdAll.months - 1) + ' ' + year;
+    }
     function historyHeads() {
       var lc = K.parse(K.lastClosedMonth());
       return fullYears.map(function (y) {
@@ -257,7 +296,7 @@
           : fill(L.priorInfo.fullYearTip, { year: y });
         return h('th', { scope: 'col', class: 'num td-hist', title: tip }, h('span', { class: 'has-tip' }, String(y)));
       }).concat([h('th', { scope: 'col', class: 'num td-hist td-l12m' },
-        C.priorLabel(null, L.priorInfo.short), h('small', { class: 'td-l12m-range' }, K.rangeLabel(true)))]);
+        C.priorLabel(null, L.priorInfo.short, C.priorNote(null, K)), h('small', { class: 'td-l12m-range' }, K.rangeLabel(true)))]);
     }
 
     // ---------- กราฟ: ยอดขายและเป้าหมายราย Channel · ที่มาของการเติบโต (ตัวเลขจาก calc) ----------
@@ -329,6 +368,8 @@
       var axis = G.vsLastYearAxis(scaleMax);
       refs.axis.replaceWith(axis);
       refs.axis = axis;
+      var sums = lockedSums(t);
+      if (refs.totalLocked) refs.totalLocked.textContent = sums && sums.total > 0 ? lockedLine(sums.total) : '';
       t.children.forEach(function (ch) {
         var r = refs.rows[ch.id];
         if (!r) return;
@@ -337,7 +378,14 @@
         var changed = editing && Math.abs((draft.pct[ch.id] || 0) - (saved.pct[ch.id] || 0)) > 1e-12;
         r.tdPct.classList.toggle('is-dirty-cell', changed);
         r.tdAmt.classList.toggle('is-dirty-cell', changed);
+        if (sums) putLocked(r.tdAmt, sums.channels[ch.id] || 0);
         C.clear(r.growth).appendChild(C.targetGrowth(ch.growth));
+        if (r.ytd) {   // CR-41 ยอดจริงสะสม · % ของเป้าหมายทั้งปีของ Revision ที่เลือก
+          var a = calc.actualToDate(live, ch.id, year);
+          r.ytd.textContent = a ? F.millionPlain(a.value, 2) : '–';
+          r.ytd.title = a ? F.baht(a.value) + ' ' + L.baht + (ytdSample ? ' · ' + cols.ytdSample : '') : '';
+          r.ytdPct.textContent = a && ch.amount ? F.pct(a.value / ch.amount, 1) : '–';
+        }
         C.clear(r.compare).appendChild(G.vsLastYearBar(ch.amount, ch.prior, scaleMax, { colorToken: ch.color, year: t.priorYear }));
       });
 
@@ -350,9 +398,8 @@
       var menu = editing ? C.menuButton([{ label: page.usePriorShares, title: page.usePriorSharesTitle, onClick: function () { setShares(channelIds(), priorSharesAll()); } }]) : null;
       var cells = fullYears.concat(['l12m']).map(function () { return { text: '' }; }).concat([
         { text: C.remainingPct(t.remaining), className: 'num' },
-        { text: C.remainingAmount(t.remaining), className: 'num' },
-        { text: '' }
-      ]);
+        { text: C.remainingAmount(t.remaining), className: 'num' }
+      ]).concat(ytdAll ? [{ text: '' }, { text: '' }] : []).concat([{ text: '' }]);
       if (editing) cells.push({ node: h('span', { class: 'td-manage-group' }, action, menu), colspan: 2, className: 'td-manage' });
       else cells.push({ text: '' });
       var totalRow = C.remainingRow({ rem: t.remaining, label: page.remainingTotal, className: 'td-rem-total', cells: cells });

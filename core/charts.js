@@ -700,5 +700,85 @@
 
   function clearNode(el) { while (el.firstChild) el.removeChild(el.firstChild); return el; }
 
-  SP.core.charts = { niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, planTargetBars: planTargetBars, partBars: partBars, splitBar: splitBar, waterfall: waterfall, waterfallColumns: waterfallColumns, stackedShare: stackedShare, stackedColumns: stackedColumns };
+  // ---------------------------------------------------------------------
+  // CR-38 Revision Compare: เส้น A (เทา ประ) · เส้น B (สีหลัก) 12 เดือน · แกน Y เริ่ม 0 · แท่งส่วนต่างบางใต้กราฟ (เขียว / แดง สเกลของส่วนต่าง)
+  //   เส้นแนวตั้งที่เดือนที่มีผลของรอบที่ใหม่กว่า + ป้าย (lockBefore > 0)
+  //   o = { a: [12], b: [12], months: [ชื่อเดือน], lockBefore, labels: { a, b, diff, effective }, tick, tip(m) → [[ป้าย, ค่า]] }
+  // ---------------------------------------------------------------------
+  function compareLines(o) {
+    var S = SP.data.settings;
+    var calc = SP.core.calc;
+    var all = [].concat(o.a || [], o.b || []).filter(function (v) { return typeof v === 'number' && isFinite(v); });
+    var axis = calc.niceAxis(0, calc.niceScaleMax(all, { headroom: S.CHART_HEADROOM }) || 1);
+    var top = axis.end;
+    function x(m) { return (m + 0.5) / 12 * 100; }
+    function y(v) { return (1 - Math.max(0, v || 0) / top) * 100; }
+    function pct(v) { return Math.round(v * 1000) / 1000 + '%'; }
+    var tick = o.tick || function (v) { return F.number(v); };
+    var plot = h('div', { class: 'barline-plot cmp-plot' });
+    var yAxis = h('div', { class: 'barline-yaxis', 'aria-hidden': 'true' });
+    axis.ticks.forEach(function (v) {
+      plot.appendChild(h('span', { class: 'barline-grid' + (v === 0 ? ' is-base' : ''), style: { top: pct(y(v)) } }));
+      yAxis.appendChild(h('span', { class: 'barline-tick', style: { top: pct(y(v)) } }, tick(v, axis.step)));
+    });
+    var L = o.lockBefore || 0;
+    if (L > 0 && L < 12) {
+      plot.appendChild(h('span', { class: 'cmp-locked-band', style: { left: '0%', width: pct(L / 12 * 100) } }));
+      plot.appendChild(h('span', { class: 'cmp-effective', style: { left: pct(L / 12 * 100) } }, h('span', { class: 'cmp-effective-label' }, o.labels.effective)));
+    }
+    var lines = svg('svg', { class: 'barline-lines', viewBox: '0 0 1200 1000', preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    // CR-41: ค่า null = ไม่มีข้อมูลเดือนนั้น (เช่น B = ยอดจริง เดือนที่ยังไม่ปิด) → เส้นขาดช่วง ไม่มีจุดและแท่งส่วนต่าง (ไม่มี null = ผลเดิม)
+    function path(values, cls) {
+      if (!values) return;
+      var parts = [], pen = false;
+      values.forEach(function (v, m) {
+        if (v == null) { pen = false; return; }
+        parts.push((pen ? 'L' : 'M') + (x(m) * 12).toFixed(1) + ' ' + (y(v) * 10).toFixed(1));
+        pen = true;
+      });
+      if (parts.length) lines.appendChild(svg('path', { d: parts.join(' '), class: cls, fill: 'none', 'vector-effect': 'non-scaling-stroke' }));
+    }
+    path(o.a, 'barline-dashed cmp-line-a');
+    path(o.b, 'barline-line cmp-line-b');
+    plot.appendChild(lines);
+    (o.b || []).forEach(function (v, m) { if (v != null) plot.appendChild(h('span', { class: 'barline-dot cmp-dot-b', style: { left: pct(x(m)), top: pct(y(v)) } })); });
+    var hits = h('div', { class: 'barline-hits' }, (o.months || []).map(function (mn, m) {
+      return h('span', { class: 'barline-hit', dataset: { m: String(m) }, tabindex: '0', 'aria-label': mn, style: { left: pct(m / 12 * 100), width: pct(100 / 12) } });
+    }));
+    plot.appendChild(hits);
+    // แท่งส่วนต่างบาง (B − A) ใต้กราฟ: เส้นกลาง = 0 · ขึ้น = เพิ่ม (เขียว) · ลง = ลด (แดง)
+    var diffs = (o.b || []).map(function (v, m) { return v == null ? 0 : (v || 0) - ((o.a || [])[m] || 0); });
+    var dmax = Math.max.apply(null, diffs.map(function (v) { return Math.abs(v); }).concat([0]));
+    var strip = h('div', { class: 'cmp-diff', 'aria-hidden': 'true' }, h('span', { class: 'cmp-diff-base' }));
+    diffs.forEach(function (v, m) {
+      if (!dmax || !v) return;
+      var hgt = Math.abs(v) / dmax * 50;
+      strip.appendChild(h('span', { class: 'cmp-diff-bar ' + (v > 0 ? 'is-up' : 'is-down'),
+        style: { left: pct((m + 0.35) / 12 * 100), width: pct(0.3 / 12 * 100), height: pct(hgt), top: v > 0 ? pct(50 - hgt) : '50%' } }));
+    });
+    var months = h('div', { class: 'barline-months', 'aria-hidden': 'true' }, (o.months || []).map(function (mn) { return h('span', null, mn); }));
+    function swatch(kind) {
+      var s = svg('svg', { class: 'barline-sym', viewBox: '0 0 28 14', 'aria-hidden': 'true' });
+      if (kind === 'b') { s.appendChild(svg('path', { d: 'M1 7 L27 7', class: 'barline-line cmp-line-b' })); s.appendChild(svg('circle', { cx: 14, cy: 7, r: 3.5, class: 'barline-sym-dot' })); }
+      if (kind === 'a') s.appendChild(svg('path', { d: 'M1 7 L27 7', class: 'barline-dashed cmp-line-a' }));
+      return s;
+    }
+    var wrap = h('div', { class: 'barline cmp-chart', role: 'img', 'aria-label': [o.labels.a, o.labels.b].join(' · ') },
+      h('div', { class: 'barline-body' }, yAxis, h('div', { class: 'barline-main' }, plot, strip, months)),
+      h('div', { class: 'legend barline-legend' },
+        h('span', { class: 'legend-item' }, swatch('a'), o.labels.a),
+        h('span', { class: 'legend-item' }, swatch('b'), o.labels.b),
+        h('span', { class: 'legend-item' }, h('span', { class: 'cmp-diff-sym is-up' }), h('span', { class: 'cmp-diff-sym is-down' }), o.labels.diff)));
+    wrap.info = { axis: axis, top: top, lockBefore: L };
+    if (o.tip) {
+      C.hoverTip(hits, '.barline-hit', function (el) {
+        var m = Number(el.dataset.m);
+        return h('div', { class: 'barline-tip' }, h('strong', null, o.months[m]),
+          h('table', { class: 'tip-table' }, h('tbody', null, o.tip(m).map(function (r) { return h('tr', null, h('td', null, r[0]), h('td', { class: 'num' }, r[1])); }))));
+      });
+    }
+    return wrap;
+  }
+
+  SP.core.charts = { compareLines: compareLines, niceScaleMax: niceScaleMax, axisStart: axisStart, millionTick: millionTick, stackedBars: stackedBars, vsLastYearBar: vsLastYearBar, vsLastYearAxis: vsLastYearAxis, barLine: barLine, hbars: hbars, planTargetBars: planTargetBars, partBars: partBars, splitBar: splitBar, waterfall: waterfall, waterfallColumns: waterfallColumns, stackedShare: stackedShare, stackedColumns: stackedColumns };
 })(window.SP);

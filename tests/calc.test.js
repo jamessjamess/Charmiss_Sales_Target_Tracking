@@ -1186,8 +1186,8 @@
       }
     },
     {
-      name: 'cr11-8. นำเข้า seed แล้ว ยอดขายปีก่อนของหน่วยขาย 7-Eleven = 19,800,000 และ EVEANDBOY = 9,900,000 (±100) / Net Sales จากจำนวนชิ้นราย SKU ต่างไม่เกิน 0.2% (CR-18 seed ฉบับที่ 2 รวม VAT) / สินค้าจริง 117 (ใน TRCLOUD เปิดแล้ว) + สินค้าใหม่ 7 (ปี 2027 · 2028 ยังไม่เปิด · CR-30 · CR-34 คำขอ NPD 2)',
-      expected: [true, true, true, true, 117, 8],
+      name: 'cr11-8. นำเข้า seed แล้ว ยอดขายปีก่อนของหน่วยขาย 7-Eleven = 19,800,000 และ EVEANDBOY = 9,900,000 (±100) / Net Sales จากจำนวนชิ้นราย SKU ต่างไม่เกิน 0.2% (CR-18 seed ฉบับที่ 2 รวม VAT) / สินค้าจริง 117 (ใน TRCLOUD เปิดแล้ว) + Bundle ตัวอย่าง 2 (CR-37 เปิดแล้ว) + สินค้าใหม่ 7 (ปี 2027 · 2028 ยังไม่เปิด · CR-30 · CR-34 คำขอ NPD 2)',
+      expected: [true, true, true, true, 119, 8],
       actual: function () {
         return [Math.abs(lyNet('seven') / 19800000 - 1) <= 0.002, Math.abs(calc.unitHistory(D.history, YEAR - 1, 'seven') - 19800000) <= 100,
           Math.abs(calc.unitHistory(D.history, YEAR - 1, 'eveandboy') - 9900000) <= 100, Math.abs(lyNet('eveandboy') / 9900000 - 1) <= 0.002,
@@ -1377,7 +1377,8 @@
   SP.tests = SP.tests || {};
   SP.tests.calc = CASES;
   function run() {
-    var all = CASES.concat((SP.tests && SP.tests.taxonomy) || [], (SP.tests && SP.tests.stores) || [], (SP.tests && SP.tests.features) || [], (SP.tests && SP.tests.permissions) || [], (SP.tests && SP.tests.targets) || [], (SP.tests && SP.tests.l12m) || [], (SP.tests && SP.tests.aging) || [], (SP.tests && SP.tests.cr27) || [], (SP.tests && SP.tests.cr28) || [], (SP.tests && SP.tests.cr29) || [], (SP.tests && SP.tests.cr30) || [], (SP.tests && SP.tests.cr31) || [], (SP.tests && SP.tests.cr32) || [], (SP.tests && SP.tests.cr33) || [], (SP.tests && SP.tests.cr34) || [], (SP.tests && SP.tests.cr35) || [], (SP.tests && SP.tests.cr36) || []);
+    var all = CASES.concat((SP.tests && SP.tests.taxonomy) || [], (SP.tests && SP.tests.stores) || [], (SP.tests && SP.tests.features) || [], (SP.tests && SP.tests.permissions) || [], (SP.tests && SP.tests.targets) || [], (SP.tests && SP.tests.l12m) || [], (SP.tests && SP.tests.aging) || [], (SP.tests && SP.tests.cr27) || [], (SP.tests && SP.tests.cr28) || [], (SP.tests && SP.tests.cr29) || [], (SP.tests && SP.tests.cr30) || [], (SP.tests && SP.tests.cr31) || [], (SP.tests && SP.tests.cr32) || [], (SP.tests && SP.tests.cr33) || [], (SP.tests && SP.tests.cr34) || [], (SP.tests && SP.tests.cr35) || [], (SP.tests && SP.tests.cr36) || [], (SP.tests && SP.tests.cr37) || [], (SP.tests && SP.tests.cr38) || [], (SP.tests && SP.tests.cr39) || [], (SP.tests && SP.tests.cr40) || [], (SP.tests && SP.tests.cr41) || [])
+      .filter(function (c) { return !c.node; });   // CR-40: ข้อที่อ่านไฟล์ในโฟลเดอร์ (node: true) รันได้เฉพาะ node tests/run.js
     return all.map(function (c) {
       var actual, error = null;
       try { actual = c.actual(); } catch (e) { error = e; }

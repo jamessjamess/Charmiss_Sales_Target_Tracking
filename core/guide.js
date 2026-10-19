@@ -88,8 +88,11 @@
     texts.forEach(function (t) {
       (t.match(/\{page_(\w+)\}/g) || []).forEach(function (m) { var id = m.slice(6, -1); if (ids.indexOf(id) < 0 && unknown.indexOf(id) < 0) unknown.push(id); });
     });
+    // CR-37: ชื่อหน้าที่เป็นคำศัพท์ด้วย (guide.conceptTerms เช่น Bundle = ประเภทสินค้า) พิมพ์เป็นคำศัพท์ได้
+    var terms = (guide && guide.conceptTerms) || [];
     list.filter(function (e) { return e.visible !== false && e.group && e.id !== 'aboutPrototype'; }).forEach(function (e) {
       var name = titleOf(e, pages);
+      if (terms.indexOf(name) >= 0) return;
       if (texts.some(function (t) { return t.indexOf(name) >= 0; }) && typed.indexOf(name) < 0) typed.push(name);
     });
     return { unknown: unknown, typed: typed };

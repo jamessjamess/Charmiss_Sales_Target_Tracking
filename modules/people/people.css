@@ -81,7 +81,7 @@
 .tl-table.is-editing td.tl-cell:not(.is-past):hover { box-shadow: inset 0 0 0 2px var(--c-primary); }
 .tl-table td.tl-cell.is-anchor { box-shadow: inset 0 0 0 2px var(--c-primary); position: relative; }
 .tl-table td.tl-cell.is-range { box-shadow: inset 0 0 0 2px var(--c-primary); background-image: linear-gradient(var(--c-primary-soft), var(--c-primary-soft)); }
-.tl-start-tag { position: absolute; top: 1px; right: 2px; font-size: 9px; line-height: 1.2; padding: 0 3px; border-radius: 3px; background: var(--c-primary); color: #fff; }
+.tl-start-tag { position: absolute; top: 1px; right: 2px; font-size: 9px; line-height: 1.2; padding: 0 3px; border-radius: 3px; background: var(--c-primary); color: var(--c-on-primary); }
 .tl-table.is-picking tbody tr.tl-row:not(.is-pick-row) { opacity: 0.5; }
 /* แท็บรายชื่อ: โหมดแก้ไข = ทั้งแถวคลิกได้ + ปุ่ม แก้ไข ขวาสุด */
 .pp-table.is-editing tr.pp-row { cursor: pointer; }

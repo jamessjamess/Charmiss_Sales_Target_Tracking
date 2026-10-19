@@ -106,6 +106,8 @@
   function teamsNow() { return fromStore('master.teams', SP.data.teams || []); }
   function monthNow() { var s = store(); return s ? s.currentKey() : null; }
   function listNow() { return SP.core.registry ? SP.core.registry.list : []; }
+  function featureOn(e) { var F = SP.core.features; return !e || !e.feature || !F || F.isOn(e.feature); }
+  function subOn(s) { var F = SP.core.features; if (!s || !s.feature || !F) return true; var neg = s.feature.charAt(0) === '!'; var on = F.isOn(neg ? s.feature.slice(1) : s.feature); return neg ? !on : on; }
   function src(context) {
     context = context || {};
     return {
@@ -127,7 +129,8 @@
     var groups = SP.core.registry ? SP.core.registry.groups : [];
     var pages = SP.data.content && SP.data.content.pages ? SP.data.content.pages : {};
     // CR-25: หน้าที่ใช้สิทธิ์ของหน้าอื่น (perm) และหน้าที่เห็นเสมอ (open) ไม่มีแถวในเมทริกซ์
-    var entries = list.filter(function (e) { return e.group && !e.perm && !e.open; }).slice().sort(function (a, b) {
+    // CR-37: หน้าที่ปิดด้วย Feature Flag (entry.feature) ไม่มีแถวในเมทริกซ์
+    var entries = list.filter(function (e) { return e.group && !e.perm && !e.open && featureOn(e); }).slice().sort(function (a, b) {
       return (groups.indexOf(a.group) - groups.indexOf(b.group)) || ((a.tour == null ? 999 : a.tour) - (b.tour == null ? 999 : b.tour)) || (list.indexOf(a) - list.indexOf(b));
     });
     var out = [];
@@ -136,8 +139,10 @@
       var subs = cfg.pages[e.id];
       if (!subs) { out.push({ id: e.id, pageId: e.id, label: title, main: true, parent: null, scopable: false, action: false, group: e.group, sub: false }); return; }
       var main = subs.filter(function (s) { return s.main; })[0];
-      subs.forEach(function (s) {
-        out.push({ id: s.id, pageId: e.id, label: s.label, main: !!s.main, parent: s.main ? null : (main ? main.id : null), scopable: !!s.scopable, action: !!s.action, group: e.group, sub: !s.main });
+      // CR-39: s.feature = Flag ของสิทธิ์ย่อย ('!ชื่อ' = แสดงเมื่อ Flag ปิด · เช่น เสนอ Lock / Lock ของ CR-38 เมื่อปิด Module Approval)
+      subs.filter(subOn).forEach(function (s) {
+        // CR-39: s.parent = สิทธิ์ย่อยของหน้าที่เป็นต้นทาง (ไม่ระบุ = สิทธิ์หลักของหน้า)
+        out.push({ id: s.id, pageId: e.id, label: s.label, main: !!s.main, parent: s.main ? null : (s.parent || (main ? main.id : null)), scopable: !!s.scopable, action: !!s.action, group: e.group, sub: !s.main });
       });
     });
     (cfg.global || []).forEach(function (s) { out.push({ id: s.id, pageId: '*', label: s.label, main: false, parent: null, scopable: !!s.scopable, action: !!s.action, group: null, sub: false }); });
@@ -259,6 +264,7 @@
     var S = src(context);
     var u = normalize(raw, S);
     var entry = entryOf(S, pageId);
+    if (entry && !featureOn(entry)) return 'NONE';   // CR-37: Flag ของหน้าปิด = ไม่มีใครเห็น
     if (entry && entry.open) return 'VIEW';
     var target = permPage(S, pageId);
     var list = resources(S.list).filter(function (r) { return r.pageId === target && !r.action; });

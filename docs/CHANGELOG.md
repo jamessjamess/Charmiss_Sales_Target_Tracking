@@ -2,6 +2,93 @@
 
 ประวัติการเปลี่ยนแปลงของ Prototype (ใหม่สุดอยู่บน) · CR ที่ทำเสร็จแล้วลบต้นฉบับออกจาก `docs/change-requests/` เหลือสรุปที่นี่
 
+## CR-41 — 2026-10-19 · สถานการณ์ Demo 2 แบบ (S1 ปลาย ก.ย. 2026 สร้าง R1 · S2 ปลาย ก.พ. 2027 ปรับเป้า R2) · นาฬิกากลางของระบบ
+
+(ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · ข้อมูลสถานการณ์ใน `data/scenarios.js` (ไม่ใช่ `data/seed/`) · ผู้รับผิดชอบ / สิทธิ์ใช้นาฬิกากลาง ·
+การเติบโตของยอดตัวอย่าง = เป้าหมายเทียบ L12M · เวลาที่ประทับ = วันที่ของสถานการณ์ — ผู้ใช้เลือก · ใช้ `SP.core.clock` เดิมแทน `SP.clock`)
+ไฟล์ใหม่: `data/scenarios.js` · `core/scenario.js` · `docs/spec/demo-scenarios.md` · `tests/cr41.test.js`
+ไฟล์นอกรายการของ CR: `core/clock.js` · `core/revision.js` (lockFirstRound · actualDataset · Snapshot asOfMonth) · `core/approval.js` · `core/components.js` · `core/charts.js` (compareLines รับ null) · `core/report.js` · `core/units.js` · `core/loader.js` ·
+`data/settings.js` · `data/revisions.js` · `data/approvals.js` · `data/guide.js` · `styles/components.css` · `tests/*` · `docs/*`
+
+- รอบ 1 (ส่วน 1 · 5): นาฬิกากลางตามสถานการณ์ (`asOfDate` · `planYear` · `now` · `isClosed` · `withScenario` / `withMonth` / `at`) · ตัด `DEMO_CURRENT_MONTH` · ยอดอ้างอิงแบบทั่วไป (S1 ค่าเดิมทุก SKU × หน่วยขาย) ·
+  `store.currentKey()` = นาฬิกากลาง (ผู้รับผิดชอบ · ทีม · สิทธิ์ · Role Management · รายงาน) · เวลาที่ประทับ 34 จุด + ชื่อไฟล์ส่งออก → `clock.now()` · Dialog เปิดรอบ = เดือนที่มีผลอ่านอย่างเดียว · ข้อความ `ข้อมูล ณ 1 {month}` → `{asOf}`
+- รอบ 2 (ส่วน 2 · 3 · 4.1–4.4): ป้ายสถานการณ์ + เมนู `สถานการณ์ Demo ▾` (Dialog ยืนยัน · หน้าแรกของสถานการณ์ · เริ่มใหม่) · `core/scenario.js` ยอดจริงตัวอย่างสูตรคงที่ · S2 R1 Lock ภายใต้นาฬิกาของ S1 ·
+  Snapshot เก็บเดือนตอน Lock · DATA_VERSION 19 · `จะสิ้นสุดเดือนนี้` · Clearance เดือนที่ปิดแล้วอ่านอย่างเดียว
+- รอบ 3 (ส่วน 4.5 · 6 · docs): Annual Target ยอดจริงสะสม + % ของเป้า · บรรทัด `จริง <ค่า>` (Sub-channel Allocation · SKU Planning) · Revision Compare B = ยอดจริง · คู่มือ (กล่องทดสอบ 2 สถานการณ์ + 7 ขั้น · คำศัพท์ 4 คำ) ·
+  spec/demo-scenarios.md (ใหม่) · revision · data-model · architecture · ui-standards-cr · pages · testing · DECISIONS D-168–D-173
+- Test: `tests/cr41.test.js` 16 ข้อ (5 ข้อในเบราว์เซอร์ · 1 ข้ออ่านไฟล์) · ปรับ l12m (เลื่อนนาฬิกาด้วย clock.withMonth) · หน้า Test 403 / 403 · S1 ตัวเลขเท่าเดิม (Net Sales รวมแผน 111,310,349 · เป้าหมาย 120 ล้าน)
+
+## CR-40 — 2026-10-19 · แถบสถานะ Revision เฉพาะโหมดแก้ไข · แถวเครื่องมือ SKU Planning แถวเดียว · ธีมใหม่ทั้งระบบตามแนว KOL Management
+
+(ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · Plan Summary แท็บรายงาน / ติดตามสถานะ เลื่อนหน้าตาม CR-39 · ไอคอน Lucide ดึงจาก unpkg ครั้งเดียว ·
+ใช้ค่าสีจริงจาก Repo KOL Management — ผู้ใช้เลือก)
+ไฟล์นอกรายการของ CR: `core/calc.js` (+ ส่วนที่ 26 `skuFilterKeys` · `clearedSkuFilters`) · `core/loader.js` (+ `assets/icons.js`) · `core/registry.js` (icon = ชื่อไอคอน Lucide) · `core/layout.js` (แถบบน · เมนูข้าง · หัวหน้า) ·
+`styles/print.css` · `tests/run.js` (`SP.testFiles` · Test `node: true`) · `tests/calc.test.js` / `.html` · `docs/*`
+
+- รอบ 1 (ส่วน 1 · 2): โหมดดูไม่มีแถบสถานะ Revision — ป้ายของรอบ + Tooltip (ร่าง · รออนุมัติ + ขั้นปัจจุบัน · Lock แล้ว) + ลิงก์ `ไปรอบปัจจุบัน` · โหมดแก้ไขแถบเดียวรวมข้อความของรอบ (`editBanner({ revision: true })`) ·
+  Annual Target แถว Channel ≥ 44px (ลิงก์ `n หน่วยขาย` ไม่ถูกบีบ) · SKU Planning แถวเครื่องมือแถวเดียว (`ตัวกรอง (n)` + แผง + Chip · `แสดงผล ▾` · ข้อมูลที่ต้องตรวจชิดขวา) · แถบโหมดแก้ไข + คำสั่งเป็นแถวของตัวเอง
+- รอบ 2 (ส่วน 3.1 · 3.4 · โครงหน้า): Token ของธีม (ค่าจาก Repo KOL) + ชื่อเดิมเป็นชื่อแทน · `assets/icons.js` (Lucide 16 ไอคอน · ISC) · `components.icon` / `stepIcon` · แถบบน (ค้นหาเมนู · Prototype · Avatar มุมมองผู้ใช้ · คู่มือ · รีเซ็ต) ·
+  เมนูข้างเต็มความสูง (กล่องโลโก้ + ปุ่มพับแบบไอคอน · ไอคอนเส้น · `v0.40 · Prototype`) · หัวหน้าการ์ดไล่สี + Breadcrumb · ตัดคำอธิบายใต้หัวข้อ 12 หน้า → `helpLead`
+- รอบ 3 (ส่วน 3.2 · 3.3 · 4 · docs): `components.tabs` แท็บขีดเส้นใต้ + ตัวนับ (9 หน้า) · การ์ด · หัวตารางพื้นขาว + Hover · ปุ่ม · ปุ่มกลุ่ม · ป้ายสถานะ 5 กลุ่มไม่มีเส้นขอบ (Status สินค้า · Revision · คำขอ · Workflow · ข้อมูลที่ต้องตรวจ) ·
+  ไม่มีค่าสีนอก tokens.css (people.css) · ตรวจความสูง 160 จุด · spec/ui-theme.md (ใหม่) · ui-standards · ui-standards-cr · pages · revision · approval · architecture · data-model · testing · DECISIONS D-161–D-167
+- Test: `tests/cr40.test.js` 11 ข้อ (4 ข้อในเบราว์เซอร์ · 4 ข้ออ่านไฟล์ด้วย Node) · หน้า Test 388 / 388 · ข้อมูลตั้งต้น Net Sales รวมแผน 111,310,349 · เป้าหมายรวม 120 ล้าน เท่าเดิม
+
+## CR-39 — 2026-10-19 · ย้าย Revision เข้า Plan Summary (แท็บ) · Module Approval สำหรับสรุปและอนุมัติ Sales Planning ของแต่ละ Revision
+
+(ทำ 4 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · Flag ใหม่ `approval` แทนการเปิด `approvalWorkflow` · ข้อมูลตัวอย่างใน `data/approvals.js` ไม่แก้ `data/seed/` ·
+ตั้งค่า = Management + ผู้ดูแลระบบ · เฉพาะ 2 แท็บใหม่ไม่เลื่อนหน้า — ผู้ใช้เลือก · Node.js ของเครื่องถูกถอนออก รัน Test ด้วย Node v24 ที่มากับ Playwright)
+ไฟล์นอกรายการของ CR: `core/approval.js` (ใหม่) · `core/revision.js` (ส่ง / Lock ผ่านคำขอ · summary · logEvent · ประวัติ create) · `core/permissions.js` (สิทธิ์ย่อย parent / feature) ·
+`core/loader.js` (หลายไฟล์ต่อหน้า · ไฟล์ใหม่) · `core/registry.js` · `core/layout.js` (ป้ายเมนู Approval) · `modules/revision-list` · `modules/revision-compare` (ทางผ่าน) · `modules/about-prototype` ·
+`data/approvals.js` (ใหม่) · `data/revisions.js` · `data/permissions.js` · `data/settings.js` · `data/guide.js` · `styles/base.css` (เมนูข้าง) · `tests/*` · `docs/*`
+
+- รอบ 1 (ส่วน 1): Plan Summary แท็บ `รายงาน | ติดตามสถานะ | Revision | เปรียบเทียบ` (`summary-revision.js` · fit เฉพาะ 2 แท็บใหม่ · `#revision` / `#compare`) · ตัดกลุ่ม REVISION ·
+  หน้าเดิมเป็นทางผ่าน · สิทธิ์ revisionList / revisionCompare ใต้ Plan Summary · revision.open ใต้แท็บ Revision · ปุ่มในแถวรูปแบบเดียวกัน · เปรียบเทียบของรอบแรกเทา + Tooltip ·
+  ประวัติ R1 = สร้างจากข้อมูลตั้งต้น · ลิงก์ไปแท็บ Revision เมื่อมีรอบเดียว · เมนูข้างไม่ตัดชื่อ ไม่เลื่อนแนวนอน · เปิดรอบเลือกปีแผนได้
+- รอบ 2 (ส่วน 2 · 3): `core/approval.js` (คำขอ · ขั้น · ตั้งค่า `approvalConfig.revisionLock` · guardWrite · authorizes · revisionMoveOk) · `calc` ส่วนที่ 25 (`revisionSummary` · `revisionSummaryChanges`) ·
+  รอ Lock → รออนุมัติ · สิทธิ์ approval / approval.submit / sdConfirm / mdLock / config · Flag `approval` · DATA_VERSION 18 · Test วงจรคำขอ
+- รอบ 3 (ส่วน 4 · 5): หน้า Approval (กลุ่ม APPROVAL · ✓ · ป้ายตัวเลข) แท็บ รอฉันดำเนินการ / ทั้งหมด / ตั้งค่า · รายละเอียดคำขอ (ไทม์ไลน์ · ชุดสรุป · แถบเตือน · ความคิดเห็น · แถบคำสั่ง) ·
+  แท็บ Revision: ส่งขออนุมัติ (ชุดสรุปย่อ · ขั้นที่จะผ่าน · ข้อความบังคับ) · ดูคำขออนุมัติ · ข้อมูลตัวอย่าง R1 approved + ความคิดเห็นของ MD · หน้าเริ่มต้น MD = Approval
+- รอบ 4 (ส่วน 6 · docs): คู่มือ รอบ Revision ใหม่ · คำศัพท์กลุ่มการอนุมัติ (คำขออนุมัติ · ขั้นอนุมัติ · ชุดสรุป · รออนุมัติ) · ตัด รอ Lock · ปุ่ม ? ของ Approval ·
+  spec/approval.md · pages/approval.md (ใหม่) · ui-standards-cr.md (แยก) · revision · Plan Summary · permissions · data-model · architecture · business-rules · guide · open-items · DECISIONS D-154–D-160
+- Test: `tests/cr39.test.js` 14 ข้อ (7 ข้อในเบราว์เซอร์) · ปรับ cr38-9 / 22 / 24 · cr21-1 · cr25-1/2/3/6/8/9 · หน้า Test 381 / 381 · ข้อมูลตั้งต้น Net Sales รวมแผน 111,310,349 เท่าเดิม
+
+## CR-38 — 2026-10-05 · Module Revision · เปิดรอบปรับเป้าหมาย · เสนอ Lock · MD Lock · ดูย้อนหลังทุกรอบ · เปรียบเทียบ Revision · ห้ามแก้ย้อนหลัง
+
+(ทำ 4 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · Flag ใหม่ `revision` แทนการเปิด `approvalWorkflow` / `baseline` / `reforecast` · ผู้ใช้ MD และข้อมูลตัวอย่างอยู่ในไฟล์ข้อมูลปกติ ไม่แก้ `data/seed/` — ผู้ใช้เลือก)
+ไฟล์นอกรายการของ CR: `core/revision.js` (ใหม่ · `SP.core.revision`) · `core/report.js` (build ตามรอบ · ผลเดิมเมื่อ Flag ปิด / R1) · `core/components.js` (+ revisionBadge / Picker / Bar / Card · workflowBar `readOnly`) ·
+`core/charts.js` (+ compareLines) · `core/registry.js` · `core/loader.js` · `data/revisions.js` (ใหม่) · `data/users.js` · `data/permissions.js` · `data/settings.js` · `data/guide.js` · `modules/about-prototype` (คู่มือ) · `styles/*` · `tests/*` · `docs/*`
+
+- รอบ 1 (ส่วน 1 · 2): `core/revision.js` (ฟังก์ชันล้วน `writable` · `lockCount` · `transition` · `defaultEffective` · `effectiveIssue` · `baseFrom` · `checksFrom` + ที่เก็บ `revision.list` / `revision.snap.<id>` / `ui.revision`) ·
+  Store เรียก `guardWrite` ทุก set / remove (รอบ Lock / รอ Lock · เดือนล็อก · ต่ำกว่าส่วนที่ล็อก · Snapshot) · `calc` ส่วนที่ 24 (`revisionPhasing` · `fillOpenMonths` · `keepLockedMonths` · `keepLockedShares` · `lockedTargetSums` · `lockedTargetIssues`) ·
+  `skuPlanGrid` ตัวเลือก `revisionLock` · บทบาท MD + ผู้ใช้ `u-md` · resource `revisionList` · `revision.open` / `submit` / `lock` · `revisionCompare` · `DATA_VERSION` 17 · Flag `revision`
+- รอบ 2 (ส่วน 4 · 6): ตัวเลือก Revision แทนตัวเลือกปีใน Sales Planning 4 หน้า · แถบสถานะ 1 บรรทัด · ทุกหน้าอ่านผ่าน `revision.read` / `data` / `master` · รอบ รอ Lock / Lock แล้ว = อ่านอย่างเดียว ·
+  เดือนล็อกพื้นเทาลายเส้น หัว `ล็อก` · Annual Target บรรทัดส่วนที่ล็อก + บันทึกต่ำกว่าส่วนที่ล็อกไม่ได้ · เครื่องมือปรับทำงานเฉพาะเดือนที่เปิด · Plan Summary ลายน้ำ / หัวรายงานตามสถานะ + การ์ดรอบในแท็บติดตามสถานะ ·
+  `report.build` ตามรอบ (รอบ Lock = Snapshot) · ปุ่ม `รีเซ็ตข้อมูล ▾` (ข้อมูลตั้งต้น · ข้อมูลตัวอย่าง Revision: R1 Lock 15 ธ.ค. 2026 โดย MD + R2 ร่าง มีผล เม.ย. 2027 · 120 → 123 ล้าน · ECOM +4 ล้าน · MT −1 ล้าน ที่ Watsons)
+- รอบ 3 (ส่วน 3): หน้า Revision List (กลุ่มเมนู REVISION · ไอคอน V) · การ์ดสถานะรอบ (Total เทียบรอบก่อน · ตรวจก่อนเสนอ Lock 3 ข้อบังคับ + แผน SKU คำเตือน) · Dialog เปิดรอบ / เสนอ Lock (สรุปการเปลี่ยนแปลง) / ถอน / ส่งกลับ (ข้อความบังคับ) /
+  Lock 2 ชั้น (พิมพ์ชื่อรอบ) · Snapshot ตอน Lock (~0.8 MB) · ตารางรายการ + ประวัติ · ดู · เปรียบเทียบกับรอบก่อน · ส่งออก
+- รอบ 4 (ส่วน 5 · 7 · docs): หน้า Revision Compare (ไอคอน ≠ · A / B ทุกรอบ · สลับ · ระดับ Total / Channel / หน่วยขาย / Series / SKU · Net Sales / Sale Amount / จำนวนชิ้น · ทั้งปี / รายเดือน · กางระดับ) ·
+  `calc.compareRevisions` · `charts.compareLines` (A ประเทา · B สีหลัก · แถบส่วนต่าง · เดือนล็อก · เส้นเดือนที่มีผล · แกน 0) · คู่มือ: บรรทัดรอบ Revision · คำศัพท์ 6 คำ · MD ในตารางบทบาท
+- Test: `tests/cr38.test.js` 16 ข้อ (6 ข้อในเบราว์เซอร์) · ปรับ Test เดิมตามบทบาท MD / กลุ่ม REVISION: pm-11 · cr21-1 · cr25-1/2/3/6/8/9 · cr29 · cr32 · หน้า Test 367 / 367 · ข้อมูลตั้งต้น Net Sales รวมแผน 111,310,349 เท่าเดิม
+- docs: `spec/revision.md` (ใหม่) · `spec/pages/revision-list.md` · `revision-compare.md` (ใหม่) · `spec/testing-cr.md` (แยกจาก testing.md ที่ใกล้ 30 KB) · Sales Planning 4 หน้า · permissions · data-model · architecture · ui-standards · ui-charts · business-rules · guide · open-items · DECISIONS D-146–D-153 · CLAUDE.md กติกาการเขียนข้อมูล Sales Planning
+
+## CR-37 — 2026-10-05 · สินค้าแบบ Bundle (Mix Product) · หน้า Bundle · วางแผน Bundle ใน SKU Planning · ความต้องการชิ้นส่วน
+
+(ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · ข้อมูลตัวอย่างอยู่ในไฟล์ข้อมูลปกติ ไม่แก้ `data/seed/`)
+ไฟล์นอกรายการของ CR: `core/catalog.js` (ไม่แก้ · ใช้ Type Bundle ใน taxonomy) · `core/seed.js` (addSampleBundle) · `core/components.js` (+ bundleTag) · `core/registry.js` (+ หน้า bundle · `feature`) ·
+`core/permissions.js` (หน้าที่ปิด Flag ไม่เห็น / ไม่อยู่ในเมทริกซ์) · `core/guide.js` (`conceptTerms`) · `modules/promotions` · `modules/about-prototype` (Flag ของกลุ่มคำศัพท์ / หน้า) ·
+`modules/bundle` (ใหม่) · `data/settings.js` (Flag `bundle` · `BUNDLE`) · `data/taxonomy.js` (Set & Bundle · Mix Series) · `data/products.js` · `data/permissions.js` · `data/guide.js` · `styles/*` · `tests/*` · `docs/*`
+
+- รอบ 1 (ส่วน 1 · 6): `calc` ส่วนที่ 23 (`isBundle` · `mergeComponents` · `bundleSeries` · `bundleIssues` · `normalizeBundles` · `bundleComponentPrice` · `bundleDiscount` · `bundlesContaining` ·
+  `duplicateBundleSets` · `bundlePlanTotals` · `componentDemand` · `bundleDeletedParts`) · Store ปฏิเสธ / ปรับ Bundle ตอนบันทึก Product Master · Flag `bundle` · `DATA_VERSION` 16 ·
+  ตัวอย่าง 90100 (12130 × 2 · Watsons 150 ชุด) / 90200 (12130 + 12140 · Shopee 200 ชุด มี.ค.–ธ.ค.) · Watsons / Shopee ยังขาดเป้าหมาย
+- รอบ 2 (ส่วน 2 · 3): หน้า Bundle แท็บ รายการ Bundle (KPI 4 · ตัวกรอง · Chip ส่วนประกอบ · ราคารวมชิ้นส่วน · ส่วนลด · แผนชุด · ข้อมูลที่ต้องตรวจ 4 เกณฑ์ · + สร้าง Bundle) |
+  ความต้องการชิ้นส่วน (3 บรรทัดต่อ SKU · กางราย Bundle) · Drawer ส่วนประกอบ (− / + · เพิ่ม / นำออก · ข้อความแดง + บันทึกไม่ได้ · ถามยืนยันเมื่อมีในแผน) ·
+  Product List (ป้าย · ประเภทสินค้า · อยู่ใน Bundle) · Price & Promotion (ป้าย · `รวมชิ้นส่วน X บาท · ส่วนลด Z%`) · สิทธิ์ `bundle` · เมนู `B`
+- รอบ 3 (ส่วน 4 · 5 · คู่มือ · docs): SKU Planning แถว Bundle (ป้าย · `รหัส · ส่วนประกอบ · ชุด` · ขอบเหลืองเมื่อชิ้นส่วน Delete) · Tooltip แถวรวมแผน · Dialog เพิ่มสินค้า (ป้าย + ประเภทสินค้า) ·
+  Plan Summary ใช้ Series ของ Bundle / Set & Bundle · คู่มือ: คำศัพท์กลุ่ม Bundle · หน้า Bundle ในกล่อง ข้อมูลที่ต้องมีก่อน · spec ใหม่ `pages/bundle.md` · `pages/sku-planning-products.md`
+- Test: `tests/cr37.test.js` 11 ข้อ (2 ข้อในเบราว์เซอร์) · ปรับค่าคาดหวังจากสินค้า +2: tx-8 (122) · cr11-8 (119) · cr35-13 (118) · cr36-12 (111,310,349 · Flag ปิด = 111,046,508 เท่าเดิม) ·
+  เมนู / เมทริกซ์ + หน้า Bundle: cr25-1 · cr25-6 · cr25-8 (152) · cr25-9 · cr31-6 · cr36-4 · หน้าเบราว์เซอร์ 351 / 351
+
 ## CR-36 — 2026-09-28 · กราฟการเติบโตแนวตั้ง · Product List (หมวดลำดับชั้น · จัดกลุ่ม · Product Year · แท็บ Product Level · Drawer 50%) · KPI Launch & Listing · แผน Clearance · Partner List · คู่มือตัด UAT
 
 (ทำ 3 รอบต่อเนื่อง รายงานครั้งเดียว · ไม่ Commit เพราะโฟลเดอร์ไม่ใช่ Git · ผู้ใช้เลือก: ข้อมูลตัวอย่างในไฟล์ข้อมูลปกติ · ข้อความคู่มือคงที่ data/guide.js · ตัด UAT รวมโค้ด)

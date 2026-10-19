@@ -18,6 +18,11 @@
     site: {
       name: 'Sales Target Planning',
       badge: 'Prototype',
+      // CR-40: กล่องโลโก้ของเมนูข้าง (บรรทัดที่ 2) · ท้ายเมนูข้าง · ช่องค้นหาเมนูที่แถบบน · Breadcrumb ของหัวหน้า
+      brandSub: 'Charmiss',
+      version: 'v0.40 · Prototype',
+      search: { placeholder: 'ค้นหาหรือไปที่หน้า…', label: 'ค้นหาหรือไปที่หน้า', empty: 'ไม่พบหน้าที่ตรงกับคำค้น' },
+      crumb: 'ตำแหน่งของหน้า',
       aboutLink: 'คู่มือ',   // CR-28 ลิงก์ Header ไปหน้าคู่มือการใช้งาน
       // CR-28: ปุ่ม ? ต่อท้ายชื่อหน้า (components.pageHelp · เนื้อหาจาก data/guide.js pages)
       help: { button: 'วิธีใช้หน้านี้', purpose: 'หน้านี้ใช้ทำอะไร', editors: 'ผู้แก้ไข', steps: 'ขั้นตอนหลัก', all: 'ดูคู่มือทั้งหมด', viewOnly: 'ทุกบทบาทดูได้อย่างเดียว', back: '← กลับ' },
@@ -25,7 +30,7 @@
       menuOpen: 'เปิดเมนู',
       collapse: 'พับเมนู',
       expand: 'ขยายเมนู',
-      groups: { 'sales-planning': 'Sales Planning', 'product-master': 'Product Master', 'account-master': 'Account Master', 'role-management': 'Role Management', 'project-info': 'ช่วยเหลือ' },
+      groups: { 'sales-planning': 'Sales Planning', approval: 'Approval', 'product-master': 'Product Master', 'account-master': 'Account Master', 'role-management': 'Role Management', 'project-info': 'ช่วยเหลือ' },
       // CR-21: เปิดหน้าที่มุมมองผู้ใช้นี้ไม่เห็น (สิทธิ์ ไม่เห็น) ตรงด้วย URL
       accessDenied: 'ไม่มีสิทธิ์เข้าถึงหน้านี้',
       accessDeniedText: 'บทบาทของมุมมองผู้ใช้นี้ไม่เห็นหน้านี้ · เปลี่ยนมุมมองผู้ใช้ที่ Header หรือกลับไปหน้าที่เห็น',
@@ -36,6 +41,16 @@
       dataVersionToast: 'ระบบปรับโครงข้อมูลเป็นรุ่นใหม่ จึงโหลดข้อมูลตั้งต้นใหม่ ค่าที่เคยแก้ไว้ในเบราว์เซอร์นี้ถูกล้างแล้ว',
       toastClose: 'ปิดข้อความ',
       reset: 'รีเซ็ตข้อมูล',
+      // CR-41: สถานการณ์ Demo (แทนรีเซ็ต 2 แบบของ CR-38 · data/scenarios.js) · {month} = เดือนปัจจุบันของสถานการณ์ · {closed} = เดือนปิดล่าสุด · {year} = ปีแผน
+      scenario: {
+        title: 'สถานการณ์ Demo', badgeTip: 'สถานการณ์ Demo ปัจจุบัน · คลิกเพื่อเปลี่ยนหรือเริ่มใหม่',
+        names: { S1: 'ปลาย {month} · สร้าง R1', S2: 'ปลาย {month} · ปรับเป้า R2' },
+        notes: { S1: 'ยังไม่มี Revision ที่ Lock · วางแผนปี {year} ครั้งแรก', S2: 'R1 Lock แล้ว · มียอดจริงถึง {closed} · เปิด R2 และส่งอนุมัติได้' },
+        switchTitle: 'สลับสถานการณ์ Demo', switchText: 'สลับเป็น {name} · ข้อมูลที่แก้ไว้ในสถานการณ์ปัจจุบันจะหายทั้งหมด', switchConfirm: 'สลับสถานการณ์',
+        restart: 'เริ่มสถานการณ์นี้ใหม่', restartTip: 'ล้างข้อมูลที่แก้ไว้ แล้วโหลดข้อมูลของสถานการณ์ปัจจุบันใหม่',
+        restartTitle: 'เริ่มสถานการณ์นี้ใหม่', restartText: 'เริ่ม {name} ใหม่ · ข้อมูลที่แก้ไว้ในสถานการณ์นี้จะหายทั้งหมด', restartConfirm: 'เริ่มใหม่',
+        failed: 'โหลดสถานการณ์ไม่สำเร็จ ({error})'
+      },
       resetConfirm: 'ล้างข้อมูลที่แก้ไขทั้งหมดรวมถึงสถานะการอนุมัติ และกลับไปใช้ข้อมูลตั้งต้นหรือไม่',
       storeWarning: 'เบราว์เซอร์นี้ไม่ส่งต่อข้อมูลที่แก้ไขข้ามหน้า',
       prev: 'ก่อนหน้า',
@@ -48,7 +63,8 @@
       approveTitle: 'สิ่งที่ต้องการให้อนุมัติ',
       leaveConfirm: 'มีรายการที่ยังไม่บันทึก หากออกจากหน้านี้ รายการดังกล่าวจะหายไป',
       discardConfirm: 'มีรายการที่ยังไม่บันทึก {n} รายการ ต้องการยกเลิกรายการดังกล่าวหรือไม่',
-      actionCount: 'รายการที่ต้องดำเนินการ {n} รายการ'
+      actionCount: 'รายการที่ต้องดำเนินการ {n} รายการ',
+      approvalCount: 'คำขอที่รอคุณดำเนินการ {n} รายการ'   // CR-39 ป้ายตัวเลขของเมนู Approval
     },
 
     labels: {
@@ -84,6 +100,61 @@
       // CR-35: วงจรสถานะ 7 แบบ (ลำดับ calc.PRODUCT_STATUSES) · ประเภทรายได้ (calc.revenueTypeOf · Phase 2) · ป้ายชื่อชั่วคราว · ยืนยันคำขอ NPD
       revenueTypes: { npd: 'NPD', existing: 'Existing', clearance: 'Clearance' },
       tempName: { tag: 'ชื่อชั่วคราว', tip: 'ชื่อชั่วคราวของคำขอ NPD · ทีม Product ตั้งชื่อจริงตอนยืนยัน' },
+      // CR-37: ป้าย Bundle (components.bundleTag · เหมือนกันทุกหน้า: Product List · Price & Promotion · SKU Planning · Dialog เพิ่มสินค้าในแผน) · หน่วยชุด
+      // CR-38 Revision (core/revision.js · ข้อความปฏิเสธของ Store · ป้ายสถานะ · เหตุการณ์ในประวัติ)
+      revision: {
+        name: '{year} R{seq}', total: 'Total Target',
+        // CR-39: ชื่อสถานะ submitted = รออนุมัติ · เหตุการณ์ของคำขออนุมัติบันทึกในประวัติของรอบด้วย
+        status: { draft: 'ร่าง', submitted: 'รออนุมัติ', locked: 'Lock แล้ว' },
+        events: { create: 'สร้างจากข้อมูลตั้งต้น', open: 'เปิดรอบ', submit: 'ส่งขออนุมัติ', withdraw: 'ถอนคำขอ', 'return': 'ส่งกลับแก้ไข', confirm: 'Sales Director ยืนยัน', lock: 'อนุมัติและ Lock' },
+        errors: {
+          locked: 'แก้ไม่ได้: {name} Lock แล้ว', submitted: 'แก้ไม่ได้: {name} รออนุมัติ', approvalOnly: 'แก้ไม่ได้: สถานะของ {name} เปลี่ยนได้ผ่านคำขออนุมัติเท่านั้น',
+          beforeEffective: 'แก้ไม่ได้: เดือน {month} อยู่ก่อนเดือนที่มีผลของรอบนี้', closed: 'แก้ไม่ได้: เดือน {month} ปิดแล้ว',
+          belowLocked: 'แก้ไม่ได้: เป้าหมาย {label} ต่ำกว่าส่วนที่ล็อก ({range}) {amount} บาท', removeLocked: 'แก้ไม่ได้: {label} มีค่าในเดือนที่ล็อกของรอบนี้',
+          snapshot: 'แก้ไม่ได้: Snapshot ของ {name} Lock แล้ว',
+          open: 'มีรอบที่ยังไม่ Lock ของปีนี้อยู่แล้ว (เปิดรอบใหม่ได้เมื่อรอบล่าสุด Lock แล้ว)', reason: 'กรุณากรอกเหตุผล',
+          effective: 'เดือนที่มีผลต้องอยู่ในปีแผนและหลังเดือนที่ปิดแล้ว', missing: 'ไม่พบรอบนี้', status: 'สถานะของรอบไม่ตรงกับคำสั่งนี้',
+          checks: 'ส่งขออนุมัติไม่ได้: ยังไม่ครบ {items}', note: 'กรุณากรอกข้อความ', confirmName: 'พิมพ์ชื่อรอบให้ตรง ({name})', permission: 'ไม่มีสิทธิ์ทำคำสั่งนี้'
+        },
+        checks: { totalChannel: 'Total = Channel', channelUnits: 'Channel = หน่วยขาย', unitMonthly: 'หน่วยขาย = รายเดือน', skuPlan: 'แผน SKU ครบเป้า' },
+        // Sales Planning: เดือนที่ล็อก (ก่อนเดือนที่มีผล)
+        lockedLine: 'ส่วนที่ล็อก ({locked}) {amount} บาท · ปรับได้ใน {open}', lockedShort: 'ล็อก {locked} {amount}',
+        belowLockedSave: 'บันทึกไม่ได้: เป้าหมาย {name} ต่ำกว่าส่วนที่ล็อก ({locked}) {amount} บาท',
+        picker: { title: 'เลือก Revision', effective: 'มีผล {month}', goCurrent: 'ไปรอบปัจจุบัน', goCurrentTip: 'เปิดรอบปัจจุบัน ({name})' },
+        // CR-40: Tooltip ของป้ายรอบที่หัวหน้า (แทนแถบสถานะในโหมดดู) · แถบโหมดแก้ไขของ Sales Planning (components.editBanner revision)
+        tip: { draft: 'แก้ไขได้ตั้งแต่ {month} · เดือนก่อนหน้าใช้ค่าจาก {base}', draftAll: 'แก้ไขได้ทุกเดือน', returned: 'ส่งกลับแก้ไข: {note}',
+          submitted: 'ส่งขออนุมัติเมื่อ {at} · ขั้นปัจจุบัน {step}', submittedLite: 'ส่งขออนุมัติเมื่อ {at}', locked: 'Lock เมื่อ {at} โดย {by}' },
+        editBar: { head: 'โหมดแก้ไข · {name} {status}', from: 'แก้ไขได้ตั้งแต่ {month}', all: 'แก้ไขได้ทุกเดือน',
+          dirty: 'มีรายการที่ยังไม่บันทึก {n} รายการ', clean: 'ยังไม่มีรายการที่เปลี่ยนแปลง', returned: 'ส่งกลับแก้ไข: {note}' },
+        bar: { draft: '{name} · ร่าง · แก้ไขได้ตั้งแต่ {month} · เดือนก่อนหน้าใช้ค่าจาก {base}', draftAll: '{name} · ร่าง · แก้ไขได้ทุกเดือน',
+          submitted: '{name} · รออนุมัติ · ดูอย่างเดียว', locked: '{name} · Lock แล้ว เมื่อ {at} โดย {by} · ดูอย่างเดียว', current: 'ดูรอบปัจจุบัน ({name})', returned: 'ส่งกลับแก้ไข: {note}' },
+        card: { effective: 'มีผลตั้งแต่ {month}', opened: 'เปิดโดย {by} เมื่อ {at} · เหตุผล: {reason}', locked: 'Lock โดย {by} เมื่อ {at}',
+          submitted: 'ส่งขออนุมัติโดย {by} เมื่อ {at} · ข้อความ: {note}', returned: 'ส่งกลับแก้ไข: {note}',
+          total: 'Total Target {amount} บาท', vsBase: '({base} {amount} · {diff} · {pct})',
+          checks: 'ตรวจก่อนส่งขออนุมัติ:', checksLocked: 'ผลตรวจตอน Lock:', ok: 'ครบ', missing: 'ขาด', missingN: 'ขาด {n}', warnN: 'ขาด {n} หน่วยขาย', goTip: 'ไปที่ {page}' },
+        watermarkDraft: 'ฉบับร่าง', watermarkSubmitted: 'รออนุมัติ', docLine: { draft: '{name} · ร่าง · มีผลตั้งแต่ {month}', submitted: '{name} · รออนุมัติ', locked: '{name} · Lock แล้ว {at} โดย {by}' },
+        lockedHead: 'ล็อก', lockedTip: 'เดือนก่อนเดือนที่มีผลของรอบนี้ · ใช้ค่าจาก {base} · แก้ไม่ได้', lockedCell: 'ล็อก · ใช้ค่าจาก {base}'
+      },
+      // CR-39 คำขออนุมัติ (core/approval.js · หน้า Approval · แท็บ Revision ของ Plan Summary · ข้อความปฏิเสธของ Store)
+      approval: {
+        type: { revisionLock: 'อนุมัติและ Lock Revision' },
+        status: { pending: 'รอดำเนินการ', approved: 'อนุมัติแล้ว', returned: 'ส่งกลับแก้ไข', withdrawn: 'ถอนคำขอแล้ว' },
+        stepStatus: { waiting: 'รอ', current: 'ขั้นปัจจุบัน', approved: 'ผ่าน', returned: 'ส่งกลับ', skipped: 'ไม่ใช้ขั้นนี้' },
+        steps: {
+          mgmtSubmit: { label: 'Management ส่งขออนุมัติ', role: 'Management', short: 'ส่งขออนุมัติ' },
+          sdConfirm: { label: 'Sales Director ยืนยันการจัดสรรหน่วยขายและรายเดือน', role: 'Sales Director', short: 'ยืนยัน' },
+          mdLock: { label: 'MD อนุมัติและ Lock', role: 'MD', short: 'อนุมัติและ Lock' }
+        },
+        errors: {
+          disabled: 'ยังไม่เปิดใช้ Module Approval', permission: 'ไม่มีสิทธิ์ทำคำสั่งนี้', type: 'ไม่รู้จักประเภทคำขอนี้', missing: 'ไม่พบคำขอนี้',
+          status: 'สร้างคำขอได้เมื่อ Revision เป็นร่าง', pending: 'Revision นี้มีคำขอที่รอดำเนินการอยู่แล้ว', checks: 'ส่งขออนุมัติไม่ได้: ยังไม่ครบ {items}',
+          note: 'กรุณากรอกข้อความ', text: 'กรุณากรอกความคิดเห็น', closed: 'คำขอนี้ปิดแล้ว แก้ไม่ได้', step: 'ขั้นปัจจุบันไม่ตรงกับคำสั่งนี้',
+          withdraw: 'ถอนคำขอได้ก่อนขั้นถัดไปถูกดำเนินการเท่านั้น', action: 'ไม่รู้จักคำสั่งนี้', remove: 'ลบคำขออนุมัติไม่ได้',
+          immutable: 'แก้ข้อมูลที่บันทึกตอนส่งของคำขอไม่ได้ (เพิ่มความคิดเห็นได้)', steps: 'ขั้นอนุมัติเดินหน้าได้ทีละขั้นเท่านั้น',
+          approve: 'อนุมัติได้เมื่อทุกขั้นผ่านและ Revision Lock แล้ว', 'return': 'ส่งกลับต้องมีข้อความ และ Revision ต้องกลับเป็นร่าง', confirmName: 'พิมพ์ชื่อรอบให้ตรง ({name})'
+        }
+      },
+      bundleTag: { tag: 'Bundle', tip: 'สินค้าแบบ Bundle: {components}', unit: 'ชุด', part: '{code} × {qty}', join: ' + ' },
       tempCode: { tag: 'รหัสชั่วคราว', tip: 'รหัสชั่วคราว NPD-ปีเดือนที่เริ่มขาย-ลำดับ · ได้ Product Code 5 หลักเมื่อทีม Product ยืนยัน', old: 'รหัสชั่วคราวเดิม {code}' },
       confirmRequest: {
         button: 'ยืนยันเป็น NPD', title: 'ยืนยันคำขอเป็น NPD · {code}', temp: 'รหัสชั่วคราว', name: 'ชื่อสินค้าจริง', type: 'Type (กำหนดเลขนำหน้า Product Code)',
@@ -162,6 +233,8 @@
         axisUnit: 'ล้าน'
       },
       // ⓘ ของยอดขายฐาน (components.priorLabel) — CR-24: ยอดขาย L12M · ช่วงเดือนจาก core/clock.js (mixed / actual / estimate = แบบเดิมเมื่อไม่มี clock)
+      // CR-41: บรรทัดเล็กยอดจริงของเดือนที่ปิดแล้ว (components.actualLine) · ข้อความกำกับยอดจริงตัวอย่าง
+      actualLine: { text: 'จริง {value}', tip: 'ยอดจริง {actual} · เป้าหมาย / แผน {target}', sample: 'ยอดจริงตัวอย่าง (ยังไม่ใช่ยอดจาก TRCLOUD)' },
       priorInfo: {
         label: 'ยอดขาย L12M',
         column: 'ยอดขาย L12M (ล้านบาท)',
@@ -214,6 +287,7 @@
         name: 'ชื่อ', nameEn: 'ชื่อภาษาอังกฤษ', shortName: 'ชื่อย่อ', inferred: 'หมวดสินค้าที่ระบบกำหนด', categoryId: 'Category', subCategoryId: 'Sub Category', typeId: 'Type',
         seriesId: 'Series', subSeriesId: 'Sub Series', packSize: 'ขนาดบรรจุ', uom: 'หน่วย', image: 'รูป',
         rsp: 'RSP', launchDate: 'เดือนเปิดตัว', discontinueMonth: 'เดือนเลิกขาย', clearance: 'Clearance', note: 'หมายเหตุ',
+        kind: 'ประเภทสินค้า', components: 'ส่วนประกอบ', seriesManual: 'Series ที่ทีม Product กำหนดเอง',   // CR-37 Bundle (ประวัติการแก้ไข)
         create: 'สร้างรายการ', 'delete': 'ลบรายการ', listing: 'Listing', price: 'ราคา', manualDefault: 'ค่าตั้งต้นช่องกรอกเอง'
       },
       // แถบบริบท (subChannelPicker) หน้า Phasing และวางแผน SKU
@@ -251,7 +325,7 @@
       // CR-19: manager / officer = ทีมขายต่อ Channel · viewer = ผู้ดูรายงาน / sales · trade = ค่าจากรุ่นก่อน (ประวัติเดิม)
       // CR-21: ชื่อที่แสดงจริงมาจาก master.roles (แก้ได้ที่หน้า Roles) ชุดนี้ใช้กับข้อความเดิม
       roles: { management: 'Management', director: 'Sales Director', manager: 'Sales Manager', officer: 'Sales Officer', product: 'ทีม Product', supply: 'Supply Chain', viewer: 'ผู้ดูรายงาน', admin: 'ผู้ดูแลระบบ',
-        sales: 'Sales Person', trade: 'Trade Marketing' },
+        sales: 'Sales Person', trade: 'Trade Marketing', md: 'MD' },
       // Workflow ต่อขั้น (core/workflow.js + components.workflowBar)
       workflow: {
         status: { draft: 'ฉบับร่าง', submitted: 'รออนุมัติ', approved: 'อนุมัติแล้ว', returned: 'ส่งกลับแก้ไข', review: 'ต้องตรวจสอบใหม่', locked: 'ล็อกแล้ว' },
@@ -411,7 +485,7 @@
 
       template: {
         title: 'Module ใหม่ (Template)',
-        lead: ['โครงตั้งต้นสำหรับสร้าง Module ใหม่ ดูขั้นตอนใน README.md'],
+        helpLead: 'โครงตั้งต้นสำหรับสร้าง Module ใหม่ ดูขั้นตอนใน README.md',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         approve: ['ตัวอย่างกล่องสิ่งที่ต้องการให้อนุมัติ']
       },
 
@@ -421,7 +495,7 @@
         title: 'Annual Target',
         short: 'Annual Target',
         titleTip: 'กำหนดเป้าหมายประจำปี',
-        lead: ['กำหนด Total Target (Net Sales) ประจำปี และเป้าหมายของแต่ละ Channel'],
+        helpLead: 'กำหนด Total Target (Net Sales) ประจำปี และเป้าหมายของแต่ละ Channel',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         workflowTitle: 'Annual Target ปี {year}',
         totalLabel: 'Total Target',
         columns: {
@@ -433,7 +507,11 @@
           amount: 'เป้าหมาย {year} (บาท)',
           amountTip: 'เป้าหมาย Net Sales ของ Channel',
           growth: 'การเติบโต',
-          manage: 'จัดการ'
+          manage: 'จัดการ',
+          // CR-41: เมื่อเดือนปิดล่าสุดอยู่ในปีแผน (สถานการณ์ S2) · {range} = ม.ค.–เดือนปิดล่าสุด · {name} = Revision ที่เลือก
+          ytd: 'ยอดจริงสะสม ({range})', ytdTip: 'ยอดขายจริง Net Sales สะสมตั้งแต่ ม.ค. ถึงเดือนปิดล่าสุด (ล้านบาท)',
+          ytdPct: '% ของเป้า {name}', ytdPctTip: 'ยอดจริงสะสมเทียบเป้าหมายทั้งปีของ Revision ที่เลือก',
+          ytdSample: 'ยอดจริงตัวอย่าง (ยังไม่ใช่ยอดจาก TRCLOUD)'
         },
         unitsLink: '{n} หน่วยขาย',
         // CR-24: กราฟใต้ตาราง
@@ -486,7 +564,7 @@
         title: 'Sub-channel Allocation',
         short: 'Sub-channel Allocation',
         titleTip: 'จัดสรรเป้าหมายหน่วยขาย',
-        lead: ['จัดสรรเป้าหมายของ Channel ให้แต่ละหน่วยขาย และกระจายเป็นรายเดือน'],
+        helpLead: 'จัดสรรเป้าหมายของ Channel ให้แต่ละหน่วยขาย และกระจายเป็นรายเดือน',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         workflowTitle: 'Sub-channel Allocation ของ {unit}',
         channelLabel: 'Channel',
         stats: { target: 'เป้าหมาย Channel', targetBy: '(กำหนดโดย Management)' },
@@ -598,7 +676,6 @@
       productList: {
         // CR-35: ชื่อหน้าภาษาอังกฤษ · คำอธิบายใต้หัวข้อย้ายไปบรรทัดแรกของปุ่ม ? (helpLead)
         title: 'Product List', short: 'Product List',
-        lead: [],
         helpLead: 'ข้อมูลหลักของสินค้า ราคา และสถานะความครบถ้วนของข้อมูล',
         // CR-36: แท็บ สินค้า | Product Level (หน้า Category & Series เดิม) · ป้าย ระบบกำหนด = ลิงก์ไปแท็บ Product Level
         pageTabLabel: 'แท็บ', pageTabs: { items: 'สินค้า', level: 'Product Level' }, levelLinkTip: 'กดเพื่อเปิด Product Level ที่ Type นี้',
@@ -617,6 +694,8 @@
           // CR-20: สินค้าที่ Sales สร้างจากหน้าวางแผน SKU
           source: 'ที่มา', sourceAll: 'ทุกที่มา', sourceOptions: { product: 'ทีม Product', sales: 'จาก Sales' },
           trcloud: 'ใน TRCLOUD', trcloudAll: 'ทุกสถานะ TRCLOUD',
+          // CR-37: ประเภทสินค้า (Flag bundle ปิด = ไม่แสดง)
+          kind: 'ประเภทสินค้า', kindAll: 'ทุกประเภทสินค้า', kindOptions: { single: 'สินค้าเดี่ยว', bundle: 'Bundle' },
           fromSales: 'จาก Sales', fromSalesTip: 'คำขอจาก Sales · ผู้ขอ {by} · {date} · หน่วยขาย {units} · หมายเหตุ {note}',
           completenessOptions: { ok: 'ครบ', required: 'ขาดข้อมูลจำเป็น', recommended: 'ขาดข้อมูลที่ควรมี' },
           // CR-30: แถวที่สอง (กดครั้งเดียวกาง · จำสถานะที่ ui.productMoreFilters)
@@ -660,7 +739,9 @@
           codeLocked: 'Product Code สร้างโดยระบบ แก้ไขไม่ได้',
           codeNote: 'Product Code สร้างโดยระบบจากเลขนำหน้าของ Type ที่เลือก',
           trcloudNote: 'ตั้งจากผลของปุ่ม เปรียบเทียบกับ ERP',
-          note: 'หมายเหตุ'
+          note: 'หมายเหตุ',
+          // CR-37: SKU เดี่ยวที่เป็นชิ้นส่วนของ Bundle (ลิงก์ไปหน้า Bundle)
+          inBundles: 'อยู่ใน Bundle', inBundleItem: '{code} (×{qty})', inBundleTip: 'เปิด {code} ที่หน้า Bundle'
         },
         // CR-30: แท็บราคาอ่านอย่างเดียว (แก้ที่หน้าราคาและ Promotion)
         price: {
@@ -698,17 +779,187 @@
         }
       },
 
+      // CR-39 Module Approval (modules/approval · core/approval.js · ชุดสรุป calc.revisionSummary)
+      approval: {
+        title: 'Approval', short: 'Approval',
+        helpLead: 'คำขออนุมัติ Sales Planning ของแต่ละ Revision · ชุดสรุปสำหรับผู้อนุมัติ · ขั้นอนุมัติตามตั้งค่า',
+        tabLabel: 'มุมมองของหน้า Approval',
+        tabs: { mine: 'รอฉันดำเนินการ', all: 'ทั้งหมด', settings: 'ตั้งค่า' },   // CR-40 ตัวนับเป็นตัวเลขเล็กต่อท้าย (components.tabs)
+        empty: 'ไม่มีคำขอที่รอคุณดำเนินการ', emptyAll: 'ไม่มีคำขออนุมัติตามตัวกรอง',
+        currentStep: 'ขั้นปัจจุบัน: {step}', sentBy: 'ส่งโดย {by} · {at}', noteLine: 'ข้อความ: {note}',
+        totalLine: 'Total Target {amount} บาท', vsPrev: '({name} · {diff} · {pct})', firstRound: '(รอบแรกของปี)', open: 'เปิดดู',
+        columns: { rev: 'Revision', type: 'ประเภท', status: 'สถานะ', step: 'ขั้นปัจจุบัน', sent: 'ผู้ส่ง / วันที่', last: 'ผลล่าสุด / วันที่', manage: 'จัดการ' },
+        lastLine: '{what} · {by} · {at}',
+        filterYear: 'ปีแผน', yearAll: 'ทุกปีแผน', filterStatus: 'สถานะ', statusAll: 'ทุกสถานะ',
+        settings: { title: 'ขั้นอนุมัติของคำขอ อนุมัติและ Lock Revision', sdConfirm: 'ต้องให้ Sales Director ยืนยันก่อนส่งถึง MD', note: 'มีผลกับคำขอใหม่เท่านั้น',
+          flow: 'ลำดับตอนนี้: {steps}', saved: 'บันทึกตั้งค่าแล้ว · มีผลกับคำขอใหม่เท่านั้น', viewOnly: 'ดูอย่างเดียว · แก้ได้โดย Management และผู้ดูแลระบบ' },
+        detail: {
+          back: '‹ กลับ', effective: 'มีผลตั้งแต่ {month}', reason: 'เหตุผลของรอบ: {reason}', firstReason: 'รอบแรกของปีแผน', requestNo: 'คำขอ {id} · {type}',
+          timeline: 'ขั้นอนุมัติ', actor: '{by} · {at}',
+          changed: 'ข้อมูลเปลี่ยนหลังส่งขออนุมัติ ({parts}) · ตัวเลขด้านล่างเป็นชุดสรุปตอนส่ง',
+          changedParts: { total: 'ตัวเลขหลัก', channels: 'ราย Channel', topUnits: 'หน่วยขาย', sku: 'แผน SKU', mix: 'ประเภทสินค้า', clearance: 'Clearance', monthly: 'รายเดือน', all: 'ทั้งหมด' },
+          summaryTitle: 'ชุดสรุป Sales Planning · {name}', summaryNote: 'คำนวณตอนส่งขออนุมัติ {at}',
+          kpi: { total: 'Total Target', prior: 'ยอดขาย L12M', growth: 'การเติบโต (เทียบ L12M)', diff: 'ส่วนต่างจาก {name}', diffNone: 'ส่วนต่างจากรอบก่อน', none: '–' },
+          channels: { title: 'ราย Channel (บาท)', name: 'Channel', diff: 'ส่วนต่าง', share: '% ของ Total', bars: 'แท่งเทียบ (รอบก่อนเทา · รอบนี้สีหลัก)', prevNone: 'รอบก่อน' },
+          units: { title: 'หน่วยขายที่เปลี่ยนมากที่สุด (5 อันดับ)', none: 'ไม่มีหน่วยขายที่เปลี่ยน', firstRound: 'รอบแรกของปี (ไม่มีรอบก่อน)', line: '{name} · {channel}' },
+          sku: { title: 'ความครบของแผน SKU', ok: 'ครบ {n}', short: 'ขาด {n}', over: 'เกิน {n}', empty: 'ไม่มีเป้า {n}', shortTotal: 'ยอดขาดรวม {amount} บาท', link: 'ดูที่ Plan Summary › ติดตามสถานะ' },
+          mix: { title: 'ประเภทสินค้าในแผน', line: '{amount} บาท · {pct}' },
+          clearance: { line: 'แผน Clearance รวม {amount} บาท (ไม่นับในเป้าหมาย)', none: 'ไม่มีแผน Clearance' },
+          chart: { title: 'เป้าหมายรายเดือน · รอบนี้เทียบรอบก่อน (ล้านบาท)', a: 'รอบก่อน · {name}', b: 'รอบนี้ · {name}', noPrev: 'ไม่มีรอบก่อน', diff: 'ส่วนต่าง', effective: 'มีผล {month}' },
+          links: { report: 'ดูรายงานเต็ม', compare: 'เปรียบเทียบละเอียด' },
+          comments: { title: 'ความคิดเห็น', none: 'ยังไม่มีความคิดเห็น', placeholder: 'เพิ่มความคิดเห็น', add: 'เพิ่มความคิดเห็น', line: '{by} · {at}' },
+          actions: { confirm: 'ยืนยัน', approve: 'อนุมัติและ Lock', 'return': 'ส่งกลับแก้ไข', withdraw: 'ถอนคำขอ', hint: 'ขั้นปัจจุบัน: {step} · รอ {role} ดำเนินการ', closed: 'คำขอนี้ปิดแล้ว ({status})' },
+          confirmDlg: { title: 'ยืนยัน · {name}', line: 'ยืนยันการจัดสรรหน่วยขายและรายเดือนของ {name} แล้วส่งต่อถึง MD', note: 'ข้อความ (ไม่บังคับ)', confirm: 'ยืนยัน' },
+          approveDlg: { title: 'อนุมัติและ Lock · {name}', warn: 'เมื่อ Lock แล้วจะแก้ไขไม่ได้',
+            what: 'ระบบเก็บ Snapshot ของค่าทั้งหมด ราคา GP ชื่อ และสถานะสินค้า ณ ตอนนี้ไว้ การแก้ Master ภายหลังไม่เปลี่ยนตัวเลขของรอบนี้',
+            next: 'ดำเนินการต่อ', title2: 'ยืนยันอนุมัติและ Lock · {name}', type: 'พิมพ์ชื่อรอบ {name} เพื่อยืนยัน', confirm: 'อนุมัติและ Lock' },
+          returnDlg: { title: 'ส่งกลับแก้ไข · {name}', line: 'รอบนี้กลับเป็นร่าง แก้ไขได้อีกครั้ง · ข้อความแสดงที่ป้ายของรอบ (Tooltip) การ์ดของรอบ และแถบโหมดแก้ไข จนกว่าจะส่งใหม่', note: 'ข้อความถึง Management (บังคับ)', confirm: 'ส่งกลับแก้ไข' },
+          withdrawDlg: { title: 'ถอนคำขอ · {name}', line: 'รอบนี้กลับเป็นร่าง แก้ไขได้อีกครั้ง', confirm: 'ถอนคำขอ' },
+          done: { confirm: 'ยืนยัน {name} แล้ว · ส่งต่อถึง MD', approve: 'อนุมัติและ Lock {name} แล้ว', 'return': 'ส่งกลับ {name} แล้ว', withdraw: 'ถอนคำขอ {name} แล้ว', comment: 'เพิ่มความคิดเห็นแล้ว' },
+          notFound: 'ไม่พบคำขอนี้'
+        },
+        exportFile: 'Approval_{date}', exportSheet: 'คำขออนุมัติ', exportId: 'เลขคำขอ', exportTotal: 'Total Target (บาท)', exportDiff: 'ส่วนต่างจากรอบก่อน (บาท)'
+      },
+
+      // CR-38 Revision List (modules/revision-list · กลุ่มเมนู REVISION) · ข้อความกลางของ Revision อยู่ที่ labels.revision
+      revisionList: {
+        title: 'Revision List', short: 'Revision List',
+        // CR-39: เป็นแท็บ Revision ของ Plan Summary (modules/summary/summary-revision.js) · หน้าเดิมเป็นทางผ่าน
+        moved: 'Revision List ย้ายไปเป็นแท็บ Revision ของ Plan Summary', go: 'ไปที่ Plan Summary › Revision',
+        helpLead: 'รอบของเป้าหมายและแผนประจำปี (Revision) · เปิดรอบปรับเป้ากลางปี เสนอ Lock และ MD Lock · รอบที่ Lock แล้วแก้ไม่ได้และดูย้อนหลังได้ทุกหน้า',
+        year: 'ปีแผน',
+        actions: { open: 'เปิด Revision ใหม่', submit: 'เสนอ Lock', withdraw: 'ถอนการเสนอ', lock: 'Lock', 'return': 'ส่งกลับแก้ไข', request: 'ส่งขออนุมัติ', viewRequest: 'ดูคำขออนุมัติ' },
+        viewOnly: 'ดูอย่างเดียว', openHint: 'เปิดรอบใหม่ได้เมื่อรอบล่าสุด Lock แล้ว', approvalHint: 'รอบนี้เป็นร่าง · Management ส่งขออนุมัติได้เมื่อรายการตรวจ 3 ข้อแรกครบ', waitSubmit: '{name} ยังเป็นร่าง · Lock ได้เมื่อ Management เสนอ Lock',
+        openDlg: { title: 'เปิด Revision ใหม่ · ปี {year}', titlePick: 'เปิด Revision ใหม่', year: 'ปีแผน', name: 'ชื่อรอบ', nameNote: '(ระบบตั้งให้)', effective: 'เดือนที่มีผล',
+          // CR-41: เดือนที่มีผล = เดือนถัดจากเดือนปัจจุบันเสมอ (ไม่ก่อนเดือนแรกของปีแผน) แสดงอ่านอย่างเดียว
+          effectiveNext: 'มีผลตั้งแต่ {month} (เดือนถัดไป)', effectiveYearStart: 'มีผลตั้งแต่ {month} (เดือนแรกของปีแผน)',
+          effectiveNote: 'เดือนก่อนเดือนที่มีผลใช้ค่าจาก {base} และแก้ไม่ได้',
+          effectiveFirst: 'รอบแรกของปี มีผลตั้งแต่เดือนแรกของปีแผน', copyNote: 'คัดลอกค่าทั้ง 4 ขั้นจาก {base}', reason: 'เหตุผล (บังคับ)', confirm: 'เปิดรอบ' },
+        submitDlg: { title: 'เสนอ Lock · {name}', changes: 'สรุปการเปลี่ยนแปลงเทียบ {base}', totalLine: 'Total Target {a} → {b} บาท ({diff})', channelLine: '{channel} {a} → {b} บาท ({diff})',
+          noBase: 'รอบแรกของปี (ไม่มีรอบก่อน)', warn: 'คำเตือน: แผน SKU ยังไม่ครบเป้า {n} หน่วยขาย (เสนอ Lock ได้ · บันทึกสถานะไว้ใน Snapshot)',
+          after: 'เสนอแล้ว Sales Planning ทุกหน้าของรอบนี้เป็นอ่านอย่างเดียวจนกว่าจะถอนการเสนอหรือ MD ส่งกลับ', note: 'ข้อความถึง MD', confirm: 'เสนอ Lock' },
+        // CR-39 ส่งขออนุมัติ (Module Approval · Flag approval)
+        requestDlg: { title: 'ส่งขออนุมัติ · {name}', changes: 'ชุดสรุปแบบย่อเทียบ {base}', totalLine: 'Total Target {a} → {b} บาท ({diff})', channelLine: '{channel} {a} → {b} บาท ({diff})',
+          noBase: 'รอบแรกของปี · Total Target {amount} บาท (ไม่มีรอบก่อน)', warn: 'คำเตือน: แผน SKU ยังไม่ครบเป้า {n} หน่วยขาย (ส่งได้ · ผู้อนุมัติเห็นในชุดสรุป)',
+          steps: 'ขั้นอนุมัติที่จะผ่าน', after: 'ส่งแล้ว Sales Planning ทุกหน้าของรอบนี้เป็นอ่านอย่างเดียวจนกว่าจะถอนคำขอหรือถูกส่งกลับ',
+          note: 'ข้อความถึงผู้อนุมัติ (บังคับ)', confirm: 'ส่งขออนุมัติ' },
+        withdrawDlg: { title: 'ถอนการเสนอ · {name}', line: 'รอบนี้กลับเป็นร่าง แก้ไขได้อีกครั้ง', confirm: 'ถอนการเสนอ' },
+        lockDlg: { title: 'Lock · {name}', warn: 'เมื่อ Lock แล้วจะแก้ไขไม่ได้', what: 'ระบบเก็บ Snapshot ของค่าทั้งหมด ราคา GP ชื่อ และสถานะสินค้า ณ ตอนนี้ไว้ การแก้ Master ภายหลังไม่เปลี่ยนตัวเลขของรอบนี้',
+          next: 'ดำเนินการต่อ', title2: 'ยืนยัน Lock · {name}', type: 'พิมพ์ชื่อรอบ {name} เพื่อยืนยัน', confirm: 'Lock' },
+        returnDlg: { title: 'ส่งกลับแก้ไข · {name}', note: 'ข้อความถึง Management (บังคับ)', confirm: 'ส่งกลับแก้ไข' },
+        done: { request: 'ส่งขออนุมัติ {name} แล้ว · ดูคำขอได้ที่หน้า Approval', open: 'เปิด {name} แล้ว (ร่าง)', submit: 'เสนอ Lock {name} แล้ว', withdraw: 'ถอนการเสนอ {name} แล้ว', lock: 'Lock {name} แล้ว', 'return': 'ส่งกลับ {name} แล้ว' },
+        noRevision: 'ยังไม่มี Revision ของปี {year}',
+        columns: { name: 'Revision', status: 'สถานะ', effective: 'มีผลตั้งแต่', total: 'Total Target (บาท)', change: 'เปลี่ยนจากรอบก่อน', reason: 'เหตุผล', locked: 'Lock โดย / เมื่อ', manage: 'จัดการ' },
+        lockedBy: '{by} · {at}', view: 'ดู', viewTip: 'เปิด Annual Target ของ {name}', compare: 'เปรียบเทียบกับรอบก่อน', compareTip: 'เปิดแท็บเปรียบเทียบ: {a} กับ {b}', compareNone: 'ยังไม่มีรอบก่อนหน้า',
+        expand: 'กดเพื่อดูประวัติ', collapse: 'กดเพื่อซ่อนประวัติ', history: 'ประวัติ', historyLine: '{by} · {at}', historyNote: 'ข้อความ: {note}',
+        exportFile: 'Revision-List_{year}_{date}', exportSheet: 'Revision', exportPct: 'เปลี่ยน (%)',
+        exportRevFile: 'Revision_{name}_{date}', exportRevSheet: 'เป้าหมายและแผน',
+        exportRev: { channel: 'Channel', unit: 'หน่วยขาย', target: 'เป้าหมายทั้งปี (บาท)', plan: 'แผน SKU Net Sales (บาท)', month: 'เป้าหมาย {month}' }
+      },
+
+      // CR-38 Revision Compare (modules/revision-compare · calc.compareRevisions)
+      revisionCompare: {
+        title: 'Revision Compare', short: 'Revision Compare',
+        // CR-39: เป็นแท็บเปรียบเทียบของ Plan Summary · หน้าเดิมเป็นทางผ่าน
+        moved: 'Revision Compare ย้ายไปเป็นแท็บเปรียบเทียบของ Plan Summary', go: 'ไปที่ Plan Summary › เปรียบเทียบ',
+        helpLead: 'เปรียบเทียบ Revision 2 รอบ (รวมรอบร่าง) · ระดับ Total · Channel · หน่วยขาย = เป้าหมาย · Series · SKU = แผน SKU',
+        compare: 'เปรียบเทียบ', with: 'กับ', swap: 'สลับ A ⇄ B', swapTip: 'สลับรอบ A และ B',
+        optionLabel: '{name} · {status}', needTwo: 'ต้องมีอย่างน้อย 2 Revision', needTwoLink: 'เปิดรอบใหม่ได้ที่แท็บ Revision',
+        level: 'ระดับ', levels: { total: 'Total', channel: 'Channel', unit: 'หน่วยขาย', series: 'Series', sku: 'SKU' }, skuNeedsFilter: 'SKU ใช้ได้เมื่อเลือก Channel หรือหน่วยขาย',
+        metric: 'ตัวชี้วัด', metrics: { net: 'Net Sales', sale: 'Sale Amount', units: 'จำนวนชิ้น' }, unitsOnly: 'จำนวนชิ้นใช้ได้เฉพาะระดับ Series และ SKU',
+        view: 'มุมมอง', views: { year: 'ทั้งปี', month: 'รายเดือน' },
+        channel: 'Channel', channelAll: 'ทั้งหมด', unit: 'หน่วยขาย', unitAll: 'ทุกหน่วยขาย',
+        basis: { target: 'ระดับ Total · Channel · หน่วยขาย = เป้าหมาย (Net Sales · Sale Amount จาก GP ของหน่วยขาย)', plan: 'ระดับ Series · SKU = แผน SKU' },
+        columns: { a: 'A · {name}', b: 'B · {name}', diff: 'ส่วนต่าง (B − A)', pct: '%', bars: 'แท่งเทียบ (A เทา · B สีหลัก)', line: '', total: 'รวม' },
+        lines: { a: 'A · {name}', b: 'B · {name}', diff: 'ส่วนต่าง' },
+        totalRow: 'รวม', totalLabel: 'Total Target', noSeries: '(ไม่ระบุ Series)', drillTip: 'ดู{level}ของ {name}', barsTip: 'A {a} · B {b}',
+        chartTitle: 'รายเดือน · {metric} ({unit}) · ระดับ {level}', chartUnits: { money: 'ล้านบาท', units: 'ชิ้น' }, chartDiff: 'ส่วนต่าง B − A', effective: 'มีผล {month}',
+        // CR-41: B = ยอดจริง (มุมมองรายเดือน · เดือนที่ปิดแล้วเท่านั้น)
+        actual: { option: 'ยอดจริง', group: 'ยอดจริง', name: 'ยอดจริง', note: 'ยอดจริงถึง {month} · เดือนที่ยังไม่ปิดแสดง – · ยอดรวมนับเฉพาะเดือนที่ปิดแล้ว', none: 'ยังไม่มีเดือนที่ปิดในปีแผน',
+          naTip: 'เดือนที่ยังไม่ปิด ยังไม่มียอดจริง', levelsTip: 'ยอดจริงเทียบได้ระดับ Total · Channel · หน่วยขาย', swapTip: 'สลับไม่ได้เมื่อ B = ยอดจริง',
+          sample: 'ยอดจริงตัวอย่าง (ยังไม่ใช่ยอดจาก TRCLOUD)' },
+        lockedNote: 'เดือนก่อน {month} ของ {name} เปลี่ยนไม่ได้ (พื้นเทา)', lockedTip: 'เดือนก่อนเดือนที่มีผลของ {name} (เปลี่ยนไม่ได้ · ส่วนต่าง = 0)',
+        empty: 'ไม่มีข้อมูลตามตัวเลือก',
+        exportFile: 'Revision-Compare_{a}_vs_{b}_{date}', exportSheet: 'เปรียบเทียบ'
+      },
+
+      // CR-37 Product Master · Bundle (modules/bundle · สินค้าแบบ Bundle = SKU เดี่ยว × จำนวน) · errors = ข้อความปฏิเสธของ Store (core/store.js checkBundles)
+      bundle: {
+        title: 'Bundle', short: 'Bundle',
+        helpLead: 'สินค้าแบบ Bundle (ชุดสินค้า) = SKU เดี่ยวหลายรายการ × จำนวน ขายเป็นสินค้า 1 รายการ มี Product Code ราคา Status และ Listing ของตัวเอง · วางแผนเป็นจำนวนชุดในแถวของ Bundle',
+        pageTabLabel: 'มุมมองของหน้า Bundle', pageTabs: { list: 'รายการ Bundle', demand: 'ความต้องการชิ้นส่วน' },
+        kpi: {
+          all: 'Bundle ทั้งหมด', allSub: 'ไม่รวม Delete', active: 'Active', inPlan: 'อยู่ในแผน', inPlanSub: 'มีจำนวนในแผน SKU ปี {year}',
+          check: 'ชิ้นส่วนที่ต้องตรวจ', checkSub: 'ชิ้นส่วน Discontinued · Clearance · Delete', unit: 'รายการ', title: 'กดเพื่อกรองตาราง (กดซ้ำเพื่อยกเลิก)'
+        },
+        searchPlaceholder: 'ค้นหารหัส / ชื่อ Bundle หรือชิ้นส่วน',
+        filters: {
+          status: 'Status', statusAll: 'ไม่รวม Delete', statusEverything: 'ทั้งหมด', component: 'ชิ้นส่วน', componentAll: 'ทุกชิ้นส่วน',
+          chip: '{label}: {value}', kpiChip: 'KPI: {value}', searchChip: 'ค้นหา: {value}'
+        },
+        resultCount: 'แสดง {n} จาก {total} Bundle',
+        columns: {
+          code: 'Product Code', name: 'ชื่อ Bundle', status: 'Status', components: 'ส่วนประกอบ', pieces: 'ชิ้น / ชุด', partsPrice: 'ราคารวมชิ้นส่วน (RSP)',
+          rsp: 'RSP Bundle', discount: 'ส่วนลด Bundle', series: 'Series', planSets: 'แผนปี {year} (ชุด)', manage: 'จัดการ'
+        },
+        chip: '{code} × {qty}', chipTip: '{code} {name} · {status}', componentsText: '{code} × {qty}', componentsJoin: ' + ',
+        discountTip: 'ติดลบ = Bundle แพงกว่าซื้อชิ้นส่วนแยก',
+        empty: 'ไม่พบ Bundle ตามตัวกรอง',
+        add: '+ สร้าง Bundle',
+        exportFile: 'Bundle_{date}', exportSheet: 'Bundle',
+        saveBlocked: 'แก้ส่วนประกอบของ Bundle ให้ถูกกติกาก่อนบันทึก',
+        checks: {
+          componentStatus: 'ชิ้นส่วนสถานะ Discontinued / Clearance / Delete', duplicate: 'Bundle ที่มีชุดส่วนประกอบซ้ำกัน',
+          negative: 'ส่วนลด Bundle ติดลบ', noRsp: 'Bundle ที่ไม่มี RSP',
+          componentLine: '{bundle} · ชิ้นส่วน {code} สถานะ {status}', duplicateLine: '{codes} มีชุดส่วนประกอบเดียวกัน', negativeLine: '{bundle} · ส่วนลด {pct}', noRspLine: '{bundle}'
+        },
+        drawer: {
+          components: 'ส่วนประกอบ', categoryNote: 'Bundle อยู่หมวด Set & Bundle › Bundle › Bundle เสมอ (ระบบกำหนด)',
+          seriesAuto: 'ระบบกำหนดจากชิ้นส่วน', seriesManual: 'ทีม Product กำหนดเอง', seriesUseAuto: 'ใช้ Series จากชิ้นส่วน',
+          columns: { sku: 'ชิ้นส่วน', name: 'ชื่อ', status: 'Status', qty: 'จำนวน', price: 'RSP / ชิ้น', total: 'รวม' },
+          remove: 'นำออก', removeTitle: 'นำ {code} ออกจาก Bundle', add: '+ เพิ่มชิ้นส่วน', pick: 'ค้นหา SKU เดี่ยว (รหัสหรือชื่อ)', pickOption: '{code} · {name}',
+          pickInvalid: 'เลือก SKU เดี่ยวจากรายการ (ไม่ใช่ Bundle · ไม่ใช่ Request / Delete)',
+          minus: 'ลดจำนวน', plus: 'เพิ่มจำนวน', qtyLabel: 'จำนวนของ {code}',
+          total: 'จำนวนชิ้นรวม {n} · ราคารวมชิ้นส่วน {parts} บาท · RSP Bundle {rsp} บาท · ส่วนลด {pct}',
+          empty: 'ยังไม่มีชิ้นส่วน',
+          planConfirm: { title: 'เปลี่ยนส่วนประกอบของ {name}', line: 'Bundle นี้มีในแผน {n} หน่วยขาย ความต้องการชิ้นส่วนจะคำนวณใหม่', confirm: 'บันทึกต่อ' }
+        },
+        create: {
+          title: 'สร้าง Bundle', name: 'ชื่อ Bundle', shortName: 'ชื่อย่อ', rsp: 'RSP Bundle (บาท รวม VAT)',
+          codePreview: 'Product Code ที่จะได้: {code}', statusNote: 'Bundle ใหม่มีสถานะ Planned จนกว่าจะกำหนดเดือนเปิดตัว (แท็บ Listing และวงจรสินค้า)',
+          nameRequired: 'กรุณากรอกชื่อ Bundle', submit: 'สร้าง Bundle'
+        },
+        demand: {
+          year: 'ปีแผน', channel: 'Channel', channelAll: 'ทุก Channel', unit: 'หน่วยขาย', unitAll: 'ทุกหน่วยขาย',
+          lines: { direct: 'ขายเดี่ยว', viaBundle: 'ผ่าน Bundle', total: 'รวม' },
+          columns: { sku: 'SKU เดี่ยว', line: 'ประเภท', total: 'รวมปี' }, unitLabel: 'หน่วย: ชิ้น',
+          note: 'จำนวนผ่าน Bundle ใช้ดูความต้องการสินค้าเท่านั้น ยอดขายนับที่ Bundle ไม่นับซ้ำที่ชิ้นส่วน',
+          expand: 'ดูแยกราย Bundle', collapse: 'ซ่อนราย Bundle', bundleLine: '{code} {name} × {qty}',
+          empty: 'ยังไม่มี SKU เดี่ยวที่เป็นชิ้นส่วนของ Bundle ตามตัวกรอง',
+          exportFile: 'Bundle-Component-Demand_{year}_{date}', exportSheet: 'ความต้องการชิ้นส่วน'
+        },
+        errors: {
+          empty: 'Bundle {bundle} ต้องมีชิ้นส่วนอย่างน้อย 1 รายการ',
+          qty: 'จำนวนของชิ้นส่วน {code} ต้องเป็นจำนวนเต็มตั้งแต่ 1',
+          minQty: 'Bundle {bundle} ต้องมีชิ้นส่วนรวมอย่างน้อย 2 ชิ้น',
+          missing: 'ไม่พบสินค้า {code} ใน Product Master',
+          nested: 'ใช้ {code} เป็นชิ้นส่วนไม่ได้ เพราะเป็น Bundle (Bundle ซ้อน Bundle ไม่ได้)',
+          status: 'ใช้ {code} เป็นชิ้นส่วนไม่ได้ เพราะสถานะ {status}',
+          invalid: 'บันทึก Bundle ไม่ได้'
+        }
+      },
+
       // Product Master · แผน NPD (modules/npd-plan · CR-30 ช่วงเวลาต่อเนื่อง · ขั้นงานมีเดือนเป้าหมาย · เดือนเปิดตัวแบบไตรมาส)
       // CR-35: Launch & Listing = แท็บ NPD (pages.npdPlan) | Listing (pages.productMaster) · คำอธิบายอยู่ในปุ่ม ?
       launchListing: {
-        title: 'Launch & Listing', short: 'Launch & Listing', lead: [],
+        title: 'Launch & Listing', short: 'Launch & Listing',
         helpLead: 'แผนการเปิดตัวสินค้าใหม่ (NPD) และสถานะ / ช่วงเวลาวางขายของสินค้าในแต่ละหน่วยขาย (Listing)',
         tabLabel: 'แท็บ', tabs: { npd: 'NPD', listing: 'Listing' }
       },
       npdPlan: {
         title: 'แผนการเปิดตัวสินค้าใหม่ (NPD)',
         moved: 'หน้านี้รวมอยู่ใน Launch & Listing แล้ว (แท็บ NPD)', go: 'ไปหน้า Launch & Listing', viewListing: 'ดู Listing',
-        lead: ['ติดตามสินค้าใหม่ตั้งแต่วางแผนจนเปิดตัว ทีมขายใช้ดูว่าสินค้าใหม่ใดพร้อมขายเมื่อใด ทีม Product ใช้ติดตามขั้นงานและคำขอจากทีมขาย'],
+        helpLead: 'ติดตามสินค้าใหม่ตั้งแต่วางแผนจนเปิดตัว ทีมขายใช้ดูว่าสินค้าใหม่ใดพร้อมขายเมื่อใด ทีม Product ใช้ติดตามขั้นงานและคำขอจากทีมขาย',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         kpi: {
           all: 'NPD ทั้งหมด', notLaunched: 'ยังไม่เปิดตัว', soon: 'เปิดตัวใน 3 เดือน', bySeries: 'ตาม Series',   // CR-36 ไม่ใช้แล้ว (แทนด้วย kpi3)
           missing: 'หน่วยขายที่ยังไม่อยู่ในแผน SKU', missingTitle: 'หน่วยขายที่วางแผนแต่ยังไม่อยู่ในแผน SKU', missingEmpty: 'ทุกหน่วยขายที่วางแผนอยู่ในแผน SKU แล้ว',
@@ -775,7 +1026,6 @@
       promotionPrice: {
         title: 'Price & Promotion',
         short: 'Price & Promotion',
-        lead: [],
         helpLead: 'ราคาหลักตามรอบเวลา และ Promotion Price รายเดือนของแต่ละ Channel และหน่วยขาย',
         tabs: { base: 'ราคาหลัก', promo: 'Promotion Price', clearance: 'Clearance' },
         tabLead: {
@@ -792,7 +1042,8 @@
           stockStatus: { ok: 'ครบ', left: 'ยังระบายไม่หมด {n}', over: 'เกินสต็อก {n}' }, stockTip: 'คงเหลือสต็อก = สต็อกที่ต้องระบาย − แผนระบาย',
           netTip: 'Net Sales ของแผนระบายปี {year} = จำนวน × ราคา Clearance ตามสูตร Net Sales ของ Channel', expand: 'กางแผนรายเดือน', collapse: 'พับแผนรายเดือน',
           plan: { title: 'แผน Clearance {year}', note: 'ไม่นับในเป้าหมาย', unit: 'หน่วยขาย', total: 'รวม', sumUnits: 'รวมชิ้น', sumNet: 'Net Sales (บาท)',
-            distribute: 'กระจายเท่ากันทุกเดือน', distributeTip: 'แบ่งคงเหลือสต็อกให้ทุกหน่วยขายและทุกเดือนเท่ากัน (ปัดลง · เศษไปเดือนสุดท้าย)',
+            distribute: 'กระจายเท่ากันทุกเดือน', distributeTip: 'แบ่งคงเหลือสต็อกให้ทุกหน่วยขายและทุกเดือนที่ยังไม่ปิดเท่ากัน (ปัดลง · เศษไปเดือนสุดท้าย)',
+            closedTip: 'เดือนที่ปิดแล้ว (มียอดจริง) แก้ไม่ได้',   // CR-41 เดือน ≤ เดือนปิดล่าสุดของนาฬิกากลาง
             noMonths: 'ช่วง Clearance ไม่อยู่ในปีแผน {year}', noUnits: 'ยังไม่มีหน่วยขาย · เลือกหน่วยขาย หรือ Listing สินค้านี้ก่อน' },
           baseTip: 'RSP ของเดือนเริ่ม Clearance (อ่านอย่างเดียว)', openEndTip: 'เดือนสิ้นสุด · ว่าง = จนสินค้าหมด', allUnits: 'ทุกหน่วยขาย', untilSold: 'จนสินค้าหมด', unitsSelected: '{n} หน่วยขาย',
           add: '+ เพิ่ม Clearance', addTitle: 'เพิ่ม Clearance', pickSku: 'SKU (Active หรือ Discontinued)', fromMonth: 'เริ่ม Clearance', pickPlaceholder: 'เลือก SKU',
@@ -808,6 +1059,7 @@
         exportColumns: { code: 'Product Code', name: 'ชื่อสินค้า' },
         base: {
           month: 'ราคา ณ เดือน', now: 'เดือนปัจจุบัน',
+          bundleLine: 'รวมชิ้นส่วน {parts} บาท · ส่วนลด {pct}',   // CR-37
           legend: { changed: 'เปลี่ยนในเดือนนี้', pending: 'ราคาใหม่ที่กำลังบันทึก' },
           changedTip: 'ราคาเปลี่ยน ณ {month}',
           newPrice: '+ บันทึกราคาใหม่', newPriceTitle: 'บันทึกราคาใหม่', newPriceLead: 'เลือกเดือนที่มีผล (เดือนปัจจุบันหรืออนาคต) แล้วกรอกเฉพาะ SKU ที่เปลี่ยน',
@@ -858,7 +1110,7 @@
         moved: 'หน้านี้รวมอยู่ใน Launch & Listing แล้ว (แท็บ Listing)', go: 'ไปหน้า Launch & Listing',   // CR-35
         // CR-30 รอบ 3: หน้า Listing = สถานะและช่วงเวลา Listing ต่อหน่วยขาย (แทน Checkbox · ตัดคอลัมน์วันเริ่มขาย / Status ปีแผน / เลิกขาย)
         title: 'Listing',
-        lead: ['กำหนดสถานะและช่วงเวลาวางขายของสินค้าในแต่ละหน่วยขาย และช่วง Clearance'],
+        helpLead: 'กำหนดสถานะและช่วงเวลาวางขายของสินค้าในแต่ละหน่วยขาย และช่วง Clearance',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         month: { label: 'ข้อมูล ณ เดือน', tip: 'เลือกเดือนที่ใช้นับความครอบคลุม จำนวน SKU ที่วางขาย และ Status', current: 'เดือนปัจจุบัน' },
         rulesHelp: 'กฎ Status และวิธีเติมยอด',
         searchPlaceholder: 'ค้นหา SKU ชื่อ หรือ Series',
@@ -930,7 +1182,6 @@
       taxonomy: {
         title: 'Product Level', short: 'Product Level',
         moved: 'หน้านี้ย้ายเป็นแท็บ Product Level ของ Product List แล้ว', go: 'ไปหน้า Product List',
-        lead: [],
         helpLead: 'รายการหมวดสินค้าและ Series ที่ใช้อ้างอิงในข้อมูลสินค้า',
         tabLabel: 'มุมมอง',
         tabs: { category: 'หมวดสินค้า', series: 'Series', cross: 'ตารางไขว้' },
@@ -1005,7 +1256,7 @@
         title: 'SKU Planning',
         short: 'SKU Planning',
         titleTip: 'วางแผนยอดขายราย SKU',
-        lead: ['วางแผนจำนวนขายราย SKU รายเดือน และเปรียบเทียบกับเป้าหมายรายเดือน'],
+        helpLead: 'วางแผนจำนวนขายราย SKU รายเดือน และเปรียบเทียบกับเป้าหมายรายเดือน',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         workflowTitle: { initial: 'แผน SKU ของ {unit}', reforecast: 'Re-forecast ของ {unit}' },
         noChannels: 'แผนของปีนี้ยังไม่มี Channel',
         noUnitsInChannel: 'Channel {channel} ในแผนปี {year} ยังไม่มี {unit}',
@@ -1026,12 +1277,17 @@
         collapseAll: 'พับทั้งหมด',
         expandAll: 'กางทั้งหมด',
         sortLabel: 'เรียง',
+        // CR-40: แถวเครื่องมือแถวเดียว · ตัวกรอง (n) กางแผงตัวกรอง · แสดงผล ▾
+        toolbar: { filter: 'ตัวกรอง ({n})', filterZero: 'ตัวกรอง', filterTitle: 'กางหรือพับแผงตัวกรอง', chip: '{label}: {value}',
+          category: 'หมวดสินค้า', categoryAll: 'ทุกหมวด', planType: 'ประเภทสินค้าในแผน', planTypeAll: 'ทุกประเภท',
+          kind: 'ประเภทสินค้า', kindAll: 'ทั้งหมด', kinds: { single: 'สินค้าเดี่ยว', bundle: 'Bundle' }, noSale: 'ไม่มียอด',
+          clear: 'ล้างตัวกรอง', empty: 'ไม่มี SKU ตามตัวกรอง', display: 'แสดงผล', displayTitle: 'เรียง · ยอดอ้างอิง · พับ / กาง · คำอธิบายสี', legend: 'คำอธิบายสี' },
         sorts: { total: 'ยอดทั้งปีมากไปน้อย', code: 'Product Code', name: 'ชื่อ', growth: 'การเติบโต', age: 'อายุการขายมากไปน้อย', noSale: 'ไม่มียอดนานที่สุด', recent: 'เริ่มขายล่าสุด' },
         // CR-26: คอลัมน์อายุการขาย (calc.salesAge · เดือนจาก core/clock.js) · ตัวกรองอายุ · ตัวนับในหัวกลุ่ม
         //   CR-33: แยก 2 คอลัมน์ ช่วงเวลาขาย | อายุ · groups = ป้ายกลุ่มอายุชุดเดียวของตัวกรองและคอลัมน์ (calc.skuAgeGroup)
         age: {
           rangeColumn: 'ช่วงเวลาขาย', groupColumn: 'อายุ',
-          headTip: 'ข้อมูล ณ 1 {month} · "ปัจจุบัน" = มียอดขายถึงเดือน {last} · ไม่มียอด = ไม่มียอดจริง {n} เดือนขึ้นไป',
+          headTip: 'ข้อมูล ณ {asOf} · "ปัจจุบัน" = มียอดขายถึงเดือน {last} · ไม่มียอด = ไม่มียอดจริง {n} เดือนขึ้นไป',
           groupHeadTip: 'กลุ่มอายุการขายในหน่วยขายนี้ (ชุดเดียวกับตัวกรองอายุ) · ชี้ที่ป้ายเพื่อดูระยะเวลาจริง',
           groups: { le1y: '≤ 1 ปี', y1to2: '1–2 ปี', gt2y: '> 2 ปี', notStarted: 'ยังไม่เริ่มขาย' },
           groupTip: 'อายุการขาย {len} · {tip}',
@@ -1075,6 +1331,7 @@
         // CR-34: + เพิ่มสินค้าในแผน (แทน + เพิ่ม SKU · + เพิ่มสินค้าใหม่ · + สร้าง NPD) — 3 แท็บ
         addPlan: {
           button: '+ เพิ่มสินค้าในแผน', title: 'เพิ่มสินค้าในแผน · {unit}',
+          kind: 'ประเภทสินค้า', kindAll: 'ทุกประเภทสินค้า', kindOptions: { single: 'สินค้าเดี่ยว', bundle: 'Bundle' },   // CR-37
           tabs: { existing: 'สินค้าเดิมที่ยังไม่เคยขายในหน่วยขายนี้', npd: 'NPD ที่ยืนยันแล้ว', request: 'ขอ NPD เพิ่ม' },
           notes: {
             existing: 'สินค้าที่ขายอยู่แต่ยังไม่อยู่ในแผนของหน่วยขายนี้ · เพิ่มแล้วสร้าง Listing ของหน่วยขายนี้ตั้งแต่เดือนที่เลือกเมื่อบันทึกแผน',
@@ -1179,6 +1436,8 @@
         checks: { title: 'ข้อมูลที่ต้องตรวจ', types: { clearance: 'มีแผนสินค้า Clearance', 'delete': 'มีแผนสินค้า Delete' }, item: '{sku} {name}', criteria: ['มีแผนสินค้า Clearance', 'มีแผนสินค้า Delete'],
           clearValues: 'ล้างค่า' },   // CR-36: ล้างค่าในเดือน Clearance ที่ล็อก (โหมดแก้ไข)
         deletedCell: 'สินค้าเป็น Delete · อ่านอย่างเดียว (ไม่ล้างค่าให้อัตโนมัติ)',
+        // CR-37: Bundle ในแผน (นับ 1 ชุด = 1 ในแถวรวมแผน) · ชิ้นส่วนที่เป็น Delete (ขอบเหลือง ไม่ล็อกแถว)
+        bundleTotalTip: 'รวม Bundle {n} ชุด (เท่ากับ {m} ชิ้นส่วน)', bundleDeletedPart: 'ชิ้นส่วน {code} สถานะ Delete', bundleCheck: 'ชิ้นส่วนต้องตรวจ',
         addSearch: 'ค้นหา SKU',
         addEmpty: 'ไม่มี SKU ตามตัวกรอง',
         npdEmpty: 'ยังไม่มีสินค้าใหม่ในแผน',
@@ -1224,9 +1483,9 @@
         title: 'Partner List',
         short: 'Partner List',
         titleTip: 'หน่วยขายและคู่ค้า',
-        lead: ['หน่วยขายของทุก Channel และคู่ค้าตามรหัสคู่ค้าที่อยู่ในแต่ละหน่วยขายตามช่วงเดือน'],
+        helpLead: 'หน่วยขายของทุก Channel และคู่ค้าตามรหัสคู่ค้าที่อยู่ในแต่ละหน่วยขายตามช่วงเดือน',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         month: { label: 'ข้อมูล ณ เดือน', tip: 'ตัวเลขและการจัดสรรทั้งหน้าแสดงตามเดือนที่เลือก', current: 'เดือนปัจจุบัน' },
-        tabLabel: 'Channel', tabAll: 'ทั้งหมด', tabCount: '{name} ({n})', tabWarn: 'มีข้อมูลที่ต้องตรวจ {n} รายการ',
+        tabLabel: 'Channel', tabAll: 'ทั้งหมด', tabWarn: 'มีข้อมูลที่ต้องตรวจ {n} รายการ',   // CR-40 จำนวนเป็นตัวนับของแท็บ (components.tabs)
         search: 'ค้นหารหัสคู่ค้า / ชื่อ',
         filters: {
           status: 'สถานะ', statusOptions: { active: 'ใช้งาน', inactive: 'ปิดใช้งาน', all: 'ทั้งหมด' },
@@ -1399,7 +1658,7 @@
         title: 'Permissions',
         short: 'Permissions',
         titleTip: 'สิทธิ์ของแต่ละบทบาทในแต่ละหน้า',
-        lead: ['สิทธิ์ของแต่ละบทบาทในแต่ละหน้า'],
+        helpLead: 'สิทธิ์ของแต่ละบทบาทในแต่ละหน้า',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         history: 'ประวัติการแก้ไข',
         historyEmpty: 'ยังไม่มีการแก้ไขสิทธิ์ บทบาท หรือผู้ใช้',
         historyLine: '{key} · {field}: {old} → {next}',
@@ -1488,14 +1747,14 @@
         title: 'Roles',
         short: 'Roles',
         titleTip: 'ย้ายไปหน้า Permissions (เมนู ⋯ ของหัวคอลัมน์บทบาท)',
-        lead: ['จัดการบทบาทได้ที่หน้า Permissions'],
+        helpLead: 'จัดการบทบาทได้ที่หน้า Permissions',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         moved: 'จัดการบทบาทย้ายไปหน้า Permissions แล้ว'
       },
       roleUsers: {
         title: 'Users',
         short: 'Users',
         titleTip: 'บทบาทของผู้ใช้และสิทธิ์ที่มีผลจริง',
-        lead: ['บทบาทของผู้ใช้และสิทธิ์ที่มีผลจริง']
+        helpLead: 'บทบาทของผู้ใช้และสิทธิ์ที่มีผลจริง'   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
       },
 
       // CR-29: หน้าบุคลากรและทีม (ใหม่ · แทนหน้าผู้รับผิดชอบและทีมขายเดิม) — บุคคล / ทีม · ทีมตามช่วงเวลา · สิ้นสุดการรับผิดชอบ · ผู้รับผิดชอบรายเดือน
@@ -1521,7 +1780,7 @@
         teamIcon: 'ทีม (รับผิดชอบหน่วยขายได้เหมือนบุคคล)', teamBadge: 'ทีม',
         types: { person: 'บุคคล', team: 'ทีม' },
         status: { active: 'ใช้งาน', ending: 'ใช้งาน', ended: 'สิ้นสุด {month}', none: 'ยังไม่ได้รับมอบหมาย' },
-        endingTag: 'จะสิ้นสุด {month}',
+        endingTag: 'จะสิ้นสุด {month}', endingThisMonth: 'จะสิ้นสุดเดือนนี้',   // CR-41 เดือนสิ้นสุด = เดือนปัจจุบันของนาฬิกากลาง
         group: {
           managers: 'Sales Manager {n}', officers: 'Sales Officer {n}', units: '{unit} {n}', noManager: '⚠ ไม่มี Sales Manager',
           allChannels: 'ทุก Channel', allChannelsNote: 'บุคลากรที่ไม่อยู่ทีมขายของ Channel ใด (เช่น ทีม KAM กลาง)'
@@ -1612,13 +1871,16 @@
         title: 'Plan Summary',
         short: 'Plan Summary',
         titleTip: 'รายงานสรุปแผน',
-        lead: ['ติดตามรายการที่ต้องดำเนินการ และสรุปแผนสำหรับประกาศและเป็นหลักฐานข้อตกลง'],
+        helpLead: 'ติดตามรายการที่ต้องดำเนินการ และสรุปแผนสำหรับประกาศและเป็นหลักฐานข้อตกลง',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         tabLabel: 'มุมมองของขั้นที่ 4',
-        tabs: { report: 'รายงานสรุปแผน', status: 'ติดตามสถานะ', statusCount: 'ติดตามสถานะ ({n})' },
+        // CR-39: + แท็บ Revision · เปรียบเทียบ (Flag revision · สิทธิ์ส่วนของหน้า)
+        tabs: { report: 'รายงาน', status: 'ติดตามสถานะ', revision: 'Revision', compare: 'เปรียบเทียบ' },   // CR-40 ตัวนับเป็นตัวเลขเล็กต่อท้าย (components.tabs)
         tabTips: {
           status: 'รายการที่ต้องดำเนินการก่อนล็อก Baseline (ไม่ใช่เอกสารสำหรับพิมพ์)',
           statusLite: 'หน่วยขายที่แผนยังมีส่วนต่างหรือยังไม่มีผู้รับผิดชอบ (ไม่ใช่เอกสารสำหรับพิมพ์)',
-          report: 'รายงานสำหรับประกาศและเป็นหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้'
+          report: 'รายงานสำหรับประกาศและเป็นหลักฐานข้อตกลง พิมพ์ / บันทึก PDF ได้',
+          revision: 'รอบของเป้าหมายและแผน (Revision) ของปีที่เลือก · เปิดรอบใหม่ · ประวัติ',
+          compare: 'เปรียบเทียบ Revision 2 รอบ (รวมรอบร่าง)'
         },
         tabCountTip: 'หน่วยขายที่มีประเด็น {n} หน่วย',
         statusNoPrint: 'แท็บติดตามสถานะไม่ใช่เอกสารสำหรับพิมพ์ · พิมพ์ได้จากแท็บรายงานสรุปแผน',
@@ -1823,7 +2085,7 @@
       aboutPrototype: {
         title: 'คู่มือการใช้งาน',
         short: 'คู่มือการใช้งาน',
-        lead: ['ภาพรวมระบบ ลำดับการทำงาน และคำศัพท์ที่ใช้'],
+        helpLead: 'ภาพรวมระบบ ลำดับการทำงาน และคำศัพท์ที่ใช้',   // CR-40 คำอธิบายใต้หัวข้อเดิม → บรรทัดแรกของปุ่ม ?
         tabLabel: 'หัวข้อในคู่มือ',
         tabs: { overview: 'ภาพรวมและลำดับงาน', glossary: 'คำศัพท์และสูตร' },   // CR-36 ตัดแท็บทดสอบ
         overviewTitle: 'ภาพรวม',

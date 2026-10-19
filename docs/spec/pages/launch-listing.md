@@ -2,7 +2,7 @@
 
 CR-35 รวมหน้าแผน NPD (`npdPlan`) และ Listing (`productMaster`) เป็นหน้าเดียว 2 แท็บ · Product Master · fit · ไอคอน `L` · ผู้แก้ไขตั้งต้น: ทีม Product · Supply Chain (สิทธิ์ย่อย Clearance)
 
-- แท็บ `NPD | Listing` (`components.segmented`) · จำที่ `ui.launchTab` · `#npd` / `#listing` ใน URL · `<title>` = `Launch & Listing · {แท็บ}`
+- แท็บ `NPD | Listing` (CR-40 `components.tabs` แท็บขีดเส้นใต้) · จำที่ `ui.launchTab` · `#npd` / `#listing` ใน URL · `<title>` = `Launch & Listing · {แท็บ}`
 - เนื้อหาแต่ละแท็บ = โค้ดเดิมของหน้าเดิม (`renderNpd` · `renderListing` ใน `modules/launch-listing/launch-listing.js`) · spec ของแท็บ:
   - แท็บ NPD → [npd-plan.md](npd-plan.md)
   - แท็บ Listing → [product-master.md](product-master.md)

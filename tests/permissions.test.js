@@ -143,7 +143,7 @@
     },
     {
       name: 'pm-11. ตัวเลือกมุมมองผู้ใช้ (master.users) จัดกลุ่มตามบทบาทแรก: 16 คนที่เปิดใช้งาน · Management · Director · Manager 3 · Officer 7 · Product · Supply · ผู้ดูรายงาน · ผู้ดูแลระบบ · ผู้ใช้ปัจจุบันที่ปิดใช้งานยังแสดง',
-      expected: [16, ['management', 'director'], 3, 7, ['product', 'supply', 'viewer', 'admin'], false, true, 'Sales Officer'],
+      expected: [17, ['management', 'director'], 3, 7, ['supply', 'viewer', 'admin', 'md'], false, true, 'Sales Officer'],   // CR-38 + MD (กลุ่มสุดท้าย)
       actual: function () {
         var list = P().directory(ctx(), null);
         var withCurrent = P().directory(ctx(), { userId: 'u-sp-wit' });
@@ -156,7 +156,7 @@
     // ---------------- CR-21 ข้อ 7 ----------------
     {
       name: 'cr21-1. สิทธิ์แก้ไขตั้งต้นทุกบทบาท × ทุก resource ตรงกับตาราง CR-19 ข้อ 3 (+ ผู้ดูรายงานแก้ไม่ได้ · ผู้ดูแลระบบแก้ได้ทุกรายการยกเว้น Plan Summary (CR-25) · Role Management เห็นเฉพาะผู้ดูแลระบบ · CR-25: หน้าที่เห็นตรวจที่ cr25-*)',
-      expected: [[], [], ['summary'], [false, false, false, false, false, false, false, true], true],
+      expected: [[], [], ['summary', 'revisionList', 'revision.open', 'revisionCompare', 'approval.submit', 'approval.sdConfirm', 'approval.mdLock'], [false, false, false, false, false, false, false, true], true],   // CR-39 ขั้นของคำขอ = บทบาทของขั้นเท่านั้น (ผู้ดูแลระบบแก้ตั้งค่าได้)   // CR-38 ปุ่มของ Revision = Management / MD เท่านั้น (ผู้ดูแลระบบไม่ได้) · CR-39 แท็บ Revision / เปรียบเทียบ ของ Plan Summary = ดู
       actual: function () {
         var mismatch = [];
         var users = { management: role('management'), director: role('director'), product: role('product'), supply: role('supply') };
@@ -283,18 +283,18 @@
     // ---------------- CR-25 ข้อ 5 ----------------
     {
       name: 'cr25-1. Sales Officer (พิมพ์ลดา): เมนู Sales Planning ขั้น 2 · 3 · 4 · Product Master 4 หน้า (ไม่มีหมวดสินค้าและ Series) · Account Master เฉพาะเขตการขายและร้านค้า · ไม่มี Role Management',
-      expected: [['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'launchListing', 'promotionPrice']],
+      expected: [['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['approval', ['approval']], ['product-master', ['productList', 'bundle', 'launchListing', 'promotionPrice']],   // CR-39 + กลุ่ม APPROVAL · Revision เป็นแท็บของ Plan Summary (ไม่มีกลุ่ม REVISION)
         ['account-master', ['salesUnits']], ['project-info', ['aboutPrototype']]],
       actual: function () { return menuIds({ userId: 'u-sp-pim' }); }
     },
     {
       name: 'cr25-2. Management: เมนูมีแค่ Sales Planning และเกี่ยวกับ Prototype (ไม่มีหัวกลุ่ม Product Master · Account Master · Role Management)',
-      expected: [['sales-planning', ['topDown', 'phasing', 'skuPlanning', 'summary']], ['project-info', ['aboutPrototype']]],
+      expected: [['sales-planning', ['topDown', 'phasing', 'skuPlanning', 'summary']], ['approval', ['approval']], ['project-info', ['aboutPrototype']]],   // CR-39 ไม่มีกลุ่ม REVISION · + กลุ่ม APPROVAL
       actual: function () { return menuIds({ userId: 'u-mgmt' }); }
     },
     {
       name: 'cr25-3. ผู้ดูรายงาน: เห็นแค่ Plan Summary และเกี่ยวกับ Prototype · หน้าเริ่มต้น = Plan Summary',
-      expected: [[['sales-planning', ['summary']], ['project-info', ['aboutPrototype']]], 'summary'],
+      expected: [[['sales-planning', ['summary']], ['approval', ['approval']], ['project-info', ['aboutPrototype']]], 'summary'],   // CR-39 ไม่มีกลุ่ม REVISION · + กลุ่ม APPROVAL (ทุกบทบาทดู)
       actual: function () { return [menuIds({ userId: 'u-viewer' }), P().homePage({ userId: 'u-viewer' }, ctx())]; }
     },
     {
@@ -320,7 +320,7 @@
     },
     {
       name: 'cr25-6. ผู้ใช้ 2 บทบาท (Sales Officer + ทีม Product) → เมนูรวมของทั้งสอง · หน้าเริ่มต้นตามบทบาทแรกตามลำดับบทบาท (Sales Officer = SKU Planning ไม่ว่าจะใส่บทบาทลำดับใด)',
-      expected: [[['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['product-master', ['productList', 'launchListing', 'promotionPrice']],   /* CR-36 Product Level = แท็บของ Product List */
+      expected: [[['sales-planning', ['phasing', 'skuPlanning', 'summary']], ['approval', ['approval']], ['product-master', ['productList', 'bundle', 'launchListing', 'promotionPrice']],   /* CR-36 Product Level = แท็บของ Product List · CR-39 ไม่มีกลุ่ม REVISION · + กลุ่ม APPROVAL */
         ['account-master', ['salesUnits']], ['project-info', ['aboutPrototype']]], 'skuPlanning', 'skuPlanning', 'productList'],
       actual: function () {
         var two = { id: 'x', name: 'x', salesPersonId: 'sp-pim', roleIds: ['officer', 'product'], active: true };
@@ -344,7 +344,7 @@
     },
     {
       name: 'cr25-8. คืนค่าตั้งต้น → เมทริกซ์ตรงกับตาราง CR-25 ข้อ 3 ทุกช่อง (8 บทบาท × 19 รายการ (CR-32 salesUnits แทน accounts / territories) · CR-29 people + accounts.gp + accounts.channelSettings · CR-30 prices + prices.base + prices.promo แทน promotionPrice) · ค่าตั้งต้นใน data/ ตรงกับตาราง',
-      expected: [[], [], 144],   // CR-35 8 บทบาท × 18 รายการ (launchListing แทน npdPlan + listing)
+      expected: [[], [], 216],   // CR-39 + approval · approval.submit · approval.sdConfirm · approval.mdLock · approval.config − revision.submit · revision.lock (Flag approval) = 27 รายการ   // CR-38 + revisionList · revision.open · revision.submit · revision.lock · revisionCompare = 24 รายการ   // CR-35 8 บทบาท × 18 รายการ (launchListing แทน npdPlan + listing) · CR-37 + bundle = 19 รายการ
       actual: function () {
         var p = P().defaultPerms();
         p = P().setCell(p, 'officer', 'taxonomy', { level: 'EDIT' });
@@ -370,7 +370,7 @@
     {
       name: 'cr25-9. หน้าเริ่มต้นของทุกบทบาทตามตาราง CR-25 ข้อ 3 (★) · แถวสรุป เห็น n · แก้ไข m หน้า (นับหน้าในเมนูข้าง ไม่นับเกี่ยวกับ Prototype) · หน้าเริ่มต้นที่ตั้งไว้แต่มองไม่เห็น = ขั้นแรกที่เห็น',
       expected: [['topDown', 'phasing', 'skuPlanning', 'skuPlanning', 'productList', 'productList', 'summary', 'roleManagement'],
-        [[4, 1], [9, 4], [8, 2], [7, 2], [4, 3], [4, 2], [1, 0], [11, 10]], 'phasing', 'topDown'],   // CR-36 Category & Series เป็นแท็บ (ทีม Product · ผู้ดูแลระบบ −1 หน้า) ·   // CR-35 Launch & Listing = 1 หน้า (แทนแผน NPD + Listing) · Supply Chain เห็น Price & Promotion (แท็บ Clearance · alsoPerms)   // CR-29 Account Master 3 หน้า · CR-30 Promotion Price (Director / Manager / Officer แก้ไขได้) · CR-31 หน้า Roles ซ่อน
+        [[5, 3], [11, 5], [10, 2], [9, 2], [6, 4], [6, 2], [2, 0], [13, 12]], 'phasing', 'topDown'],   // CR-39 + หน้า Approval (ทุกบทบาทเห็น · Management / Sales Director / ผู้ดูแลระบบแก้ไข) · Revision เป็นแท็บของ Plan Summary (ไม่ใช่หน้าในเมนู) · CR-38 + Revision List (ดู · Management / ผู้ดูแลระบบแก้ไข) + Revision Compare (ดู · ผู้ดูแลระบบแก้ไข)   // CR-37 + หน้า Bundle (ทีม Product แก้ไข · Management / ผู้ดูรายงานไม่เห็น)   // CR-36 Category & Series เป็นแท็บ (ทีม Product · ผู้ดูแลระบบ −1 หน้า) ·   // CR-35 Launch & Listing = 1 หน้า (แทนแผน NPD + Listing) · Supply Chain เห็น Price & Promotion (แท็บ Clearance · alsoPerms)   // CR-29 Account Master 3 หน้า · CR-30 Promotion Price (Director / Manager / Officer แก้ไขได้) · CR-31 หน้า Roles ซ่อน
       actual: function () {
         var ids = CR25_ROLES;
         var bad = P().setRoleHome(SP.data.roles, 'officer', 'topDown');   // Sales Officer ไม่เห็น Annual Target

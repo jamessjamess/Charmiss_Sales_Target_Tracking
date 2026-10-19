@@ -98,3 +98,6 @@
   .ap-table thead th.ap-unit-col { font-size: 11px; }
   .pr-table input.num.ap-input { font-size: 12px; padding: 1px 3px; }
 }
+
+/* CR-37 Bundle ในแท็บราคาหลัก: รวมชิ้นส่วน X บาท · ส่วนลด Z% */
+.pr-bundle-note { display: block; font-size: 11px; color: var(--c-text-muted); white-space: nowrap; }

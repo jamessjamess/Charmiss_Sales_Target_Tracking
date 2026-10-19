@@ -1,5 +1,6 @@
 /* modules/launch-listing/launch-listing.css — Launch & Listing (CR-35 · แท็บ NPD | Listing) · สไตล์ของแต่ละแท็บอยู่ที่ npd-plan.css / product-master.css เดิม */
 .ll-tabs { margin-bottom: var(--sp-2); }
+.ll-tabs > .page-tabs { flex: 1 1 auto; }   /* CR-40 แท็บระดับหน้า: เส้นฐานเต็มความกว้าง */
 .ll-body { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
 .ll-intro { display: contents; }
 /* CR-36: แท็บ NPD — การ์ด KPI 3 ใบ (รูปแบบเดียวกับ Product List) · Chip · หัวกลุ่ม · ปุ่ม ยังไม่อยู่ในแผน */

@@ -52,3 +52,11 @@
 .gd-roles .gd-desc { color: var(--c-text-muted); font-size: var(--fs-xs); }
 .gd-roles .gd-users { white-space: nowrap; }
 .gd-custom { margin-left: 4px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--c-border-strong); font-size: 10px; color: var(--c-text-muted); }
+
+/* CR-38 บรรทัด รอบ Revision ใต้การ์ดลำดับงาน */
+.gd-rev-flow { margin: var(--sp-2) 0 0; font-size: 13px; }
+.gd-rev-arrow { color: var(--c-text-muted); }
+.gd-rev-links a { white-space: nowrap; }
+
+/* CR-41 ลำดับขั้นทดลองของสถานการณ์ Demo ในกล่อง สำหรับการทดสอบ */
+.gd-test-scenario .gd-test-steps { color: var(--text-muted); }
